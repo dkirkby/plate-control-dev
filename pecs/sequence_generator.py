@@ -32,9 +32,10 @@ def describe(seq, axis):
     # print('delta sequence: ' + str(deltas))
     # print('running total: ' + str(cumsum))
     
-def typ_motortest_sequence(prefix, short_suffix, long_suffix, forward_deltas, settings):
+def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_deltas, settings):
     new = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
-                            long_name = prefix + ' ' + long_suffix)
+                            long_name = prefix + ' ' + long_suffix,
+                            details = details)
     i = 0 if prefix.lower()[0] == 't' else 1
     deltas = wiggle(forward_deltas, case=i)
     for j in range(len(deltas)):
@@ -49,31 +50,21 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, forward_deltas, se
 
 # TEST DEFINITIONS
 
-# TEST 0 - Theta performance at nominal settings
-# TEST 1 - Phi performance at nominal settings
-#
-# Options: default
-#
-# Moves:   Several moves at cruise speed, each followed by the usual final
-#          creep moves for precision positioning and antibacklash.
-#
-# Purpose: Baseline tests for typical proper function.
+# Theta and phi performance at nominal settings
+details = '''Settings: default
+Moves: Several moves at cruise speed, each followed by the usual final creep moves for precision positioning and antibacklash.'
+Purpose: Baseline tests for typical proper function.'''
 options = {}
 short_suffix = 'nominal'
 long_suffix = 'performance at nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
-# TEST 2 - Theta cruise-only at otherwise nominal settings
-# TEST 3 - Phi cruise-only at otherwise nominal settings
-#
-# Options: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON
-#
-# Moves:   Several moves at cruise speed.
-#          In each direction, at several step sizes.
-#          
-# Purpose: Measure the effective output ratio in typical cruise mode.
+# Theta and phi cruise-only at otherwise nominal settings
+details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON
+Moves: Several moves at cruise speed. In each direction, at several step sizes.
+Purpose: Measure the effective output ratio in typical cruise mode.'''
 options = {'FINAL_CREEP_ON': False,
            'ANTIBACKLASH_ON': False,
            'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'] # smallest finite value
@@ -81,19 +72,14 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise only'
 long_suffix = 'cruise-only, at otherwise nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
-# TEST 4 - Theta cruise-only, with spinup/down power disabled
+# Theta and phi cruise-only, with spinup/down power disabled
 # TEST 5 - Phi cruise-only, with spinup/down power disabled
-#
-# Options: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON.
-#          Set CURR_SPIN_UP_DOWN = 0.
-#
-# Moves:   Several moves at cruise speed.
-#          In each direction, at several step sizes.
-#          
-# Purpose: Measure the effective output ratio in typical cruise mode.
+details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON. Set CURR_SPIN_UP_DOWN = 0.
+Moves: Several moves at cruise speed. In each direction, at several step sizes.
+Purpose: Measure the effective output ratio in typical cruise mode.'''
 options = {'FINAL_CREEP_ON': False,
            'ANTIBACKLASH_ON': False,
            'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
@@ -103,38 +89,60 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise no spinupdown'
 long_suffix = 'cruise-only, with spinup/down power disabled'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
-# TEST 6 - Theta creep-only at otherwise nominal settings
-# TEST 7 - Phi creep-only at otherwise nominal settings
-#
-# Options: Turn on parameter ONLY_CREEP
-#
-# Purpose: Measure the effective output ratio in creep mode.
+# Theta and phi creep-only at otherwise nominal settings
+details = '''Settings: Turn on parameter ONLY_CREEP.
+Moves: Several moves at creep speed. In each direction, at several step sizes.
+Purpose: Measure the effective output ratio in creep mode.'''
 options = {'ONLY_CREEP': True}
 short_suffix = 'creep only'
 long_suffix = 'creep-only, at otherwise nominal settings'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
-# TEST 8 - Theta fast creep
-# TEST 9 - Phi fast creep
-#
-# Options: Halve the creep period thereby doubling the creep speed.
-#
-# Purpose: Determine whether creep performance can be improved under
-#          existing firmware (v5.0) constraints.
+# Theta and phi fast creep
+details = '''Settings: Halve the creep period thereby doubling the creep speed.
+Moves: Several moves at creep speed. In each direction, at several step sizes.
+Purpose: Determine whether creep performance can be improved under existing firmware (v5.0) constraints.'''
 options = {'ONLY_CREEP': True,
            'CREEP_PERIOD': 1}
 short_suffix = 'fast creep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+
+# Debugging / code syntax tests
+debug_note = lambda seq: f'move sequence code test, {seq.normalized_short_name}'
+new = sequence.Sequence(short_name='debug dTdP', long_name='test the code with single tiny move')
+new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new),
+             pos_settings={'ANTIBACKLASH_ON': False})
+print(new,'\n')
+tests.append(new)
+
+new = sequence.Sequence(short_name='debug dTdP full current', long_name='test the code with single tiny move and motor current set to 100')
+new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new),
+             pos_settings={'ANTIBACKLASH_ON': False,
+                           'CURR_SPIN_UP_DOWN': 100,
+                           'CURR_CRUISE': 100,
+                           'CURR_CREEP': 100})
+print(new,'\n')
+tests.append(new)
+
+new = sequence.Sequence(short_name='debug home_and_debounce', long_name='test the code with rehome followed by debounce')
+new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=debug_note(new))
+print(new,'\n')
+tests.append(new)
+
+new = sequence.Sequence(short_name='debug home_no_debounce',  long_name='test the code with rehome followed by no debounce')
+new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=debug_note(new))
+print(new,'\n')
+tests.append(new)
 
 # SAVE TO DISK
 for test in tests:
-    test.save(basename='test' + str(tests.index(test)))
+    test.save()
     

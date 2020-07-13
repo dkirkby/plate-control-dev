@@ -93,19 +93,17 @@ class Sequence(object):
     
         short_name ... string, brief name for the test
         long_name  ... string, optional longer descriptive name for the test
-        min_phi_limit ... 'typical', some float value, or None ... controls min phi limit on targets
+        details ... string, optional additional string to explain the test's purpose, etc
         
     After initialization, populate the sequence using the "add_move" function.
-    
-    
     '''
-    def __init__(self, short_name, long_name='', min_phi_limit=None):
+    def __init__(self, short_name, long_name='', details=''):
         names = [key for key in col_defaults.keys()]
         types = [type(val) for val in col_defaults.values()]
         self.table = Table(names=names, dtype=types)
         self.short_name = short_name
         self.long_name = str(long_name)
-        self.min_phi_limit = min_phi_limit
+        self.details = str(details)
         
     @property
     def short_name(self):
@@ -116,13 +114,26 @@ class Sequence(object):
         self.table.meta['short_name'] = str(value)
 
     @property
+    def normalized_short_name(self):
+        '''A particular format, used for example when saving files to disk.'''
+        return self.short_name.replace(' ','_').upper()
+
+    @property
     def long_name(self):
         return self.table.meta['long_name']
     
     @long_name.setter
     def long_name(self, value):
         self.table.meta['long_name'] = str(value)
+        
+    @property
+    def details(self):
+        return self.table.meta['details']
     
+    @details.setter
+    def details(self, value):
+        self.table.meta['details'] = str(value)
+        
     def add_move(self, command, target0, target1, log_note='', pos_settings={}, index=None):
         '''Add a move to the sequence.
         
@@ -158,9 +169,11 @@ class Sequence(object):
         assert 0 <= index <= len(self.table), f'error index {index} not in sequence'
         del self.table[index]
     
-    def save(self, directory='.', basename='sequence'):
+    def save(self, directory='.', basename=''):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
         '''
+        if not basename:
+            basename = f'seq_{self.normalized_short_name}'
         path = os.path.join(directory, basename + '.ecsv')
         self.table.write(path, overwrite=True, delimiter=',')
     
@@ -180,27 +193,34 @@ class Sequence(object):
         return d
     
     def __str__(self):
-        s = f'{self.short_name}: {self.long_name}'
+        s = f'{self.normalized_short_name}'
+        if self.long_name:
+            s += f': {self.long_name}'
+        if self.details:
+            s += f'\n{self.details}'
+        s += '\n'
         def truncate_and_fill(string, length):
             truncated = string[:length-2] + '..' if len(string) > length else string
             filled = format(truncated, str(length) + 's')
             return filled
-        widths = {'note':40, 'settings':50}
-        s += 'ROW '
-        s += '   COMMAND '
-        s += '      U '
+        width_note = 40
+        width_settings = 50
+        width_command = max(7, max({len(row['command']) for row in self.table}))
+        s += 'ROW   '
+        s += format('COMMAND', f'<{width_command}.{width_command}')
+        s += '     U '
         s += '      V  '
-        s += truncate_and_fill('LOG_NOTE', widths['note']) + '  '
-        s += truncate_and_fill('SETTINGS', widths['settings'])
+        s += truncate_and_fill('LOG_NOTE', width_note) + '  '
+        s += truncate_and_fill('SETTINGS', width_settings)
         for i in range(len(self.table)):
             move = self.table[i]
             s += '\n'
             s += format(i, '3d') + ' '
-            s += format(move['command'], '>10s') + ' '
+            s += truncate_and_fill(f'  {move["command"]} ', width_command) + ' '
             s += format(move['target0'], '7g') + ' '
             s += format(move['target1'], '7g') + '  '
-            s += truncate_and_fill(str(move['log_note']), widths['note']) + '  '
-            s += truncate_and_fill(str(self.non_default_pos_settings(i)), widths['settings'])
+            s += truncate_and_fill(str(move['log_note']), width_note) + '  '
+            s += truncate_and_fill(str(self.non_default_pos_settings(i)), width_settings)
         return s
     
     def __repr__(self):
