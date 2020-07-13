@@ -122,19 +122,6 @@ class Sequence(object):
     @long_name.setter
     def long_name(self, value):
         self.table.meta['long_name'] = str(value)
-        
-    @property
-    def min_phi_limit(self):
-        return self.table.meta['min_phi_limit']
-    
-    @min_phi_limit.setter
-    def min_phi_limit(self, value):
-        try:
-            ok_val = float(value)
-        except:
-            assert value in {'typical', None}, f'min_phi_limit of {value} not recognized'
-            ok_val = value
-        self.table.meta['min_phi_limit'] = ok_val
     
     def add_move(self, command, target0, target1, log_note='', pos_settings={}, index=None):
         '''Add a move to the sequence.
