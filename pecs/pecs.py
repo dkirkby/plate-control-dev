@@ -271,14 +271,14 @@ class PECS:
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request, match_radius=None, check_unmatched=False,
-                     test_tp=False):
+                     test_tp=False, anticollision=None):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
-        self.ptlm.prepare_move(request, anticollision=None)
+        self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
@@ -301,6 +301,33 @@ class PECS:
         #cleanup
         self.ptlm.clear_exposure_info()
         return merged.join(exppos)
+    
+    def rehome_and_measure(self, posids, axis='both', debounce=True, log_note='',
+                           match_radius=None, check_unmatched=False, test_tp=False,
+                           anticollision=None):
+        '''Wrapper for sending rehome command and then measuring result.
+        Returns whatever fvc_measure returns.
+        '''
+        assert axis in {'both', 'phi', 'theta'}
+        assert debounce in {True, False}
+        self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
+                   f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
+        enabled = self.get_enabled_posids(posids)
+        posids_by_petal = {self.pcid_lookup(posid): posid for posid in enabled}
+        for pcid, these_posids in posids_by_petal.items():
+            # 2020-07-12 [JHS] this happens sequentially petal by petal, only because
+            # I haven't studied the PetalMan / PECS interfaces sufficiently well to
+            # understand how to call the rehome_pos commands simultanously across
+            # multiple petals. That said, this is probably such a rarely called function
+            # that it's not critical to achieve that parallelism right now.
+            role = self._pcid2role(pcid)
+            self.ptlm.rehome_pos(ids=these_posids, axis=axis, anticollision=anticollision,
+                                 debounce=debounce, log_note=log_note, participating_petals=role)
+        result = self.fvc_measure(exppos=None, matched_only=True, match_radius=match_radius, 
+                                  check_unmatched=check_unmatched, test_tp=test_tp)
+        self.ptlm.clear_exposure_info()
+        return result
 
     def home_adc(self):
         try:
