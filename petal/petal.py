@@ -197,8 +197,9 @@ class Petal(object):
         self._init_collider(collider_file, anticollision)
         
         # extra limitations on addressable target area. limit is a minimum phi value (like a maximum radius)
+        self.typical_phi_limit_angle = self.collider.Eo_phi
         if phi_limit_on:
-            self.limit_angle = self.collider.Eo_phi  # [deg] minimum poslocP angle to reject targets. Set to False or None to skip check
+            self.limit_angle = self.typical_phi_limit_angle  # [deg] minimum poslocP angle to reject targets. Set to False or None to skip check
         else:
             self.limit_angle = None
             
@@ -546,7 +547,7 @@ class Petal(object):
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
             self.schedule.expert_add_table(table)
 
-    def request_homing(self, posids, axis='both'):
+    def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
         collection of posids. Finds the primary hardstop, and sets values for
         the max position and min position. Requests to disabled positioners
@@ -554,6 +555,16 @@ class Petal(object):
 
         axis ... string, 'both' (default), 'theta_only', or 'phi_only'. Optional
                  argument that allows for homing either theta or phi only.
+        
+        debounce ... boolean, if True the hard limit strike is followed by
+                     a small move off the hardstop in the opposite direction
+                     
+        log_note ... optional string to append in the log. N.B.: 'homing', the 
+                     axis, and whether debounce was done, will all automatically
+                     be included in the log, so it's just redundant and noisy to
+                     include such information here. So this log_note is intended
+                     more for contextual info not known to the petal, like name
+                     of a human operator, or whether the sky was blue that day, etc.
         """
         axis = 'phi_only' if axis == 'phi' else axis  # deal with common typo
         axis = 'theta_only' if axis == 'theta' else axis  # deal with common typo
@@ -564,14 +575,19 @@ class Petal(object):
         for posid in posids:
             if posid not in enabled.keys():
                 self.pos_flags[posid] |= self.ctrl_disabled_bit
-        for posid,posmodel in enabled.items():
+        for posid, posmodel in enabled.items():
             directions = {}
+            phi_note = None
             if axis in {'both', 'phi_only'}:
                 directions[pc.P] = +1 # force this, because anticollision logic depends on it
-                self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note='homing phi')
+                phi_note = pc.join_notes(log_note, 'homing phi')
+                self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note=phi_note)
             if axis in {'both', 'theta_only'}:
                 directions[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
-                self.request_limit_seek(posid, pc.T, directions[pc.T], cmd_prefix='T', log_note='homing theta')
+                theta_note = 'homing theta'
+                if phi_note == None:
+                    theta_note = pc.join_notes(log_note, theta_note)
+                self.request_limit_seek(posid, pc.T, directions[pc.T], cmd_prefix='T', log_note=theta_note)
             hardstop_debounce = [0,0]
             postmove_cleanup_cmds = {pc.T: '', pc.P:''}
             for i, direction in directions.items():
@@ -582,10 +598,10 @@ class Petal(object):
                 else:
                     hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
                     postmove_cleanup_cmds[i] = f'{cmd_prefix} +1.0'
-            request = {posid:{'target': hardstop_debounce,
-                              'postmove_cleanup_cmds': postmove_cleanup_cmds}
-                       }
-            self.request_direct_dtdp(request, cmd_prefix='debounce')
+            if debounce:
+                request = {posid:{'target': hardstop_debounce,
+                                  'postmove_cleanup_cmds': postmove_cleanup_cmds}}
+                self.request_direct_dtdp(request, cmd_prefix='debounce')
                 
     def schedule_moves(self, anticollision='default', should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -1583,7 +1599,7 @@ class Petal(object):
                 self.altered_states.add(m.posmodel.state)
             else:
                 self.pos_flags[m.posid] |= self.movetable_rejected_bit
-        self.commit()
+        self.commit(mode='move')
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
         if self.animator_on:
