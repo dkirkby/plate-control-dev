@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Perform a sequence of moves + FVC measurements on hardware.
+Perform a sequence of moves + FVC measurements on hardware. (Note that any positioner
+calibration parameters or motor settings altered during the sequence are stored only
+in memory, so a re-initialization of the petal software should restore you to the
+original state, as defined by the posmove and constants databases.)
 """
 
 import os
@@ -10,18 +13,17 @@ script_name = os.path.basename(__file__)
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='Path to sequence file, readable by sequence.py. For some common pre-cooked sequences, run sequence_generator.py.')
+parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
+parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-m', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
-parser.add_argument('-c', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
-parser.add_argument('-t', '--test_tp', action='store_true', help='turns on auto-updating of POS_T, POS_P based on measurements')
-
-# TO BE IMPLEMENTED:
-parser.add_argument('-d', '--debug', action='store_true', help='suppresses sending "SYNC" to positioners, so they will not actually move')
-parser.add_argument('-r', '--restore_state_from_cache', type=str,
-                    help='Path to a cached positioner settings file from previous run of this script. Intended' +
-                         ' to be used in event of a crash. Will restore all positioners\' settings to that' +
-                         ' original cached state, and do nothing else.')
+parser.add_argument('-c', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
+parser.add_argument('-t', '--test_tp', action='store_true', help='turns on auto-updating of POS_T, POS_P based on measurements, default is False')
+parser.add_argument('-n', '--no_movement', action='store_true', help='for debugging purposes, this option suppresses sending move tables to positioners, so they will not physically move')
 
 args = parser.parse_args()
+if args.anticollision == 'None':
+    args.anticollision = None
+assert args.anticollision in {'adjust', 'freeze', None}, f'bad argument {args.anticollision} for anticollision parameter'
 
 # read sequence file
 import sequence
@@ -39,7 +41,8 @@ except:
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
 log_dir = pc.dirs['sequence_logs']
-log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
+log_timestamp = pc.filename_timestamp_str()
+log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -117,31 +120,53 @@ def make_requests(posids, command, target0, target1, log_note):
 # general settings for the move measure function
 if args.match_radius == None and pecs_on:
     args.match_radius = pecs.match_radius
-move_meas_settings = {key: args.__dict__[key] for key in ['match_radius', 'check_unmatched', 'test_tp']}
+move_meas_settings = {key: args.__dict__[key] for key in ['match_radius', 'check_unmatched', 'test_tp', 'anticollision']}
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
 # motor settings (must be made known to petal.py and FIPOS)
 motor_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
 
+# caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
     '''Gathers current positioner settings and caches them to disk. Returns a
     file path.
     '''
-    # TO BE IMPLEMENTED, NEEDED FOR RESTORING ORIGINAL STATE AFTER CRASH
-    pass
+    cache_name = f'{log_timestamp}_pos_settings_cache.ecsv'
+    cache_path = os.path.join(log_dir, cache_name)
+    settings = []
+    for posid in posids:
+        role = pecs.ptl_role_lookup(posid)
+        these_settings = {'POS_ID': posid}
+        these_settings.update(sequence.pos_defaults.copy())
+        for key in sequence.pos_defaults:
+            value = pecs.ptlm.get_posfid_val(posid, key, participating_petals=role)
+            these_settings[key] = value
+        settings.append(these_settings)
+    frame = pd.DataFrame(data=settings)
+    frame.to_csv(cache_path, index=False)
+    return cache_path
 
 def retrieve_cached_pos_settings(path):
-    '''Retrieves positioenr settings from file cached to disk. Returns a dict with
-    keys = posids and values = settings dicts. This can be directly used in the
+    '''Retrieves positioner settings from file cached to disk. Returns a dict with
+    keys = posids and values = settings subdicts. This can be directly used in the
     apply_pos_settings function.'''
-    # TO BE IMPLEMENTED, NEEDED FOR RESTORING ORIGINAL STATE AFTER CRASH
-    pass
+    frame = pd.read_csv(path)
+    settings = {}
+    for row in frame.iterrows():
+        posid = row['POS_ID']
+        these_settings = {key: row[key] for key in sequence.pos_defaults}
+        settings[posid] = these_settings
+    return settings
 
 def apply_pos_settings(settings):
     '''Push new settings values to the positioners in posids. The dict settings
     should have keys = posids, and values = sub-dictionaries. Each sub-dict
-    should have keys / value types like pos_defaults in the sequence module.'''
+    should have keys / value types like pos_defaults in the sequence module.
+    
+    Nothing will be committed to the posmoves database (settings will be stored
+    only in memory, and can be reset by reinitializing the petal software.
+    '''
     if not settings:
         logger.warning(f'apply_pos_settings: called with null arg settings={settings}')
         return
@@ -169,24 +194,62 @@ def apply_pos_settings(settings):
                     ' parameters. Now pushing new settings to petal controllers on petals' +
                     f' {motor_update_petals}')
         pecs.ptlm.set_motor_parameters(participating_petals=list(motor_update_petals))
-    pecs.ptlm.commit(mode='both', log_note='')
-    logger.info(f'apply_pos_settings: Positioner settings committed to DB')
 
 # cache the pos settings
 cache_path = cache_current_pos_settings(get_posids())
 logger.info('Initial settings of all positioners cached to: {cache_path}')
 
+# set phi limit angle for the test
+old_phi_limits = pecs.ptlm.get_phi_limit_angle()
+if args.enable_phi_limit:
+    some_petal = pecs.petal_roles[0]
+    typical_phi_limit = pecs.ptlm.app_get('typical_phi_limit_angle', participating_petals=some_petal)
+    uniform_phi_limit = typical_phi_limit
+else:
+    uniform_phi_limit = None
+pecs.ptlm.set_phi_limit_angle(uniform_phi_limit)
+new_phi_limits = pecs.ptlm.get_phi_limit_angle()
+if new_phi_limits == old_phi_limits:
+    logger.info(f'Phi limits unchanged: {old_phi_limits}')
+else:
+    logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
+                f'New phi limits: {new_phi_limits}')
+
 # do the sequence
 last_pos_settings = None
-for row in seq.table:
+for move in seq:
+    index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-    logger.info(f'Now doing move {row.index} of 0-{len(seq.table)-1} on {len(posids)} positioners.')
-    kwargs1 = {key: row[key] for key in sequence.move_defaults}
-    requests = make_requests(posids, **kwargs1)
-    logger.info(f'General move command: {kwargs1}')
-    kwargs2 = {'request': requests}
-    kwargs2.update(move_meas_settings)
-    new_settings = seq.pos_settings(row.index)
+    dict_repr = dict(zip(move.columns, move))
+    logger.info(f'Now doing move {index} of 0-{len(seq)-1} on {len(posids)} positioners.')
+    logger.info(f'Move settings are {dict_repr}')
+    command = move['command']
+    target0 = move['target0']
+    target1 = move['target1']
+    log_note = move['log_note']
+    if command in seq.general_commands:
+        move_measure_func = pecs.move_measure
+        requests = make_requests(posids, command, target0, target1, log_note)
+        kwargs = {'request': requests}
+    elif command in seq.homing_commands:
+        move_measure_func = pecs.rehome_and_measure
+        if not target0 and not target1:
+            logger.warning(f'Skipping move {index} because home request had neither'
+                           f' axis specified. (Need to set target0 to 1 for theta homing'
+                           f', target1 to 1 for phi homing, or both simultaneously.')
+            continue
+        should_debounce = command == 'home_and_debounce'
+        axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
+        kwargs = {'posids': posids,
+                  'axis': axis,
+                  'debounce': should_debounce,
+                  'log_note': log_note,
+                  }
+    else:
+        logger.warning(f'Skipping move {index} due to unexpected command {command}')
+        continue
+    kwargs.update(move_meas_settings)
+    new_settings = seq.pos_settings(index)
     if new_settings != last_pos_settings:
         all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
         if pecs_on:
@@ -195,8 +258,8 @@ for row in seq.table:
         last_pos_settings = new_settings
     else:
         logger.info('Positioner settings: (no change)')
-    if pecs_on:
-        result = pecs.move_measure(**kwargs2)
+    if pecs_on and not args.no_movement:
+        result = move_measure_func(**kwargs)  # nothing is done here with result, data retrieval is a separate step, from the online DB
 logger.info('Sequence complete!')
 
 # restore the original pos settings
@@ -212,6 +275,18 @@ else:
                 ' finish of sequence. Now restoring system to original state.')
     apply_pos_settings(orig_settings)
     logger.info('Restoration of original positioner settings complete.')
+    
+# restore old phi limit angles
+if new_phi_limits != old_phi_limits:
+    for role, angle in old_phi_limits.items():  # 2020-07-13 [JHS] I'm unclear if the keys are role or pcid, will try it out
+        pecs.ptlm.set_phi_limit_angle(angle, participating_petals=role)
+    restored_phi_limits = pecs.ptlm.get_phi_limit_angle()
+    if restored_phi_limits == old_phi_limits:
+        logger.info(f'Phi limits restored to: {restored_phi_limits}')
+    else:
+        logger.warning(f'Some error when restoring phi limits. Old limits were' +
+                       f' {old_phi_limits} but restored values are different:' +
+                       f' {restored_phi_limits}')
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
