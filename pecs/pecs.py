@@ -399,7 +399,7 @@ class PECS:
         '''
         if posids == 'sub':
             selected_posids = self.posids
-        if posids == 'all':
+        elif posids == 'all':
             selected_posids = None
         else:
             try:
