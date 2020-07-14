@@ -47,7 +47,7 @@ class RehomeVerify(PECS):
         self.printfunc('Taking FVC exposure to confirm home positions...')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
-                                                              match_radius=50)
+                                                              match_radius=self.match_radius)
         self.ptlm.clear_exposure_info()
         unmatched = unmatched & (set(self.posids))
         matched = matched & (set(self.posids))

@@ -206,7 +206,7 @@ logger.info('Initial settings of positioner(s) cached to: {cache_path}')
 # set phi limit angle for the test
 old_phi_limits = pecs.ptlm.get_phi_limit_angle()
 if args.enable_phi_limit:
-    some_petal = pecs.petal_roles[0]
+    some_petal = pecs.ptl_roles[0]
     typical_phi_limit = pecs.ptlm.app_get('typical_phi_limit_angle', participating_petals=some_petal)
     uniform_phi_limit = typical_phi_limit
 else:
