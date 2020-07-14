@@ -142,6 +142,9 @@ new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=debug_no
 print(new,'\n')
 tests.append(new)
 
+# Hardstop debounce
+# TO-DO
+
 # SAVE TO DISK
 for test in tests:
     test.save()

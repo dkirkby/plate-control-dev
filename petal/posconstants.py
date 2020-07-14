@@ -141,7 +141,7 @@ nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
 # Nominal value for when positioner is sufficiently off-center, to ensure that
 # a theta measurement by the FVC will be valid.
-off_center_threshold_mm = 0.5  # radial distance off-center
+off_center_threshold_mm = 0.4  # radial distance off-center
 phi_off_center_threshold = 180 - round(off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
 
 # Conservatively accessible angle ranges (intended to be valid for any basically
