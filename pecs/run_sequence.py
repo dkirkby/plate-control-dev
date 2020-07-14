@@ -183,7 +183,7 @@ def apply_pos_settings(settings):
             else:
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
-            value = settings[key]                
+            value = these_settings[key]                
             val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
             assert2(val_accepted, f'unable to set {key}={value} for {posid}')
             if key in motor_settings:
@@ -197,7 +197,7 @@ def apply_pos_settings(settings):
 
 # cache the pos settings
 cache_path = cache_current_pos_settings(get_posids())
-logger.info('Initial settings of all positioners cached to: {cache_path}')
+logger.info('Initial settings of positioner(s) cached to: {cache_path}')
 
 # set phi limit angle for the test
 old_phi_limits = pecs.ptlm.get_phi_limit_angle()
@@ -221,7 +221,7 @@ for move in seq:
     index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     dict_repr = dict(zip(move.columns, move))
-    logger.info(f'Now doing move {index+1} of {len(seq)} (row idx {index}) on {len(posids)} positioners.')
+    logger.info(f'Now doing move {index+1} of {len(seq)} (row idx {index}) on {len(posids)} positioner(s).')
     logger.info(f'Move settings are {dict_repr}')
     command = move['command']
     target0 = move['target0']
