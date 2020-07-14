@@ -92,7 +92,7 @@ def is_number(x):
 
 def is_boolean(x):
     '''Check type to see if it's a common boolean type.'''
-    if isinstance(x, bool, np.bool_):
+    if isinstance(x, (bool, np.bool_)):
         return True
     if is_number(x) and (x == 0 or x == 1):
         return True
