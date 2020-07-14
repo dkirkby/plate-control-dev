@@ -153,11 +153,16 @@ keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_PHI_ANGULAR',
                           'KEEPOUT_EXPANSION_THETA_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_ANGULAR']
-
 keepout_keys = keepout_expansion_keys + ['CLASSIFIED_AS_RETRACTED']
 
+# other "calib" keys, meaning keys that for whatever historical reason, were
+# separated into the calib tables in the online db
+extra_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
+                        'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P'}
+fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
+
 # test for whether certain posstate keys are classified as "calibration" vals
-calib_keys = set(nominals.keys()) | set(keepout_keys)
+calib_keys = set(nominals.keys()) | set(keepout_keys) | extra_pos_calib_keys | fiducial_calib_keys
 def is_calib_key(key):
     return key.upper() in calib_keys
 
