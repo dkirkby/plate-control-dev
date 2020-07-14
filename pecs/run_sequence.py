@@ -187,7 +187,8 @@ def apply_pos_settings(settings):
             val_accepted = pecs.ptlm.set_posfid_val(posid, key, value,
                                                     check_existing=True,
                                                     participating_petals=role)
-            assert2(val_accepted, f'unable to set {key}={value} for {posid}')
+            if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
+                assert2(val_accepted, f'unable to set {key}={value} for {posid}')
             if key in motor_settings:
                 motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
