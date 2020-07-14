@@ -88,11 +88,11 @@ import numpy as np
 
 def is_number(x):
     '''Check type to see if it's a common number type.'''
-    return isinstance(x, (int, float, np.int, np.float))
+    return isinstance(x, (int, float, np.int_, np.float_))
 
 def is_boolean(x):
     '''Check type to see if it's a common boolean type.'''
-    if isinstance(x, bool):
+    if isinstance(x, bool, np.bool_):
         return True
     if is_number(x) and (x == 0 or x == 1):
         return True
