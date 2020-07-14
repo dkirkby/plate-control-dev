@@ -90,11 +90,11 @@ def is_number(x):
     '''Check type to see if it's a common number type.'''
     return isinstance(x, (int, float, np.int_, np.float_))
 
-def is_boolean(x):
+def is_boolean(x, include01=True):
     '''Check type to see if it's a common boolean type.'''
     if isinstance(x, (bool, np.bool_)):
         return True
-    if is_number(x) and (x == 0 or x == 1):
+    if include01 and is_number(x) and (x == 0 or x == 1):
         return True
     return False
 
@@ -176,10 +176,10 @@ def apply_pos_settings(settings):
         for key, value in these_settings.items():
             assert2(key in sequence.pos_defaults, f'unexpected pos settings key {key} for posid {posid}')
             default = sequence.pos_defaults[key]
-            if is_number(default):
+            if is_boolean(default, include01=False):
+                test = is_boolean(value, include01=True)
+            elif is_number(default):
                 test = is_number(value)
-            elif is_boolean(default):
-                test = is_boolean(value)
             else:
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
