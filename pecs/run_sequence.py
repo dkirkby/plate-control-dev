@@ -217,7 +217,7 @@ if new_phi_limits == old_phi_limits:
     logger.info(f'Phi limits unchanged: {old_phi_limits}')
 else:
     logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
-                f'New phi limits: {new_phi_limits}')
+                f'new phi limits: {new_phi_limits}')
 
 # do the sequence
 last_pos_settings = None
@@ -282,8 +282,15 @@ else:
     
 # restore old phi limit angles
 if new_phi_limits != old_phi_limits:
-    for role, angle in old_phi_limits.items():  # 2020-07-13 [JHS] I'm unclear if the keys are role or pcid, will try it out
-        pecs.ptlm.set_phi_limit_angle(angle, participating_petals=role)
+    if isinstance(old_phi_limits, dict):
+        # 2020-07-13 [JHS] I'm unclear if the keys here are supposed to be role or
+        # pcid. Might be a bug, but hard for me to test at LBNL because only one petal.
+        # Frankly I'm not even 100% sure if it's a dict in the case of multiple petals.
+        roles_angles = [(role, angle) for role, angle in old_phi_limits.items()]
+    else:
+        roles_angles = [(None, old_phi_limits)]
+    for ra in roles_angles:
+        pecs.ptlm.set_phi_limit_angle(ra[1], participating_petals=ra[0])
     restored_phi_limits = pecs.ptlm.get_phi_limit_angle()
     if restored_phi_limits == old_phi_limits:
         logger.info(f'Phi limits restored to: {restored_phi_limits}')
