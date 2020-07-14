@@ -268,12 +268,12 @@ logger.info(f'Sequence "{seq.short_name}" complete!')
 
 # restore the original pos settings
 orig_settings = retrieve_cached_pos_settings(cache_path)
-logger.info('Retrieved original positioner settings from {cache_path}')
+logger.info(f'Retrieved original positioner settings from {cache_path}')
 new_cache_path = cache_current_pos_settings(posids)
 new_settings = retrieve_cached_pos_settings(new_cache_path)
 if orig_settings == new_settings:
     logger.info('No net change of positioner settings detected between start and finish' +
-                'of sequence. No further modifications to postioner state required.')
+                ' of sequence. No further modifications to postioner state required.')
 else:
     logger.info('Some net change(s) of positioner settings detected between start and' +
                 ' finish of sequence. Now restoring system to original state.')
