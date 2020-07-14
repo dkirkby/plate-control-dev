@@ -188,9 +188,10 @@ def apply_pos_settings(settings):
                                                     check_existing=True,
                                                     participating_petals=role)
             if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
-                assert2(val_accepted, f'unable to set {key}={value} for {posid}')
-            if key in motor_settings:
-                motor_update_petals.add(role)
+                assert2(False, f'unable to set {key}={value} for {posid}')
+            elif val_accepted == True:  # again, distinct from the None case
+                if key in motor_settings:
+                    motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
         logger.info('apply_pos_settings: Positioner settings include change(s) to motor' +
