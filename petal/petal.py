@@ -206,7 +206,11 @@ class Petal(object):
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[fidid] = posstate.PosState(fidid,
+                                   logging=self.local_log_on, device_type='fid',
+                                   printfunc=self.printfunc, petal_id=self.petal_id,
+                                   alt_move_adder=self._add_to_altered_states,
+                                   alt_calib_adder=self._add_to_altered_calib_states)
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
@@ -296,7 +300,9 @@ class Petal(object):
         for posid in posids:
             self.states[posid] = posstate.PosState(
                 posid, logging=self.local_log_on, device_type='pos',
-                printfunc=self.printfunc, petal_id=self.petal_id)
+                printfunc=self.printfunc, petal_id=self.petal_id,
+                alt_move_adder=self._add_to_altered_states,
+                alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
@@ -1055,12 +1061,17 @@ class Petal(object):
             if old == value:
                 return None
         accepted = state.store(key, value)
-        if accepted:
-            if pc.is_calib_key(key):
-                self.altered_calib_states.add(state)
-            else:
-                self.altered_states.add(state)
         return accepted
+    
+    def _add_to_altered_states(self, state):
+        '''Wrapper function so that another module (posstate) can add itself
+        to petal's cached set.'''
+        self.altered_states.add(state)
+    
+    def _add_to_altered_calib_states(self, state):
+        '''Wrapper function so that another module (posstate) can add itself
+        to petal's cached set.'''
+        self.altered_calib_states.add(state)
     
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
@@ -1599,7 +1610,7 @@ class Petal(object):
                 self.altered_states.add(m.posmodel.state)
             else:
                 self.pos_flags[m.posid] |= self.movetable_rejected_bit
-        self.commit(mode='move')
+        self.commit(mode='both')  # commit() determines whether anything actually needs pushing to db
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
         if self.animator_on:

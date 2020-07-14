@@ -28,6 +28,8 @@ class PosState(object):
         logging:  boolean whether to enable logging state data to disk
         type:     'pos', 'fid', 'ptl'
         petal_id: '00' to '11', '900' to '909', must be string
+        alt_move_adder: function handle the state can use to add itself to petal's altered_states collection
+        alt_calib_adder: function handle the state can use to add itself to petal's altered_calib_states collection
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -43,10 +45,12 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
-                 logging=False, printfunc=print, defaults=None):  # DOS change
+                 logging=False, printfunc=print, defaults=None,
+                 alt_move_adder=None, alt_calib_adder=None):
         self.printfunc = printfunc
         self.logging = logging
         self.write_to_DB = False
+        self._set_altered_state_adders(func_move=alt_move_adder, func_calib=alt_calib_adder)
         if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
                                     in ['True', 'true', 'T', 't', '1', None]):
             self.write_to_DB = True
@@ -274,11 +278,17 @@ class PosState(object):
                     f'{key} rejected, outside nominal range {nom} ± {tol}')
                 # val = nom
                 return False
+        old_val = self._val[key]
         if key == 'LOG_NOTE':
             self.append_log_note(val)
         else:
-            self._val[key] = val  # set value if all 3 checks above are passed
+            self._val[key] = val  # set value if all checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
+        if self._val[key] != old_val:
+            if pc.is_calib_key(key):
+                self._register_altered_calib()
+            else:
+                self._register_altered_move()
         return True
 
     def write(self):
@@ -362,6 +372,17 @@ class PosState(object):
         for key, value in pc.late_commit_defaults.items():
             if key in self._val:
                 self._val[key] = value
+
+    def _set_altered_state_adders(self, func_move=None, func_calib=None):
+        '''Set function handles for registering when state changes. The intent
+        here is that PosState can add itself to Petal's altered_state and
+        altered_calib_state sets.'''
+        if func_move and func_calib:
+            self._register_altered_move = lambda: func_move(self)
+            self._register_altered_calib = lambda: func_calib(self)
+        else:
+            self._register_altered_move = lambda: None
+            self._register_altered_calib = lambda: None
 
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
