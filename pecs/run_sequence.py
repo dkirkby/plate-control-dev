@@ -184,7 +184,9 @@ def apply_pos_settings(settings):
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
             value = these_settings[key]                
-            val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
+            val_accepted = pecs.ptlm.set_posfid_val(posid, key, value,
+                                                    check_existing=True,
+                                                    participating_petals=role)
             assert2(val_accepted, f'unable to set {key}={value} for {posid}')
             if key in motor_settings:
                 motor_update_petals.add(role)
