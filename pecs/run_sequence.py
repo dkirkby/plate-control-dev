@@ -153,7 +153,7 @@ def retrieve_cached_pos_settings(path):
     apply_pos_settings function.'''
     frame = pd.read_csv(path)
     settings = {}
-    for row in frame.iterrows():
+    for idx, row in frame.iterrows():
         posid = row['POS_ID']
         these_settings = {key: row[key] for key in sequence.pos_defaults}
         settings[posid] = these_settings
@@ -264,7 +264,7 @@ for move in seq:
         logger.info('Positioner settings: (no change)')
     if pecs_on and not args.no_movement:
         result = move_measure_func(**kwargs)  # nothing is done here with result, data retrieval is a separate step, from the online DB
-logger.info('Sequence complete!')
+logger.info(f'Sequence "{seq.short_name}" complete!')
 
 # restore the original pos settings
 orig_settings = retrieve_cached_pos_settings(cache_path)
