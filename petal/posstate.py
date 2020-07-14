@@ -258,7 +258,7 @@ class PosState(object):
         """
         return self._val[key]
 
-    def store(self, key, val):
+    def store(self, key, val, register_if_altered=True):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values.
 
@@ -266,6 +266,11 @@ class PosState(object):
         added boolean return to indicate outcome of storing posstate
 
         (NEVER EVER write directly to state._val dictionary)
+        
+        Normally, if a value is changed, then the state will register itself
+        with petal as having been altered. That way petal knows to push its
+        data to posmovedb upon the next commit(). This registration can be
+        turned off in special cases by arguing register_if_altered=False.
         """
         if key not in self._val.keys():  # 1st check: validate the key name
             self.printfunc(f'Unit {self.unit_id}: invalid Key {key}')
@@ -284,7 +289,7 @@ class PosState(object):
         else:
             self._val[key] = val  # set value if all checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
-        if self._val[key] != old_val:
+        if self._val[key] != old_val and register_if_altered:
             if pc.is_calib_key(key):
                 self._register_altered_calib()
             else:
@@ -372,7 +377,7 @@ class PosState(object):
         for key, value in pc.late_commit_defaults.items():
             if key in self._val:
                 self._val[key] = value
-
+                
     def _set_altered_state_adders(self, func_move=None, func_calib=None):
         '''Set function handles for registering when state changes. The intent
         here is that PosState can add itself to Petal's altered_state and

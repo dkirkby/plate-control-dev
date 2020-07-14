@@ -1060,7 +1060,7 @@ class Petal(object):
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
-        accepted = state.store(key, value)
+        accepted = state.store(key, value, register_if_altered=True)
         return accepted
     
     def _add_to_altered_states(self, state):
@@ -1137,8 +1137,8 @@ class Petal(object):
             fid_commit_list = [st for st in states if st.type == 'fid']
             if len(pos_commit_list) > 0:
                 for state in pos_commit_list:
-                    state.store('EXPOSURE_ID', self._exposure_id)
-                    state.store('EXPOSURE_ITER', self._exposure_iter)
+                    state.store('EXPOSURE_ID', self._exposure_id, register_if_altered=False)
+                    state.store('EXPOSURE_ITER', self._exposure_iter, register_if_altered=False)
                 self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
             if len(fid_commit_list) > 0:
                 self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
@@ -1739,7 +1739,8 @@ class Petal(object):
                   }
         for posid in self.posids:
             for key in resets:
-                self.states[posid].store(key, resets[key])  # Set through state.store to avoid triggering another commit
+                # Set directly with state.store + special arg, to avoid triggering another commit
+                self.states[posid].store(key, resets[key], register_if_altered=False)
 
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
