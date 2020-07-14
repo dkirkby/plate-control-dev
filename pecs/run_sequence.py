@@ -221,17 +221,17 @@ for move in seq:
     index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     dict_repr = dict(zip(move.columns, move))
-    logger.info(f'Now doing move {index} of 0-{len(seq)-1} on {len(posids)} positioners.')
+    logger.info(f'Now doing move {index+1} of {len(seq)} (row idx {index}) on {len(posids)} positioners.')
     logger.info(f'Move settings are {dict_repr}')
     command = move['command']
     target0 = move['target0']
     target1 = move['target1']
     log_note = move['log_note']
-    if command in seq.general_commands:
+    if command in sequence.general_commands:
         move_measure_func = pecs.move_measure
         requests = make_requests(posids, command, target0, target1, log_note)
         kwargs = {'request': requests}
-    elif command in seq.homing_commands:
+    elif command in sequence.homing_commands:
         move_measure_func = pecs.rehome_and_measure
         if not target0 and not target1:
             logger.warning(f'Skipping move {index} because home request had neither'
