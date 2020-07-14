@@ -246,10 +246,3 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         for key,value in params.items():
             ptl.states[posid].store(key, value)
         ptl.states[posid].write()
-        
-print(ptl.quick_query(key='BACKLASH'))
-print(ptl.quick_query(key='BACKLASH', posids='M04409'))
-print(ptl.quick_query(key='BACKLASH', op='>', value=3.0))
-print(ptl.quick_query(key='BACKLASH', op='>', value=3.0, posids='M04409'))
-print(ptl.quick_query(key='BACKLASH', op='==', value=3.0))
-print(ptl.quick_query(key='BACKLASH', op='==', value=3.0, posids='M04409'))
