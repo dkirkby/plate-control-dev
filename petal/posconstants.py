@@ -140,9 +140,13 @@ nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
 # Nominal value for when positioner is sufficiently off-center, to ensure that
-# a theta measurement by the FVC will be valid.
-off_center_threshold_mm = 0.4  # radial distance off-center
-phi_off_center_threshold = 180 - round(off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
+# a theta measurement by the FVC will be valid. Also a tol value meant for identifying
+# when the off-center phi would cause an intolerably large theta jump.
+_off_center_threshold_mm = 0.5  # radial distance off-center
+_ctrd_phi_theta_change_tol_mm = 0.1 # allowable max positioning error induced by sudden theta change while centered phi
+_nom_max_r = nominals['LENGTH_R1']['value'] + nominals['LENGTH_R2']['value']
+phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
+ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Conservatively accessible angle ranges (intended to be valid for any basically
 # functional postioner, and for which a seed calibration is at least roughly known).
