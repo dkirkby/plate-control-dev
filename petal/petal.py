@@ -692,7 +692,7 @@ class Petal(object):
         currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
         periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
         enabled = self.enabled_posmodels(self.posids)
-        for posid,posmodel in enabled.items():
+        for posid, posmodel in enabled.items():
             canid = posmodel.canid
             busid = posmodel.busid
             p = {key:posmodel.state._val[key] for key in parameter_keys}
@@ -704,6 +704,7 @@ class Petal(object):
                 self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
         self.comm.pbset('currents', currents_by_busid)
         self.comm.pbset('periods', periods_by_busid)
+        self.printfunc(f'Set motor parameters for {len(enabled)} positioners')
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
