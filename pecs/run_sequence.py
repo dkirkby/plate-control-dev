@@ -115,9 +115,7 @@ def make_requests(posids, command, target0, target1, log_note):
                     'LOG_NOTE': log_note,
                     }
     requests = pd.DataFrame(request_data)
-    for idx, row in requests.iterrows():
-        posid = row['DEVICE_ID']
-        row.update(pecs.posinfo.loc[posid].to_dict())
+    requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
     return requests
 
 # general settings for the move measure function
