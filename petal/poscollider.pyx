@@ -21,7 +21,7 @@ class PosCollider(object):
     def __init__(self, configfile='',
                  use_neighbor_loc_dict=False,
                  config=None,
-                 animator_label_type='loc',
+                 animator_label_type='both',
                  printfunc=print):
         self.printfunc = printfunc
         if not config:
@@ -104,6 +104,8 @@ class PosCollider(object):
             label = str(posid)
         elif self.animator_label_type == 'loc':
             label = format(self.posmodels[posid].deviceloc,'03d')
+        elif self.animator_label_type == 'both':
+            label = f'{posid}\n{self.posmodels[posid].deviceloc:03d}'
         else:
             label = ''
         if posid not in self.labeled_posids:
