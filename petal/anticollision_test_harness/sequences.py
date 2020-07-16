@@ -13,14 +13,16 @@ positioner_param_sequences = {'cmds_unit_test':[90000],
                               3:[99003],
                               'one real petal':[98004],
                               'two real petals':[98002,98003],
-                              'many real petals':[98002,98003,98004,98005,98006,98007,98008,98009,98010,98011],
-                              'PTL03_03001':[03001],
-                             }
+                              'many real petals':[98002,98003,98004,98005,98006,
+                                                  98007,98008,98009,98010,98011],
+                              'PTL03_03001':[3001],
+                              'PTL01_01001':[1001],
+                              }
 
 move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
                               0:[0],
                               1:[0,1],
-							  2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                              2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
                               3:[20,21,22,23,24],
                               4:[20,21],
                               5:[21],
@@ -53,18 +55,18 @@ move_request_sequences.update(stress_sequences_petal3_subset7a)
 
 def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of positioner parameter sets.
-        
+
         sequence_id    ... Identifies which sequence to return, per the above
                            definition of positioner_param_sequences.
-        
+
         device_loc_ids ... 'all' --> returns positioner data for all locations on the petal
                            iterable collection of ints --> returns only data for the argued device_loc_ids
-        
+
     Return value is a dict of dicts. The primary keys are ids of positioner parameter
     groups at each step in the sequence.
-    
+
     Each subdict has keys = posid, value = sub-sub-dictionary.
-    
+
     The sub-sub-dictionary keys / values correspond to PosState parameters. The
     idea is that these can be immediately stored to state objects to generate a
     new configuration of the simulated petal.
@@ -73,22 +75,22 @@ def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
 
 def get_move_request_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of move requests.
-        
+
         sequence_id    ... Identifies which sequence to return, per the above
                            definition of move_request_sequences.
-        
+
         device_loc_ids ... 'all' --> returns move request data for all locations on the petal
                            iterable collection of ints --> returns only data for the argued device_loc_ids
-        
+
     Return value is a dict of request dictionaries. The primary keys are ids of
     each step in the sequence.
-    
+
     At each step, there is a subdictionary, containing all the target requests
     for that step in the sequence. The keys for these are device_location_id.
-    
+
     Then the subdictionaries have keys device_location_id. (Rather than posid, so
     that they can be used for any petal generically.
-    
+
     Finally, there is a lowest third level of dictionary. These contain the actual
     move request data for each device. The keys for these are:
         'command','u', and 'v'
@@ -133,4 +135,3 @@ def _read_data(data_id, directory=_pos_dir, prefix=_pos_prefix, device_loc_ids='
     return new
 
 
-        
