@@ -11,6 +11,11 @@ import sequences
 import posstate
 import random
 import csv
+from astropy.table import Table
+import numpy as np
+
+# uniform starting position
+start_posintTP = [0.0, 150.0]
 
 # Some pre-cooked device location selections (can be used below)
 locations_all = 'all'
@@ -40,7 +45,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL01_01001' # 'cmds_unit_test'
-move_request_sequence_id = '01000-01001' # 'cmds_unit_test'
+move_request_sequence_id = '01001_ntarg001_set000' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -63,14 +68,14 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
 
 # saving of target sets for later use on hardware
 # formatted for direct input to xytest
-should_export_targets = False
+should_export_targets = True
 def make_xytest_column_headers(command, device_loc):
     '''For making the funky column headers of xytest target files. Returns
     a pair of headers, e.g. for the x and y coordinates or the like.'''
@@ -103,13 +108,28 @@ if include_neighbors:
 pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_id, all_device_loc)
 move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_to_command)
 exportable_targets = []
+expected_result_keys = {('target_posintT', 'target_posintP'): 'posintTP',
+                        ('target_poslocT', 'target_poslocP'): 'poslocTP',
+                        ('target_poslocX', 'target_poslocY'): 'poslocXY',
+                        ('target_ptlX', 'target_ptlY'): 'ptlXY',
+                        ('expected_posintT', 'expected_posintP'): 'posintTP',
+                        ('expected_poslocT', 'expected_poslocP'): 'poslocTP',
+                        ('expected_poslocX', 'expected_poslocY'): 'poslocXY',
+                        ('expected_ptlX', 'expected_ptlY'): 'ptlXY',
+                        }
+exp_colnames = ['POS_ID', 'DEVICE_LOC', 'target_no']
+exp_dtypes = [str, int, int]
+for key in expected_result_keys.keys():
+    exp_colnames += list(key)
+    exp_dtypes += [float, float]
+expected_results = Table(names=exp_colnames, dtype=exp_dtypes)
 orig_params = {}
 loop = 0
-for pos_param_id, pos_params in pos_param_sequence.items():         
+for pos_param_id, pos_params in pos_param_sequence.items():
     for posid, params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
-        state.store('POS_T', 0.0)
-        state.store('POS_P', 180.0)
+        state.store('POS_T', start_posintTP[0])
+        state.store('POS_P', start_posintTP[1])
         for key,val in params.items():
             state.store(key,val)
         if ignore_params_ctrl_enabled:
@@ -139,7 +159,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     ptl.limit_radius = None
     if ptl.schedule_stats.is_enabled():
         if new_stats_per_loop:
-            stats_path = os.path.join(pc.dirs['temp_files'], f'sched_stats_{filename_suffix}_loop{loop}.csv')
+            loop_suffix = f'_loop{loop}' if len(pos_param_sequence) > 1 else ''
+            stats_path = os.path.join(pc.dirs['temp_files'], f'sched_stats_{filename_suffix}{loop_suffix}.csv')
             ptl.sched_stats_path = stats_path
         ptl.schedule_stats.clear_cache_after_save = False
         ptl.schedule_stats.add_note('POS_PARAMS_ID: ' + str(pos_param_id))
@@ -169,21 +190,43 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     mtot = len(move_request_sequence)
     for move_requests_id, move_request_data in move_request_sequence.items():
         m += 1
-        exportable_targets.append({'target_no':m-1})
+        target_no = m-1
+        exportable_targets.append({'target_no':target_no})
         if ptl.schedule_stats.is_enabled():
             ptl.schedule_stats.add_note('MOVE_REQUESTS_ID: ' + str(move_requests_id))
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
             log_note = f'harness move {m} submove {n}'
             requests = {}
-            for loc_id,data in move_request_data.items():
+            results_rows = {}
+            for loc_id, data in move_request_data.items():
                 if data['command'] == 'posXY': # handles older file format
                     data['command'] = 'poslocXY'
                 if loc_id in ptl.devices:
-                    requests[ptl.devices[loc_id]] = {'command':data['command'], 'target': [data['u'], data['v']], 'log_note':log_note}
-                    u_header, v_header = make_xytest_column_headers(data['command'], loc_id)
+                    posid = ptl.devices[loc_id]
+                    command = data['command']
+                    target = [data['u'], data['v']]
+                    requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
+                    u_header, v_header = make_xytest_column_headers(command, loc_id)
                     exportable_targets[-1][u_header] = data['u']
                     exportable_targets[-1][v_header] = data['v']
+                    trans = ptl.posmodels[posid].trans
+                    results_row = {key:None for key in expected_results.columns}
+                    results_row['target_no'] = target_no
+                    results_row['POS_ID'] = posid
+                    results_row['DEVICE_LOC'] = loc_id
+                    for keys, coord in expected_result_keys.items():
+                        if 'target' in keys[0]:
+                            if coord == command:
+                                expected = target
+                            else:
+                                transform_func = trans.construct(coord_in=data['command'], coord_out=coord)
+                                expected = transform_func(target)
+                                if isinstance(expected[1], (bool, np.bool_)):
+                                    expected = expected[0] # because some transform funcs return "unreachable" bool as a 2nd tuple element
+                            results_row[keys[0]] = expected[0]
+                            results_row[keys[1]] = expected[1] 
+                    results_rows[posid] = results_row
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
@@ -213,6 +256,14 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                     print(f'POS_T + OFFSET_T = {vals["POS_T"] + vals["OFFSET_T"]}')
                     print(f'POS_P + OFFSET_P = {vals["POS_P"] + vals["OFFSET_P"]}')
                 print('---------------')
+        for posid, row in results_rows.items():
+            posmodel = ptl.posmodels[posid]
+            current = posmodel.expected_current_position
+            for keys, coord in expected_result_keys.items():
+                if 'expected' in keys[0]:
+                    row[keys[0]] = current[coord][0]
+                    row[keys[1]] = current[coord][1]
+            expected_results.add_row(row)
         if test_direct_dTdP:
             posids_to_test = list(requests.keys())
             for dtdp in [[30,0], [-30,0], [0,-30], [0,30], [30,-30], [-30,30]]:
@@ -241,6 +292,9 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             for row in exportable_targets:
                 row[''] = row['target_no']
                 writer.writerow(row)
+        filename = 'expected_' + filename_suffix + '.csv'
+        path = os.path.join(pc.dirs['temp_files'], filename)
+        expected_results.write(path)
     if should_animate and not ptl.animator.is_empty():
         ptl.stop_gathering_frames()
         print('Generating animation (this can be quite slow)...')
