@@ -42,6 +42,7 @@ runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL01_01001' # 'cmds_unit_test'
 move_request_sequence_id = '01000-01001' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
+new_stats_per_loop = True # save a new stats file for each loop of this script
 
 # Other ids and notes
 fidids = {}
@@ -50,7 +51,7 @@ note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -103,6 +104,7 @@ pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_
 move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_to_command)
 exportable_targets = []
 orig_params = {}
+loop = 0
 for pos_param_id, pos_params in pos_param_sequence.items():         
     for posid, params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
@@ -136,8 +138,10 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         ptl.sim_fail_freq[key] = val
     ptl.limit_radius = None
     if ptl.schedule_stats.is_enabled():
-        ptl.schedule_stats.filename_suffix = filename_suffix
-        ptl.schedule_stats.clear_cache_after_save_by_append = False
+        if new_stats_per_loop:
+            stats_path = os.path.join(pc.dirs['temp_files'], f'sched_stats_{filename_suffix}_loop{loop}.csv')
+            ptl.sched_stats_path = stats_path
+        ptl.schedule_stats.clear_cache_after_save = False
         ptl.schedule_stats.add_note('POS_PARAMS_ID: ' + str(pos_param_id))
     if should_animate:
         ptl.animator.cropping_on = True
@@ -247,3 +251,4 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         for key,value in params.items():
             ptl.states[posid].store(key, value)
         ptl.states[posid].write()
+    loop += 1
