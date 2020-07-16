@@ -16,40 +16,41 @@ import csv
 locations_all = 'all'
 locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,369,390,411,433,455,475,493,509,522,532,330,350,370,391,412,434,456,476,494,510,523,533,351,371,392,413,435,457,477,495,511,524,372,393,414,436,458,512,525,415,437,459,526}
 subset7a = {78, 79, 87, 88, 89, 98, 99}
+subset7b = {21, 22, 26, 27, 28, 33, 34}
 
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = subset7a # note pre-cooked options above
+device_loc_to_command = subset7b # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
-retract_and_disable = {87,88} # enter device locations to simulate those positioners as retracted and disabled
+retract_and_disable = set() #{87,88} # enter device locations to simulate those positioners as retracted and disabled
 retracted_TP = [0, 110]
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
 
 # Whether to test some "expert" mode commands
-test_direct_dTdP = True
-test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_direct_dTdP = False
+test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
-pos_param_sequence_id = 'PTL03_30001' # 'cmds_unit_test'
-move_request_sequence_id = '03000-03001' # 'cmds_unit_test'
-ignore_params_ctrl_enabled = True # turn on posids regardless of the CTRL_ENABLED column in params file
+pos_param_sequence_id = 'PTL01_01001' # 'cmds_unit_test'
+move_request_sequence_id = '01000-01001' # 'cmds_unit_test'
+ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 
 # Other ids and notes
 fidids = {}
-petal_id = 3
+petal_id = 1
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -61,7 +62,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 0 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
