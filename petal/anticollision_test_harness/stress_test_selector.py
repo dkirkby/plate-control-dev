@@ -55,7 +55,7 @@ min_weight = 1.0
 weights = [w + min_weight for w in weights]
 
 # generate sequences
-sequence_prefix = '30001'
+sequence_prefix = '03001'
 sequences = {}
 num_collisions_to_avoid = {}
 for shape in output_shapes:

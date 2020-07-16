@@ -14,7 +14,7 @@ import sequences
 
 # input parameters
 num_sets_to_make = 1000
-posparams_id = 30001
+posparams_id = 03001
 posparams = sequences._read_data(data_id=posparams_id)
 posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
 
