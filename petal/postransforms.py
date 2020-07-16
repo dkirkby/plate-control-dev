@@ -144,6 +144,20 @@ class PosTransforms(petaltransforms.PetalTransforms):
         else:
             print(f'bad range_limits argument: {range_limits}')
             return None
+        
+    def construct(self, coord_in, coord_out):
+        '''Utility to construct a transform function using strings describing
+        the coordinates in and out.'''
+        try:
+            for coord in [coord_in, coord_out]:
+                assert coord in {'posintTP', 'poslocTP', 'poslocXY', 'flatXY', 'obsXY', 'QS', 'ptlXY'}
+            assert coord_in != coord_out
+            func_name = f'{coord_in}_to_{coord_out}'
+            assert hasattr(self, func_name)
+            handle = eval(f'self.{func_name}')
+            return handle
+        except:
+            return None
 
     # LOWEST LEVEL CALIBRATED XY <--> TP CONVERSIONS
     # These two methods grab calibration values and then call the fundametnal
