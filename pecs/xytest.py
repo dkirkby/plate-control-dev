@@ -213,7 +213,9 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.logger.info(f'Parking {len(self.data.posids)} positioners...')
-        ret = self.ptlm.park_positioners(self.data.posids)
+        ret = self.ptlm.park_positioners(ids=self.data.posids,
+                                         mode='semi',
+                                         log_note='moving to xytest starting position')
         ret = pd.concat(list(ret.values()))
         mask = ret['FLAG'] != 4
         ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
