@@ -24,7 +24,13 @@ data_types = {'POS_ID':str, 'DEVICE_LOC':int, 'CTRL_ENABLED':bool,
               'LENGTH_R1':float, 'LENGTH_R2':float, 'OFFSET_T':float,
               'OFFSET_P':float, 'OFFSET_X':float, 'OFFSET_Y':float,
               'PHYSICAL_RANGE_T':float, 'PHYSICAL_RANGE_P':float,
-              'command':str, 'u':float, 'v':float}
+              'command':str, 'u':float, 'v':float,
+              'KEEPOUT_EXPANSION_PHI_RADIAL':float,
+              'KEEPOUT_EXPANSION_PHI_ANGULAR':float,
+              'KEEPOUT_EXPANSION_THETA_RADIAL':float,
+              'KEEPOUT_EXPANSION_THETA_ANGULAR':float,
+              'CLASSIFIED_AS_RETRACTED':bool,
+              }
 
 def filenumber(filename,prefix):
     base = os.path.basename(filename)
