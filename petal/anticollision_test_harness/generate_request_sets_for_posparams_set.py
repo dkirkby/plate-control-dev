@@ -14,7 +14,8 @@ import sequences
 
 # input parameters
 num_sets_to_make = 1000
-posparams_id = 03001
+petal_id = 1
+posparams_id = int(f'{petal_id}001')
 posparams = sequences._read_data(data_id=posparams_id)
 posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
 
@@ -24,7 +25,10 @@ posmodels = {}
 keys_to_copy = ['POS_ID','DEVICE_LOC','CTRL_ENABLED',
                 'LENGTH_R1','LENGTH_R2',
                 'OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y',
-                'PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
+                'PHYSICAL_RANGE_T','PHYSICAL_RANGE_P',
+                'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_PHI_ANGULAR',
+                'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_THETA_ANGULAR',
+                'CLASSIFIED_AS_RETRACTED']
 for posid,data in posparams.items():
     if posid in posids or posids == 'all':
         state = posstate.PosState(posid)
@@ -84,7 +88,6 @@ for targets in all_targets:
     all_targets_by_loc.append(targets_by_loc)
 
 # save set files
-petal_id = 3 #posparams_id - 10000 # quick hack, assuming the "add 10000" to id rule from "generate_request_sets_for_posparams.py" applies
 start_number = input('Enter starting file number (or nothing, to start at \'000\'). The petal id number will be prefixed. start = ')
 start_number = 0 if not start_number else int(start_number)
 next_filenumber = petal_id * 1000 + start_number # more id number hackery
