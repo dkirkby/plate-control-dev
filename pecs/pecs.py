@@ -308,7 +308,7 @@ class PECS:
         '''Wrapper for sending rehome command and then measuring result.
         Returns whatever fvc_measure returns.
         '''
-        assert axis in {'both', 'phi', 'theta'}
+        assert axis in {'both', 'phi', 'phi_only', 'theta', 'theta_only'}
         assert debounce in {True, False}
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
