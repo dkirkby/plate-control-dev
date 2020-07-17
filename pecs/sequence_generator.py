@@ -158,11 +158,10 @@ for axis in {'theta', 'phi'}:
     new = sequence.Sequence(short_name=f'{axis} hardstop test',
                             long_name=f'hysteresis of debounce distances off {axis} hard limit',
                             details=details)
-    if axis == 'theta':
-        init_cmd = 'posintTP'
-        init_pos = [0, 140]
-        new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
-                     log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} to ensure accurate theta measurements')
+    init_cmd = 'posintTP'
+    init_pos = [0, 130]
+    new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
+                 log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
     for loop in range(n_repeats):
         loop_text = f'loop {loop+1} of {n_repeats}'
         new.add_move(command='home_no_debounce',
