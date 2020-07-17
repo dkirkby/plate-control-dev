@@ -18,9 +18,10 @@ import posconstants as pc
 
 # load stats data
 statsfile_dir = 'C:\\Users\\joe\\fp_temp_files'
-statsfile_name = 'sched_stats_075EK4_01000-01999.csv'
+statsfile_name = 'sched_stats_075RQO_01000-01999.csv'
 statsfile_path = os.path.join(statsfile_dir, statsfile_name)
 stats = pd.read_csv(statsfile_path)
+sequence_prefix = '01002'
 
 # clear out footers
 not_string = [i for i in range(len(stats)) if not isinstance(stats['method'].iloc[i], str)]
@@ -55,7 +56,6 @@ min_weight = 1.0
 weights = [w + min_weight for w in weights]
 
 # generate sequences
-sequence_prefix = '01001'
 sequences = {}
 num_collisions_to_avoid = {}
 for shape in output_shapes:
