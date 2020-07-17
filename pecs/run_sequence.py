@@ -16,9 +16,11 @@ parser.add_argument('-i', '--infile', type=str, required=True, help='Path to seq
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-m', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
-parser.add_argument('-c', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
+parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
 parser.add_argument('-t', '--test_tp', action='store_true', help='turns on auto-updating of POS_T, POS_P based on measurements, default is False')
 parser.add_argument('-n', '--no_movement', action='store_true', help='for debugging purposes, this option suppresses sending move tables to positioners, so they will not physically move')
+default_cycle_time = 60.0 # sec
+parser.add_argument('-c', '--cycle_time', type=float, default=default_cycle_time, help=f'min period of time (seconds) for successive moves (default={default_cycle_time})')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
@@ -222,7 +224,14 @@ else:
 
 # do the sequence
 last_pos_settings = None
+last_move_time = time.time() - args.cycle_time
 for move in seq:
+    sec_since_last_move = time.time() - last_move_time
+    need_to_wait = args.cycle_time - sec_since_last_move
+    if need_to_wait > 0:
+        logger.info(f'Pausing {need_to_wait} sec for positioner cool down.')
+        time.sleep(need_to_wait)
+    last_move_time = time.time()
     index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     dict_repr = dict(zip(move.columns, move))
