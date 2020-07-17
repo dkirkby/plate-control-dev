@@ -96,7 +96,8 @@ tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details,
 details = '''Settings: Turn on parameter ONLY_CREEP.
 Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in creep mode.'''
-options = {'ONLY_CREEP': True}
+options = {'ONLY_CREEP': True,
+           'FINAL_CREEP_ON': False}
 short_suffix = 'creep only'
 long_suffix = 'creep-only, at otherwise nominal settings'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
@@ -108,7 +109,8 @@ details = '''Settings: Halve the creep period thereby doubling the creep speed.
 Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Determine whether creep performance can be improved under existing firmware (v5.0) constraints.'''
 options = {'ONLY_CREEP': True,
-           'CREEP_PERIOD': 1}
+           'CREEP_PERIOD': 1,
+           'FINAL_CREEP_ON': False}
 short_suffix = 'fast creep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
