@@ -147,7 +147,7 @@ class PECS:
         self.ptlm.participating_petals = [self._pcid2role(pcid)
                                           for pcid in self.pcids]
         if posids is None:
-            posids0, posinfo = self.get_enabled_posids(posids='all')
+            posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             self.print(f'Defaulting to all {len(posids0)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
@@ -391,11 +391,16 @@ class PECS:
         log_note = pc.join_notes(log_note, f'use_desimeter={self.use_desimeter}')
         return log_note
                 
-    def get_enabled_posids(self, posids='sub'):
+    def get_enabled_posids(self, posids='sub', include_posinfo=False):
         '''Returns list of the enabled posids.
+        
+        INPUTS:
             posids ... 'sub' --> return enabled subset of PECS' self.posids property
                    ... 'all' --> return all currently enabled posids
                    ... some iterable --> return just the enabled subset of iterable
+        
+            include_posinfo ... boolean, whether to return a second item with
+                                additional "posinfo" data
         '''
         if posids == 'sub':
             selected_posids = self.posids
@@ -410,4 +415,6 @@ class PECS:
         ret = self.ptlm.get_positioners(enabled_only=True, posids=selected_posids)
         posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
         posids = sorted(posinfo.index)
-        return posids, posinfo
+        if include_posinfo:
+            return posids, posinfo
+        return posids

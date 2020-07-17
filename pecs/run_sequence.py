@@ -74,7 +74,7 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: pecs.get_enabled_posids('sub')[0]
+    get_posids = lambda: pecs.get_enabled_posids('sub')
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info(f'PECS initialization failed')
