@@ -146,7 +146,7 @@ print(new,'\n')
 tests.append(new)
 
 # Hardstop debounce measurements
-details = '''Settings: default initially, then ONLY_CREEP and no ANTIBACKLASH
+details = '''Settings: default initially, then ONLY_CREEP, and no ANTIBACKLASH, and no auto final creep
 Moves: Strike hard-limit, then creep away from it in steps.
 Purpose: Measure the hysteresis of coming off the hardstops.'''
 step_size = {'theta': 1.0, 'phi': -1.0}
@@ -171,7 +171,7 @@ for axis in {'theta', 'phi'}:
             new.add_move(command='dTdP',
                          target0=step_size[axis] * (axis=='theta'),
                          target1=step_size[axis] * (axis=='phi'),
-                         pos_settings={'ONLY_CREEP': True, 'ANTIBACKLASH_ON': False},
+                         pos_settings={'ONLY_CREEP': True, 'ANTIBACKLASH_ON': False, 'FINAL_CREEP_ON': False},
                          log_note=f'{new.short_name}, {loop_text}, step {step+1} of {num_steps[axis]}',
                          )
     print(new,'\n')
