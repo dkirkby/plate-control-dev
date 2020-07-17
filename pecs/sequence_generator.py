@@ -123,7 +123,8 @@ new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new
 print(new,'\n')
 tests.append(new)
 
-new = sequence.Sequence(short_name='debug dTdP full current', long_name='test the code with single tiny move and motor current set to 100')
+new = sequence.Sequence(short_name='debug dTdP full current',
+                        long_name='test the code with single tiny move and motor current set to 100')
 new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new),
              pos_settings={'ANTIBACKLASH_ON': False,
                            'CURR_SPIN_UP_DOWN': 100,
@@ -132,18 +133,49 @@ new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new
 print(new,'\n')
 tests.append(new)
 
-new = sequence.Sequence(short_name='debug home_and_debounce', long_name='test the code with rehome followed by debounce')
+new = sequence.Sequence(short_name='debug home_and_debounce',
+                        long_name='test the code with rehome followed by debounce')
 new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=debug_note(new))
 print(new,'\n')
 tests.append(new)
 
-new = sequence.Sequence(short_name='debug home_no_debounce',  long_name='test the code with rehome followed by no debounce')
+new = sequence.Sequence(short_name='debug home_no_debounce', 
+                        long_name='test the code with rehome followed by no debounce')
 new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=debug_note(new))
 print(new,'\n')
 tests.append(new)
 
-# Hardstop debounce
-# TO-DO
+# Hardstop debounce measurements
+details = '''Settings: default initially, then ONLY_CREEP and no ANTIBACKLASH
+Moves: Strike hard-limit, then creep away from it in steps.
+Purpose: Measure the hysteresis of coming off the hardstops.'''
+step_size = {'theta': 1.0, 'phi': -1.0}
+num_steps = {'theta': 10, 'phi': 10}
+n_repeats = 1
+for axis in {'theta', 'phi'}:
+    new = sequence.Sequence(short_name=f'{axis} hardstop test',
+                            long_name=f'hysteresis of debounce distances off {axis} hard limit',
+                            details=details)
+    if axis == 'theta':
+        init_cmd = 'posintTP'
+        init_pos = [0, 140]
+        new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
+                     log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} to ensure accurate theta measurements')
+    for loop in range(n_repeats):
+        loop_text = f'loop {loop+1} of {n_repeats}'
+        new.add_move(command='home_no_debounce',
+                     target0=(axis=='theta'),
+                     target1=(axis=='phi'),
+                     log_note=f'{new.short_name}, starting {loop_text}')
+        for step in range(num_steps[axis]):
+            new.add_move(command='dTdP',
+                         target0=step_size[axis] * (axis=='theta'),
+                         target1=step_size[axis] * (axis=='phi'),
+                         pos_settings={'ONLY_CREEP': True, 'ANTIBACKLASH_ON': False},
+                         log_note=f'{new.short_name}, {loop_text}, step {step+1} of {num_steps[axis]}',
+                         )
+    print(new,'\n')
+    tests.append(new)
 
 # SAVE TO DISK
 for test in tests:
