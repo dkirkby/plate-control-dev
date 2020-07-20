@@ -135,14 +135,15 @@ new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new
 print(new,'\n')
 tests.append(new)
 
-new = sequence.Sequence(short_name='debug home_and_debounce',
-                        long_name='test the code with rehome followed by debounce')
+# Basic homing sequences
+new = sequence.Sequence(short_name='home_and_debounce',
+                        long_name='run a single rehome on both axes, followed by debounce moves')
 new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=debug_note(new))
 print(new,'\n')
 tests.append(new)
 
-new = sequence.Sequence(short_name='debug home_no_debounce', 
-                        long_name='test the code with rehome followed by no debounce')
+new = sequence.Sequence(short_name='home_no_debounce', 
+                        long_name='run a single rehome on both axes, with no debounce moves')
 new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=debug_note(new))
 print(new,'\n')
 tests.append(new)
