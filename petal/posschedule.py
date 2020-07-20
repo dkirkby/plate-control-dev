@@ -202,7 +202,7 @@ class PosSchedule(object):
         the move density in time.
         """
         self._schedule_moves_initialize_logging(anticollision)
-        if not self._requests and not self.stages['expert'].is_not_empty():
+        if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
         num_requests_received = len(self._all_received_requested_posids)
