@@ -242,9 +242,11 @@ class PosModel(object):
         move_cmds = {}
         move_cmds['MOVE_CMD'] = [cleanup_table['orig_command']]
         move_cmds['MOVE_CMD'] += cleanup_table['auto_commands']
+        has_finite_dist = [i for i in range(cleanup_table['nrows']) if cleanup_table['dT'][i] or cleanup_table['dP'][i]]
         for letter, number in zip(['T', 'P'], ['1', '2']):
-            speeds_dists = zip(cleanup_table[f'speed_mode_{letter}'], cleanup_table[f'd{letter}'])
-            move_cmds[f'MOVE_VAL{number}'] = [f'{speed} {dist:.3f}' for speed, dist in speeds_dists]
+            speeds = cleanup_table[f'speed_mode_{letter}']
+            dists = cleanup_table[f'd{letter}']
+            move_cmds[f'MOVE_VAL{number}'] = [f'{speeds[i]} {dists[i]:.3f}' for i in has_finite_dist]
         for key, sublist in move_cmds.items():
             string = pc.join_notes(*sublist)
             self.state.store(key, string)
