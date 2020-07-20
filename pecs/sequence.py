@@ -19,6 +19,7 @@ pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
                 'ANTIBACKLASH_ON': True,
                 'ONLY_CREEP': False,
                 'MIN_DIST_AT_CRUISE_SPEED': 180.0,
+                'ALLOW_EXCEED_LIMITS': False,
                 }
 
 col_defaults = move_defaults.copy()
@@ -33,6 +34,7 @@ pos_comments = {'CURR_SPIN_UP_DOWN': 'int, 0-100, spin up / spin down current',
                 'ANTIBACKLASH_ON': 'boolean, if true do an antibacklash sequence at end of a move',
                 'ONLY_CREEP': 'bool, if true disable cruising speed',
                 'MIN_DIST_AT_CRUISE_SPEED': 'float, minimum rotor distance in deg to travel when at cruise speed before slowing back down',
+                'ALLOW_EXCEED_LIMITS': 'bool, flag to allow positioner to go past software limits or not. exercise some caution if setting',
                 }
 
 nominals = {}
