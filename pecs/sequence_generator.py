@@ -6,11 +6,6 @@ Produces positioner move sequences, for any of several pre-cooked types of test.
 import sequence
 import numpy as np
 
-deg = '\u00B0'
-try:
-    dummy = str(deg)
-except:
-    deg = ' deg'  # for crappy ascii setups like on beyonce
 tests = []
 
 # HELPER FUNCTIONS
@@ -32,7 +27,7 @@ def describe(seq, axis):
     deltas = [move[f'target{axis}'] for move in seq.table]
     cumsum = np.cumsum(deltas).tolist()
     print('num test points: '  + str(len(deltas)))
-    print('min and max excursions: [' + str(min(cumsum)) + deg + ', ' + str(max(cumsum)) + deg + ']')
+    print(f'min and max excursions: [{min(cumsum)} deg, {max(cumsum)} deg]')
     # print('delta sequence: ' + str(deltas))
     # print('running total: ' + str(cumsum))
     
