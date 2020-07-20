@@ -135,15 +135,16 @@ print(new,'\n')
 tests.append(new)
 
 # Basic homing sequences
+simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
 new = sequence.Sequence(short_name='home_and_debounce',
                         long_name='run a single rehome on both axes, followed by debounce moves')
-new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=debug_note(new))
+new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(new))
 print(new,'\n')
 tests.append(new)
 
 new = sequence.Sequence(short_name='home_no_debounce', 
                         long_name='run a single rehome on both axes, with no debounce moves')
-new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=debug_note(new))
+new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(new))
 print(new,'\n')
 tests.append(new)
 
