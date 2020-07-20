@@ -31,8 +31,7 @@ class PosMoveTable(object):
             self.init_posintTP = init_posintTP  # initial [theta,phi] position (positioner local coordinates)
         else:
             self.init_posintTP = self.posmodel.expected_current_posintTP
-        self.init_poslocTP = self.posmodel.trans.posintTP_to_poslocTP(
-            self.init_posintTP)  # initial theta, phi position (in petal CS)
+        self.init_poslocTP = self.posmodel.trans.posintTP_to_poslocTP(self.init_posintTP)  # initial theta, phi position (in petal CS)
         self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
@@ -64,7 +63,7 @@ class PosMoveTable(object):
     def __str__(self):
         return str(self.as_dict())
         
-    def display(self,printfunc=print,show_posid=True):
+    def display(self, printfunc=print, show_posid=True):
         def fmt(x):
             if x == None:
                 x = str(x)
@@ -72,11 +71,19 @@ class PosMoveTable(object):
                 return format(x,'>11s')
             elif type(x) == int or type(x) == float:
                 return format(x,'>11g')
-        output = '  move table for: ' + str(self.posid) + '\n' if show_posid else ''
-        output += '  Initial posintTP: ' + str(self.init_posintTP) + '\n'
-        output += '  Initial poslocTP: ' + str(self.init_poslocTP) + '\n'
+        tab = '  '
+        output = f'{tab}move table for: {self.posid}\n' if show_posid else ''
+        output += f'{tab}Original command: {self._orig_command}\n'
+        output += f'{tab}Initial posintTP: {self.init_posintTP}\n'
+        output += f'{tab}Initial poslocTP: {self.init_poslocTP}\n'
         for axisid, cmd_str in self._postmove_cleanup_cmds.items():
-            output += f'  Axis {axisid} postmove cmds: {repr(cmd_str)}\n'
+            output += f'{tab}Axis {axisid} postmove cmds: {repr(cmd_str)}\n'
+        d = self.as_dict()
+        keys_elsewhere = {'posid', 'rows', '_rows_extra', 'init_posintTP',
+                          'init_poslocTP', 'postmove_cleanup_cmds', 'orig_command'}
+        other_keys = set(d.keys()) - keys_elsewhere
+        for key in other_keys:
+            output += f'{tab}{key}: {d[key]}\n'
         if self.rows or self._rows_extra:
             output += fmt('row_type')
             headers = PosMoveRow().data.keys()
@@ -247,6 +254,17 @@ class PosMoveTable(object):
         self.append_log_note(other_move_table.log_note)
         self.store_orig_command(string=other_move_table._orig_command)
         
+        # Second table (since it comes last) takes precedence  when determining
+        # whether to do automatic final moves.
+        self.should_final_creep = other_move_table.should_final_creep
+        self.should_antibacklash = other_move_table.should_antibacklash
+        
+        # Any disabling of range limits takes precedence.
+        self.allow_exceed_limits |= other_move_table.allow_exceed_limits
+        
+        # Any forcing of creep-only takes precedence.
+        self.allow_cruise &= other_move_table.allow_cruise
+        
     # internal methods
     def _calculate_true_moves(self):
         """Uses PosModel instance to get the real, quantized, calibrated values.
@@ -258,20 +276,32 @@ class PosMoveTable(object):
         new_moves = [[],[]]
         true_and_new = [[],[]]
         has_moved = [False,False]
+        normal_row_limits = None if self.allow_exceed_limits else 'debounced'
+        extra_row_limits = None if self.allow_exceed_limits else 'near_full'
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'],row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
-                limits = None if self.allow_exceed_limits else 'debounced'
-                true_moves[i].append(self.posmodel.true_move(i, ideal_dist[i], self.allow_cruise, limits, latest_TP))
+                move = self.posmodel.true_move(axisid=i,
+                                               distance=ideal_dist[i],
+                                               allow_cruise=self.allow_cruise,
+                                               limits=normal_row_limits,
+                                               init_posintTP=latest_TP)
+                true_moves[i].append(move)
                 latest_TP[i] += true_moves[i][-1]['distance']
                 if true_moves[i][-1]['distance']:
                     has_moved[i] = True
         if self.should_antibacklash and any(has_moved):
-            backlash_dir = [self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T'], self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
+            backlash_dir = [self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T'],
+                            self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in [pc.T,pc.P]:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
-                new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, limits='near_full', init_posintTP=latest_TP))
+                move = self.posmodel.true_move(axisid=i,
+                                               distance=backlash[i],
+                                               allow_cruise=self.allow_cruise,
+                                               limits=extra_row_limits,
+                                               init_posintTP=latest_TP)
+                new_moves[i].append(move)
                 new_moves[i][-1]['auto_cmd'] = '(auto backlash backup)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
@@ -283,7 +313,12 @@ class PosMoveTable(object):
             for i in [pc.T,pc.P]:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                 err_dist[i] = ideal_total[i] - actual_total[i]
-                new_moves[i].append(self.posmodel.true_move(i, err_dist[i], allow_cruise=False, limits='near_full', init_posintTP=latest_TP))
+                move = self.posmodel.true_move(axisid=i,
+                                               distance=err_dist[i],
+                                               allow_cruise=False,
+                                               limits=extra_row_limits,
+                                               init_posintTP=latest_TP)
+                new_moves[i].append(move)
                 new_moves[i][-1]['auto_cmd'] = '(auto final creep)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
@@ -292,7 +327,8 @@ class PosMoveTable(object):
             self._rows_extra[i].data = {'dT_ideal': new_moves[pc.T][i]['distance'],
                                         'dP_ideal': new_moves[pc.P][i]['distance'],
                                         'prepause': 0,
-                                        'move_time': max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
+                                        'move_time': max(new_moves[pc.T][i]['move_time'],
+                                                         new_moves[pc.P][i]['move_time']),
                                         'postpause': 0,
                                         'auto_cmd': new_moves[pc.T][i]['auto_cmd'],
                                         }
