@@ -7,6 +7,10 @@ import sequence
 import numpy as np
 
 deg = '\u00B0'
+try:
+    dummy = str(deg)
+except:
+    deg = ' deg'  # for crappy ascii setups like on beyonce
 tests = []
 
 # HELPER FUNCTIONS
