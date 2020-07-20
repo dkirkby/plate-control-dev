@@ -148,33 +148,42 @@ print(new,'\n')
 tests.append(new)
 
 # Hardstop debounce measurements
-details = '''Settings: default initially, then ONLY_CREEP, and no ANTIBACKLASH, and no auto final creep
-Moves: Strike hard-limit, then creep away from it in steps.
-Purpose: Measure the hysteresis of coming off the hardstops.'''
-step_size = {'theta': 1.0, 'phi': -1.0}
-num_steps = {'theta': 10, 'phi': 10}
-n_repeats = 1
+details = '''Settings: default
+Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
+Purpose: Measure the debounce distance needed when coming off the hardstops.'''
+debounce_vals = {'theta': [2.0, 3.0, 4.0],
+                 'phi': [-2.0, -3.0, -4.0]}
+test_step_away = {'theta': 30.0, 'phi': -30.0}
+num_test_steps = {'theta': 2, 'phi': 2}
 for axis in {'theta', 'phi'}:
     new = sequence.Sequence(short_name=f'{axis} hardstop test',
-                            long_name=f'hysteresis of debounce distances off {axis} hard limit',
+                            long_name=f'tests varying debounce distances, when coming off {axis} hard limit',
                             details=details)
     init_cmd = 'posintTP'
     init_pos = [0, 130]
     new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
                  log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
-    for loop in range(n_repeats):
-        loop_text = f'loop {loop+1} of {n_repeats}'
+    n_debounce = len(debounce_vals[axis])
+    for i in range(n_debounce):
+        debounce = debounce_vals[axis][i]
+        note = f'{new.short_name}, loop {i+1} of {n_debounce}'
         new.add_move(command='home_no_debounce',
                      target0=(axis=='theta'),
                      target1=(axis=='phi'),
-                     log_note=f'{new.short_name}, starting {loop_text}')
-        for step in range(num_steps[axis]):
-            new.add_move(command='dTdP',
-                         target0=step_size[axis] * (axis=='theta'),
-                         target1=step_size[axis] * (axis=='phi'),
-                         pos_settings={'ONLY_CREEP': True, 'ANTIBACKLASH_ON': False, 'FINAL_CREEP_ON': False},
-                         log_note=f'{new.short_name}, {loop_text}, step {step+1} of {num_steps[axis]}',
-                         )
+                     log_note=note)
+        new.add_move(command='dTdP',
+                     target0=debounce_vals[axis][i] * (axis=='theta'),
+                     target1=debounce_vals[axis][i] * (axis=='phi'),
+                     log_note=f'{note}, debounce={debounce}')
+        for j in range(num_test_steps[axis]):
+            for direction in {'away from', 'toward'}:
+                sign = 1 if direction == 'away from' else -1
+                step = sign * test_step_away[axis]
+                new.add_move(command='dTdP',
+                             target0=step * (axis=='theta'),
+                             target1=step * (axis=='phi'),
+                             log_note=f'{note}, step {j+1} of {num_test_steps[axis]}, {direction} hardstop',
+                             )
     print(new,'\n')
     tests.append(new)
 
