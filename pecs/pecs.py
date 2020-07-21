@@ -283,7 +283,7 @@ class PECS:
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
             check_unmatched=check_unmatched, test_tp=test_tp)
-        result = self._match_and_rename_fvc_data(meapos, matched)
+        result = self._merge_match_and_rename_fvc_data(request, meapos, matched)
         self.ptlm.clear_exposure_info()
         return result
     
@@ -309,10 +309,9 @@ class PECS:
             role = self._pcid2role(pcid)
             self.ptlm.rehome_pos(ids=these_posids, axis=axis, anticollision=anticollision,
                                  debounce=debounce, log_note=log_note, participating_petals=role)
-        _, meapos, matched, _ = self.fvc_measure(
-            exppos=None, matched_only=True, match_radius=match_radius, 
-            check_unmatched=check_unmatched, test_tp=test_tp)
-        result = self._match_and_rename_fvc_data(meapos, matched)
+        # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here 
+        result = self.fvc_measure(exppos=None, matched_only=True, match_radius=match_radius, 
+                                  check_unmatched=check_unmatched, test_tp=test_tp)
         self.ptlm.clear_exposure_info()
         return result
 
@@ -406,11 +405,15 @@ class PECS:
             return posids, posinfo
         return posids
     
-    def _match_and_rename_fvc_data(self, meapos, matched):
+    def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
         '''Returns results of fvc measurement after checking for target matches
         and doing ome pandas juggling, very specifc to the other data interchange
-        formats in pecs etc. meapos is a pandas dataframe with index column
-        DEVICE_ID, matched is a set of posids,'''
+        formats in pecs etc.
+        
+        request ... pandas dataframe with index column DEVICE_ID and request data
+        meapos ... pandas dataframe with index column DEVICE_ID and fvc data
+        matched ... set of posids
+        '''
         # meapos may contain not only matched but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
         merged = matched_df.merge(request, on='DEVICE_ID').set_index('DEVICE_ID')
