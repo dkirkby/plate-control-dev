@@ -20,6 +20,11 @@ pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
                 'ONLY_CREEP': False,
                 'MIN_DIST_AT_CRUISE_SPEED': 180.0,
                 'ALLOW_EXCEED_LIMITS': False,
+                'BACKLASH': 3.0,
+                'PRINCIPLE_HARDSTOP_CLEARANCE_T': 3.0,
+                'PRINCIPLE_HARDSTOP_CLEARANCE_P': 3.0,
+                'MOTOR_CCW_DIR_P': -1,
+                'MOTOR_CCW_DIR_T': -1,
                 }
 
 col_defaults = move_defaults.copy()
@@ -35,6 +40,11 @@ pos_comments = {'CURR_SPIN_UP_DOWN': 'int, 0-100, spin up / spin down current',
                 'ONLY_CREEP': 'bool, if true disable cruising speed',
                 'MIN_DIST_AT_CRUISE_SPEED': 'float, minimum rotor distance in deg to travel when at cruise speed before slowing back down',
                 'ALLOW_EXCEED_LIMITS': 'bool, flag to allow positioner to go past software limits or not. exercise some caution if setting',
+                'BACKLASH': 'deg, backlash removal distance',
+                'PRINCIPLE_HARDSTOP_CLEARANCE_T': 'float, minimum distance in deg to stay clear of theta principle hardstop',
+                'PRINCIPLE_HARDSTOP_CLEARANCE_P': 'float, minimum distance in deg to stay clear of phi principle hardstop',
+                'MOTOR_CCW_DIR_P': '+1 or -1, defining as-wired motor counter-clockwise direction',
+                'MOTOR_CCW_DIR_T': '+1 or -1, defining as-wired motor counter-clockwise direction',
                 }
 
 nominals = {}
@@ -65,6 +75,9 @@ import os
 from astropy.table import Table
 import numpy as np
 
+is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
+is_bool = lambda x: isinstance(x, (bool, np.bool_))
+
 def read(path):
     '''Reads in and validates format for a saved Sequence from a file. E.g.
         sequence = Sequence.read(path)
@@ -72,8 +85,6 @@ def read(path):
     table = Table.read(path)
     example = Sequence(short_name='dummy')
     example.add_move(command='QS', target0=0.0, target1=0.0)
-    is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
-    is_bool = lambda x: isinstance(x, (bool, np.bool_))
     for col in table.columns:
         assert col in example.table.columns
         for i in range(len(table)):
@@ -161,8 +172,9 @@ class Sequence(object):
         row['log_note'] = str(log_note)
         for key, value in pos_settings.items():
             assert key in pos_defaults
-            expected_type =  type(pos_defaults[key])
-            if isinstance(value, int) and isinstance(expected_type, float):
+            example = pos_defaults[key]
+            expected_type =  type(example)
+            if isinstance(value, (int, np.integer)) and isinstance(example, (float, np.floating)):
                 value = float(value)
             assert isinstance(value, expected_type)
             row[key] = value
