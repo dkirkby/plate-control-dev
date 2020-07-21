@@ -209,6 +209,8 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
                   "SECONDARY_HARDSTOP_CLEARANCE_T": 3.0,
                   "SPINUPDOWN_PERIOD": 12,
                   }
+def is_constants_key(key):
+    return key.upper() in constants_keys
 
 # state data fields associated with "late" committing to database
 late_commit_defaults = {'OBS_X':None,
@@ -217,6 +219,12 @@ late_commit_defaults = {'OBS_X':None,
                         'PTL_Y':None,
                         'PTL_Z':None,
                         'FLAGS':None}
+
+# ordered lists of motor parameters (in order that petalcontroller expects them)
+# interface is funky, for example the doubling in some cases for the two motors
+ordered_motor_current_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD'] * 2
+ordered_motor_period_keys = ['CREEP_PERIOD'] * 2 + ['SPINUPDOWN_PERIOD']
+motor_param_keys = set(ordered_motor_current_keys + ordered_motor_period_keys)
 
 # performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']

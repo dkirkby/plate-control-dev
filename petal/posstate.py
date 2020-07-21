@@ -292,7 +292,8 @@ class PosState(object):
         if self._val[key] != old_val and register_if_altered:
             if pc.is_calib_key(key):
                 self._register_altered_calib()
-            else:
+            elif not pc.is_constants_key(key):
+                # any other key must be in the moves db
                 self._register_altered_move()
         return True
 
