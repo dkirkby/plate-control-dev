@@ -90,7 +90,7 @@ import numpy as np
 
 def is_number(x):
     '''Check type to see if it's a common number type.'''
-    return isinstance(x, (int, float, np.int_, np.float_))
+    return isinstance(x, (int, float, np.integer, np.floating))
 
 def is_boolean(x, include01=True):
     '''Check type to see if it's a common boolean type.'''
