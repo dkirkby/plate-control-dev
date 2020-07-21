@@ -152,11 +152,11 @@ tests.append(new)
 details = '''Settings: default
 Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
 Purpose: Measure the debounce distance needed when coming off the hardstops.'''
-debounce_vals = {'theta': [2.0, 3.0, 4.0],
-                 'phi': [-2.0, -3.0, -4.0]}
+clearance_vals = {'theta': [1.0, 3.0, 5.0, 7.0, 9.0],
+                 'phi': [1.0, 3.0, 5.0, 7.0]}
 test_step_away = {'theta': 30.0, 'phi': -30.0}
 num_test_steps = {'theta': 2, 'phi': 2}
-for axis in {'theta', 'phi'}:
+for axis in ['theta', 'phi']:
     new = sequence.Sequence(short_name=f'{axis} hardstop test',
                             long_name=f'tests varying debounce distances, when coming off {axis} hard limit',
                             details=details)
@@ -164,26 +164,27 @@ for axis in {'theta', 'phi'}:
     init_pos = [0, 130]
     new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
                  log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
-    n_debounce = len(debounce_vals[axis])
-    for i in range(n_debounce):
-        debounce = debounce_vals[axis][i]
-        note = f'{new.short_name}, loop {i+1} of {n_debounce}'
-        new.add_move(command='home_no_debounce',
+    n_loops = len(clearance_vals[axis])
+    for i in range(n_loops):
+        clearance_val = clearance_vals[axis][i]
+        clearance_key = f'PRINCIPLE_HARDSTOP_CLEARANCE_{"T" if axis=="theta" else "P"}'
+        settings = {clearance_key: clearance_val}
+        note = f'{new.short_name}, loop {i+1} of {n_loops}, {clearance_key}={clearance_val}'
+        new.add_move(command='home_and_debounce',
                      target0=(axis=='theta'),
                      target1=(axis=='phi'),
-                     log_note=note)
-        new.add_move(command='dTdP',
-                     target0=debounce_vals[axis][i] * (axis=='theta'),
-                     target1=debounce_vals[axis][i] * (axis=='phi'),
-                     log_note=f'{note}, debounce={debounce}')
+                     log_note=note,
+                     pos_settings=settings,
+                     )
         for j in range(num_test_steps[axis]):
-            for direction in {'away from', 'toward'}:
+            for direction in ['away from', 'toward']:
                 sign = 1 if direction == 'away from' else -1
                 step = sign * test_step_away[axis]
                 new.add_move(command='dTdP',
                              target0=step * (axis=='theta'),
                              target1=step * (axis=='phi'),
                              log_note=f'{note}, step {j+1} of {num_test_steps[axis]}, {direction} hardstop',
+                             pos_settings=settings,
                              )
     print(new,'\n')
     tests.append(new)
