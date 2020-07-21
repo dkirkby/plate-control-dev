@@ -64,7 +64,7 @@ valid_commands.update(homing_commands)
 import os
 from astropy.table import Table
 import numpy as np
-        
+
 def read(path):
     '''Reads in and validates format for a saved Sequence from a file. E.g.
         sequence = Sequence.read(path)
@@ -72,10 +72,16 @@ def read(path):
     table = Table.read(path)
     example = Sequence(short_name='dummy')
     example.add_move(command='QS', target0=0.0, target1=0.0)
+    is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
+    is_bool = lambda x: isinstance(x, (bool, np.bool_))
     for col in table.columns:
         assert col in example.table.columns
         for i in range(len(table)):
-            assert type(table[col][i]) == type(example.table[col][0])
+            val = table[col][i]
+            test = example.table[col][0]
+            if is_number(val) and is_number(test) or is_bool(val) and is_bool(test):
+                continue
+            assert isinstance(val, type(test))
         try:
             np.isfinite(example.table[col][0])
             isnumber = True
