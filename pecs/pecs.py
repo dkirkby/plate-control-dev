@@ -283,24 +283,9 @@ class PECS:
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
             check_unmatched=check_unmatched, test_tp=test_tp)
-        # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        merged = matched_df.merge(request, how='outer',
-                                  left_index=True, right_index=True)
-        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
-                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
-                      inplace=True)
-        mask = merged['FLAG'].notnull()
-        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
-            merged.loc[mask, 'FLAG'])
-        # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
-                                          participating_petals=self.ptl_roles)
-                  .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
-        #cleanup
+        result = self._match_and_rename_fvc_data(meapos, matched)
         self.ptlm.clear_exposure_info()
-        return merged.join(exppos)
+        return result
     
     def rehome_and_measure(self, posids, axis='both', debounce=True, log_note='',
                            match_radius=None, check_unmatched=False, test_tp=False,
@@ -324,8 +309,10 @@ class PECS:
             role = self._pcid2role(pcid)
             self.ptlm.rehome_pos(ids=these_posids, axis=axis, anticollision=anticollision,
                                  debounce=debounce, log_note=log_note, participating_petals=role)
-        result = self.fvc_measure(exppos=None, matched_only=True, match_radius=match_radius, 
-                                  check_unmatched=check_unmatched, test_tp=test_tp)
+        _, meapos, matched, _ = self.fvc_measure(
+            exppos=None, matched_only=True, match_radius=match_radius, 
+            check_unmatched=check_unmatched, test_tp=test_tp)
+        result = self._match_and_rename_fvc_data(meapos, matched)
         self.ptlm.clear_exposure_info()
         return result
 
@@ -418,3 +405,27 @@ class PECS:
         if include_posinfo:
             return posids, posinfo
         return posids
+    
+    def _match_and_rename_fvc_data(self, meapos, matched):
+        '''Returns results of fvc measurement after checking for target matches
+        and doing ome pandas juggling, very specifc to the other data interchange
+        formats in pecs etc. meapos is a pandas dataframe with index column
+        DEVICE_ID, matched is a set of posids,'''
+        # meapos may contain not only matched but all posids in expected pos
+        matched_df = meapos.loc[sorted(matched & set(self.posids))]
+        merged = matched_df.merge(request, on='DEVICE_ID').set_index('DEVICE_ID')
+        
+        # columns get renamed
+        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
+                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
+                      inplace=True)
+        mask = merged['FLAG'].notnull()
+        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAG'])
+        
+        # get expected (tracked) posintTP angles
+        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+                                          participating_petals=self.ptl_roles)
+                  .set_index('DEVICE_ID')[['X1', 'X2']])
+        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
+        result = merged.join(exppos, on='DEVICE_ID')
+        return result
