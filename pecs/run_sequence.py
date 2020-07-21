@@ -229,7 +229,7 @@ for move in seq:
     sec_since_last_move = time.time() - last_move_time
     need_to_wait = args.cycle_time - sec_since_last_move
     if need_to_wait > 0:
-        logger.info(f'Pausing {need_to_wait} sec for positioner cool down.')
+        logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down.')
         time.sleep(need_to_wait)
     last_move_time = time.time()
     index = move.index
