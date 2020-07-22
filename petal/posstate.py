@@ -295,6 +295,8 @@ class PosState(object):
             elif not pc.is_constants_key(key):
                 # any other key must be in the moves db
                 self._register_altered_move()
+            if pc.is_cached_in_posmodel(key):
+                self._refresh_posmodel()
         return True
 
     def write(self):
@@ -389,7 +391,12 @@ class PosState(object):
         else:
             self._register_altered_move = lambda: None
             self._register_altered_calib = lambda: None
-
+            
+    def set_posmodel_cache_refresher(self, func):
+        '''Set function handle for refreshing posmodel cache when a relevant
+        state value changes.'''
+        self._refresh_posmodel = func
+            
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
         to have a regular method for incrementing the suffix on log filenames.

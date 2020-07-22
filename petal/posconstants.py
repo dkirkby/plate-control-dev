@@ -226,6 +226,28 @@ ordered_motor_current_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 
 ordered_motor_period_keys = ['CREEP_PERIOD'] * 2 + ['SPINUPDOWN_PERIOD']
 motor_param_keys = set(ordered_motor_current_keys + ordered_motor_period_keys)
 
+# state keys which posmodel keeps a cache of (for speed)
+keys_cached_in_posmodel = {'BACKLASH',
+                           'PRINCIPLE_HARDSTOP_CLEARANCE_T',
+                           'PRINCIPLE_HARDSTOP_CLEARANCE_P',
+                           'SECONDARY_HARDSTOP_CLEARANCE_T',
+                           'SECONDARY_HARDSTOP_CLEARANCE_P',
+                           'ANTIBACKLASH_FINAL_MOVE_DIR_T',
+                           'ANTIBACKLASH_FINAL_MOVE_DIR_P',
+                           'PRINCIPLE_HARDSTOP_DIR_T',
+                           'PRINCIPLE_HARDSTOP_DIR_P',
+                           'GEAR_TYPE_T',
+                           'GEAR_TYPE_P',
+                           'MOTOR_CCW_DIR_T',
+                           'MOTOR_CCW_DIR_P',
+                           'GEAR_CALIB_T',
+                           'GEAR_CALIB_P',
+                           'PHYSICAL_RANGE_T',
+                           'PHYSICAL_RANGE_P',
+                           }
+def is_cached_in_posmodel(key):
+    return key.upper() in keys_cached_in_posmodel
+
 # performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 

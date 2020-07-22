@@ -16,6 +16,7 @@ class PosModel(object):
             self.state = posstate.PosState()
         else:
             self.state = state
+        self.state.set_posmodel_cache_refresher(self.refresh_cache)
         self.trans = postransforms.PosTransforms(this_posmodel=self, petal_alignment=petal_alignment)
         self.axis = [None, None]
         self.axis[pc.T] = Axis(self, pc.T)
@@ -25,8 +26,17 @@ class PosModel(object):
         self._stepsize_cruise            = 3.3    # deg
         self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
+        
+    def _load_cached_params(self):
+        '''Do this *after* refreshing the caches in the axis instances.'''
         self._abs_shaft_speed_cruise_T   = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
         self._abs_shaft_speed_cruise_P   = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+
+    def refresh_cache(self):
+        """Reloads state parameters with cached values."""
+        for axis in self.axis:
+            axis._load_cached_params()
+        self._load_cached_params()
 
     @property
     def _motor_speed_creep(self):
@@ -264,14 +274,21 @@ class Axis(object):
     def __init__(self, posmodel, axisid):
         self.posmodel = posmodel
         self.axisid = axisid
-        self.antibacklash_final_move_dir = self.calc_antibacklash_final_move_dir()
-        self.principle_hardstop_direction = self.calc_principle_hardstop_direction()
-        self.backlash_clearance = self.calc_backlash_clearance()
-        self.hardstop_clearance = self.calc_hardstop_clearance()
-        self.hardstop_clearance_near_full_range = self.calc_hardstop_clearance_near_full_range()
-        self.hardstop_debounce = self.calc_hardstop_debounce()
+        self._load_cached_params()
+        
+    def _load_cached_params(self):
+        # order of operations here matters
+        self.antibacklash_final_move_dir = self._calc_antibacklash_final_move_dir()
+        self.principle_hardstop_direction = self._calc_principle_hardstop_direction()
+        self.backlash_clearance = self._calc_backlash_clearance()
+        self.hardstop_clearance = self._calc_hardstop_clearance()
+        self.hardstop_clearance_near_full_range = self._calc_hardstop_clearance_near_full_range()
+        self.hardstop_debounce = self._calc_hardstop_debounce()
         motor_props = self.motor_calib_properties
         self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio'] / motor_props['gear_calib']
+        self.full_range = self._calc_full_range()
+        self.debounced_range = self._calc_debounced_range()
+        self.near_full_range = self._calc_near_full_range()
 
     @property
     def pos(self):
@@ -295,50 +312,15 @@ class Axis(object):
             self.posmodel.state.store('POS_P', value)
 
     @property
-    def full_range(self):
-        """Calculated from physical range only, with no subtraction of debounce
-        distance.
-        Returns [1x2] array of [min,max]
-        """
-        if self.axisid == pc.T:
-            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_T'])
-            return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
-        else:
-            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
-            return [185.0-r, 185.0]  # split phi range such that 0 is essentially at the minimum
-
-    @property
-    def debounced_range(self):
-        """Calculated from full range, accounting for removal of both the hardstop
-        clearance distances and the backlash removal distance.
-        Returns [1x2] array of [min,max]
-        """
-        f = self.full_range
-        h = self.hardstop_debounce # includes "backlash" and "clearance"
-        return [f[0] + h[0], f[1] + h[1]]
-
-    @property
-    def near_full_range(self):
-        """In-between full_range and debounced_range. This guarantees sufficient
-        backlash clearance, while giving reasonable probability of not contacting
-        the hard stop. Intended use case is to allow a small amount of numerical
-        margin for making tiny cruise move corrections.
-        Returns [1x2] array of [min,max]
-        """
-        f = self.full_range
-        nh = self.hardstop_clearance_near_full_range # does not include "backlash"
-        return [f[0] + nh[0], f[1] + nh[1]]
-
-    @property
     def maxpos(self):
         """Max accessible position, as defined by debounced_range.
         """
-        return self.get_maxpos() # this redirect is for legacy compatibility with external code
+        return self.get_maxpos()  # this redirect is for legacy compatibility with external code
 
     def get_maxpos(self, use_near_full_range=False):
         """Function to return accessible position. By default this is within
-        debounced_range. An option exists to get the min as defined by near_full_range
-        instead.
+        debounced_range. An option exists to get the max as defined by
+        near_full_range instead.
         """
         d = self.near_full_range if use_near_full_range else self.debounced_range
         if self.last_primary_hardstop_dir >= 0:
@@ -348,15 +330,14 @@ class Axis(object):
 
     @property
     def minpos(self):
-        """Min accessible position. By default this is within debounced_range.
-        An option exists to get the min as defined by near_full_range instead.
+        """Min accessible position, as defined by debounced_range.
         """
-        return self.get_minpos()
+        return self.get_minpos()  # this redirect is for legacy compatibility with external code
         
     def get_minpos(self, use_near_full_range=False):
         """Function to return accessible position. By default this is within
-        debounced_range. An option exists to get the min as defined by near_full_range
-        instead.
+        debounced_range. An option exists to get the min as defined by
+        near_full_range instead.
         """
         d = self.near_full_range if use_near_full_range else self.debounced_range
         if self.last_primary_hardstop_dir < 0:
@@ -453,7 +434,39 @@ class Axis(object):
             distance = new_distance
         return distance
 
-    def calc_principle_hardstop_direction(self):
+    def _calc_full_range(self):
+        """Calculated from physical range only, with no subtraction of debounce
+        distance.
+        Returns [1x2] array of [min,max]
+        """
+        if self.axisid == pc.T:
+            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_T'])
+            return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
+        else:
+            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
+            return [185.0-r, 185.0]  # split phi range such that 0 is essentially at the minimum
+
+    def _calc_debounced_range(self):
+        """Calculated from full range, accounting for removal of both the hardstop
+        clearance distances and the backlash removal distance.
+        Returns [1x2] array of [min,max]
+        """
+        f = self.full_range
+        h = self.hardstop_debounce # includes "backlash" and "clearance"
+        return [f[0] + h[0], f[1] + h[1]]
+
+    def _calc_near_full_range(self):
+        """In-between full_range and debounced_range. This guarantees sufficient
+        backlash clearance, while giving reasonable probability of not contacting
+        the hard stop. Intended use case is to allow a small amount of numerical
+        margin for making tiny cruise move corrections.
+        Returns [1x2] array of [min,max]
+        """
+        f = self.full_range
+        nh = self.hardstop_clearance_near_full_range # does not include "backlash"
+        return [f[0] + nh[0], f[1] + nh[1]]
+
+    def _calc_principle_hardstop_direction(self):
         """The "principle" hardstop is the one which is struck during homing.
         (The "secondary" hardstop is only struck when finding the total available travel range.)
         """
@@ -462,13 +475,13 @@ class Axis(object):
         else:
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
 
-    def calc_antibacklash_final_move_dir(self):
+    def _calc_antibacklash_final_move_dir(self):
         if self.axisid == pc.T:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
         else:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
 
-    def calc_hardstop_debounce(self):
+    def _calc_hardstop_debounce(self):
         """This is the amount to debounce off the hardstop after striking it.
         It is the hardstop clearance distance plus the backlash removal distance.
         Returns [1x2] array of [min,max]
@@ -477,7 +490,7 @@ class Axis(object):
         b = self.backlash_clearance
         return [h[0] + b[0], h[1] + b[1]]
 
-    def calc_hardstop_clearance(self):
+    def _calc_hardstop_clearance(self):
         """Minimum distance to stay clear from hardstop.
         Returns [1x2] array of [clearance_at_min_limit, clearance_at_max_limit].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction
@@ -499,8 +512,8 @@ class Axis(object):
                 return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
                         -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
 
-    def calc_hardstop_clearance_near_full_range(self):
-        """Slightly less clearance than provided by the calc_hardstop_clearance
+    def _calc_hardstop_clearance_near_full_range(self):
+        """Slightly less clearance than provided by the _calc_hardstop_clearance
         function.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction
@@ -509,7 +522,7 @@ class Axis(object):
         h = self.hardstop_clearance
         return [x * pc.near_full_range_reduced_hardstop_clearance_factor for x in h]
 
-    def calc_backlash_clearance(self):
+    def _calc_backlash_clearance(self):
         """Minimum clearance distance required for backlash removal moves.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction
