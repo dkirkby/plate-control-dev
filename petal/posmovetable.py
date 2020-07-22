@@ -399,10 +399,10 @@ class PosMoveTable(object):
         if output_type in {'cleanup', 'full'}:
             table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
             for i in row_range:
-                table['TOTAL_CRUISE_MOVES_T'] += int(table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
-                table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
-                table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
-                table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
+                table['TOTAL_CRUISE_MOVES_T'] += int(table['speed_mode_T'][i] == 'cruise' and table['dT'][i] != 0)
+                table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'][i] != 0)
+                table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
+                table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['log_note'] = self.log_note
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
         if output_type == 'full':
