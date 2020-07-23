@@ -102,6 +102,10 @@ def read(path):
             assert all(np.isfinite(table[col]))
     for row in table:
         assert row['command'] in valid_commands
+    missing_col = set(col_defaults) - set(table.columns)
+    for col in missing_col:
+        values = pos_defaults[col]*len(table)
+        table[col] = values
     sequence = Sequence(short_name=table.meta['short_name'],
                         long_name=table.meta['long_name'])
     sequence.table = table
