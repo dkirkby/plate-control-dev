@@ -152,10 +152,10 @@ tests.append(new)
 details = '''Settings: default
 Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
 Purpose: Measure the debounce distance needed when coming off the hardstops.'''
-clearance_vals = {'theta': [1.0, 3.0, 5.0, 7.0, 9.0],
+clearance_vals = {'theta': [1.0, 3.0, 6.0, 9.0, 12.0],
                  'phi': [1.0, 3.0, 5.0, 7.0]}
 test_step_away = {'theta': 30.0, 'phi': -30.0}
-num_test_steps = {'theta': 2, 'phi': 2}
+num_test_steps = {'theta': 3, 'phi': 3}
 for axis in ['theta', 'phi']:
     new = sequence.Sequence(short_name=f'{axis} hardstop test',
                             long_name=f'tests varying debounce distances, when coming off {axis} hard limit',
