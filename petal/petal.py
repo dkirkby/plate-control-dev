@@ -1678,6 +1678,7 @@ class Petal(object):
                                f'about which positioners failed to communicate. Further downstream errors are ' +
                                f'likely.')
                 posids_to_retry = {}
+                failed_send_posids = self._posids_where_tables_were_just_sent
             if self.schedule.expert_mode_is_on():
                 expert_mode = True
                 all_tables = self.schedule.get_orig_expert_tables_sequence()
