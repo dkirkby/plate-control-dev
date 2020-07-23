@@ -1671,12 +1671,13 @@ class Petal(object):
                 self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_posids)} ' +
                                f'move tables to petalcontroller. Failed posids: {failed_send_posids}. ' +
                                f'CAN busids with failures: {buses_with_fails}.')
+                posids_to_retry = self._posids_where_tables_were_just_sent - failed_send_posids
             else:
                 self.printfunc(f'ERROR: {response_str}. Could not send move tables to some unknown number ' +
                                f'of positioners. Most likely due petalcontroller not sending back information ' +
                                f'about which positioners failed to communicate. Further downstream errors are ' +
                                f'likely.')
-            posids_to_retry =  self._posids_where_tables_were_just_sent - failed_send_posids
+                posids_to_retry = {}
             if self.schedule.expert_mode_is_on():
                 expert_mode = True
                 all_tables = self.schedule.get_orig_expert_tables_sequence()
