@@ -74,6 +74,8 @@ class PECS:
             self.ptlm = PetalMan()
             pcids = [self._role2pcid(role)
                      for role in self.ptlm.participating_petals]
+            # Only use petals that are availible in Petalman
+            self.pcids = list(set(self.pcids) & set(pcids))
             self.print(f'PetalMan proxy initialised with active petal '
                        f'role numbers (PCIDs): {pcids}')
         else:
@@ -84,7 +86,9 @@ class PECS:
             self.illuminated_ptl_roles = list(self.ptlm.Petals.keys())
         else:
             self.illuminated_ptl_roles = [self._pcid2role(pcid)
-                                          for pcid in self.illuminated_pcids]
+                                          for pcid in self.illuminated_pcids
+                                          if self._pcid2role(pcid)
+                                          in list(self.ptlm.Petals.keys())]
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
