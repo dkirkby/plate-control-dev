@@ -1266,7 +1266,12 @@ class Petal(object):
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid,
         according to the internal tracking of its posmodel object.
-        Returns a two element list. Valid keys are:
+        Returns a two element list.
+        
+        INPUTS:  posid ... id string for a single positioner
+                 key ... coordinate system to return position in
+        
+        Valid keys are:
             'posintTP, 'poslocXY', 'poslocTP',
             'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
         See comments in posmodel.py for explanation of these values.
