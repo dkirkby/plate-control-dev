@@ -232,6 +232,7 @@ class PosAnimator(object):
                 self.set_patch(self.patches[i], item, frame)
 
     def animate(self):
+        '''Returns path of output file.'''
         successful = self.anim_init()
         if not successful:
             print('Animator not initialized. Usually due to no frames available to animate.')
@@ -283,6 +284,7 @@ class PosAnimator(object):
         if self.delete_imgs:
             for path in image_paths.values():
                 os.remove(path)
+        return output_file
 
     def grab_frame(self, frame_number):
         """Saves current figure to an image file. Returns next frame number."""
