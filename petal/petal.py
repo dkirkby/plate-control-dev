@@ -520,9 +520,19 @@ class Petal(object):
 
     def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for a single positioner or all positioners
-        in iterable collection posids. The optional argument cmd_prefix allows adding a
-        descriptive string to the log. This method is generally recommended only for
+        in iterable collection posids. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
+        
+        ** IMPORTANT **
+        This is a very EXPERT function. There is no situation where a normal user would
+        ever call it. If you're even sniffing in this direction, be assured you want the
+        vastly safer rehome_pos wrapper function (defined in PetalApp.py) instead.
+        
+        INPUTS:
+            posids ... single positioner id or iterable collection of ids
+            axisid ... 0 for theta or 1 for phi axis
+            direction ... +1 or -1
+            cmd_prefix ... optional, allows adding a descriptive string to the log
         """
         self._initialize_pos_flags(ids = posids)
         posids = {posids} if isinstance(posids,str) else set(posids)
@@ -558,19 +568,24 @@ class Petal(object):
         collection of posids. Finds the primary hardstop, and sets values for
         the max position and min position. Requests to disabled positioners
         will be ignored.
-
-        axis ... string, 'both' (default), 'theta_only', or 'phi_only'. Optional
-                 argument that allows for homing either theta or phi only.
         
-        debounce ... boolean, if True the hard limit strike is followed by
-                     a small move off the hardstop in the opposite direction
-                     
-        log_note ... optional string to append in the log. N.B.: 'homing', the 
-                     axis, and whether debounce was done, will all automatically
-                     be included in the log, so it's just redundant and noisy to
-                     include such information here. So this log_note is intended
-                     more for contextual info not known to the petal, like name
-                     of a human operator, or whether the sky was blue that day, etc.
+        ** IMPORTANT **
+        This is an EXPERT function. A user should call the rehome_pos wrapper
+        function (defined in PetalApp.py) instead.
+
+        INPUTS:
+            axis ... string, 'both' (default), 'theta_only', or 'phi_only'. Optional
+                     argument that allows for homing either theta or phi only.
+            
+            debounce ... boolean, if True the hard limit strike is followed by
+                         a small move off the hardstop in the opposite direction
+                         
+            log_note ... optional string to append in the log. N.B.: 'homing', the 
+                         axis, and whether debounce was done, will all automatically
+                         be included in the log, so it's just redundant and noisy to
+                         include such information here. So this log_note is intended
+                         more for contextual info not known to the petal, like name
+                         of a human operator, or whether the sky was blue that day, etc.
         """
         axis = 'phi_only' if axis == 'phi' else axis  # deal with common typo
         axis = 'theta_only' if axis == 'theta' else axis  # deal with common typo
@@ -683,6 +698,8 @@ class Petal(object):
             
     def set_motor_parameters(self):
         """Send the motor current and period settings to the positioners.
+        
+        INPUTS:  None
         """
         if self.simulator_on:
             if self.verbose:
@@ -709,6 +726,8 @@ class Petal(object):
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
+        
+        INPUTS:  None
         """
         self.printfunc('execute_moves called')
         if self.simulator_on:
@@ -733,6 +752,8 @@ class Petal(object):
     def send_and_execute_moves(self):
         """Convenience wrapper to send and execute the pending moves (that have already
         been scheduled).
+            
+        INPUTS:  None
         """
         failed_posids = self.send_move_tables()
         self.execute_moves()
@@ -1385,6 +1406,8 @@ class Petal(object):
     def cache_keepouts(self):
         '''Cache keepout parameters to a temporary file on disk. Returns the path
         to the cache file.
+        
+        INPUTS:  None
         '''
         msg_prefix = 'cache_keepouts:'
         path = pc.get_keepouts_cache_path(self.petal_id)
@@ -1401,6 +1424,8 @@ class Petal(object):
     def restore_keepouts(self, path=None):
         '''Restores keepout parameters from cache file on disk. In typical usage
         no path needs to be provided, and the default file path will be used.
+        
+        INPUTS:  path ... string, optional file path where to find cached data
         '''
         msg_prefix = 'restore_keepouts:'
         argued_path = str(path)
@@ -1552,6 +1577,8 @@ class Petal(object):
         it is generated (during move scheduling) and will be retained for making
         an animation of it in the future. Old frame data from any previous animation
         is cleared out first.
+        
+        INPUTS:  None
         """
         self.animator.clear()
         self.animator_on = True
@@ -1560,15 +1587,20 @@ class Petal(object):
 
     def stop_gathering_frames(self):
         """Stop collecting frame data of scheduled moves for the animator.
+        
+        INPUTS:  None
         """
         self.animator_on = False
 
     def generate_animation(self):
         """Use the current collection of move frames in the animator to plot
-        the animation.
+        the animation. Returns path to the generated movie.
+        
+        INPUTS:  None
         """
-        self.animator.animate()
-
+        output_path = self.animator.animate()
+        self.printfunc(f'Animation saved to {output_path}.')
+        return output_path
 
 # INTERNAL METHODS
 
