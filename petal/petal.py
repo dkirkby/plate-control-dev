@@ -1519,7 +1519,10 @@ class Petal(object):
         assert op in valid_ops, 'f{err_prefix} invalid op {op}'
         op_func = valid_ops[op]
         try:
-            operand = float(value)
+            if key in {'POS_ID', 'BUS_ID'}:
+                operand = str(value)
+            else:
+                operand = float(value)
         except:
             assert False, f'{err_prefix} invalid type {type(value)} for value {value}'
         if posids == 'all':
