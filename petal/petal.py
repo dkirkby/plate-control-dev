@@ -1473,7 +1473,7 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
-    def quick_query(self, key=None, op='', value=0, posids='all', mode='compact'):
+    def quick_query(self, key=None, op='', value='', posids='all', mode='compact'):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1482,7 +1482,8 @@ class Petal(object):
         INPUTS:
             key ... string like 'POS_P' or 'LENGTH_R1', etc
             op ... string like '>' or '==', etc. Can leave blank to simply retrieve all values.
-            value ... the operand to compare against
+                   assume '==' if a value is argued but no op
+            value ... the operand to compare against, usually a number for most keys
             posids ... 'all' or iterator of positioner id strings
             mode ... 'compact', 'expanded', 'iterable' ... controls return type
             
@@ -1513,6 +1514,8 @@ class Petal(object):
                       'constants_keys': sorted(constants_keys),
                       'valid_ops': sorted(valid_ops)}
             return valids
+        if value != '' and op == '':
+            op == '=='
         msg_prefix = 'quick_query:'
         err_prefix = f'{msg_prefix} error,'
         assert key in valid_keys, f'{err_prefix} invalid key {key}'
