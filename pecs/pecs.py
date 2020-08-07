@@ -307,7 +307,7 @@ class PECS:
         for posid in enabled:
             pcid = self.pcid_lookup(posid)
             if pcid not in posids_by_petal:
-                posids_by_petal = set()
+                posids_by_petal[pcid] = set()
             posids_by_petal[pcid].add(posid)
         for pcid, these_posids in posids_by_petal.items():
             # 2020-07-12 [JHS] this happens sequentially petal by petal, only because
