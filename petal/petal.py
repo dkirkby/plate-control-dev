@@ -1525,6 +1525,8 @@ class Petal(object):
             if key in {'POS_ID', 'BUS_ID'}:
                 operand = str(value)
             else:
+                if value == '':
+                    value = 0  # case where user made no argument
                 operand = float(value)
         except:
             assert False, f'{err_prefix} invalid type {type(value)} for value {value}'
