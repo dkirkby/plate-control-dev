@@ -1498,7 +1498,8 @@ class Petal(object):
                          'obsY', 'Q', 'S'}
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
         constants_keys = set(pc.constants_keys)
-        valid_keys = position_keys | state_keys | constants_keys
+        id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
+        valid_keys = position_keys | state_keys | constants_keys | id_keys
         valid_ops = {'>': operator.gt,
                      '>=': operator.ge,
                      '==': operator.eq,
@@ -1711,9 +1712,9 @@ class Petal(object):
                 posids_to_retry = self._posids_where_tables_were_just_sent - failed_send_posids
             else:
                 self.printfunc(f'ERROR: {response_str}. Could not send move tables to some unknown number ' +
-                               f'of positioners. Most likely due petalcontroller not sending back information ' +
-                               f'about which positioners failed to communicate. Further downstream errors are ' +
-                               f'likely.')
+                               'of positioners. Most likely due petalcontroller not sending back information ' +
+                               'about which positioners failed to communicate. Further downstream errors are ' +
+                               'likely.')
                 posids_to_retry = {}
                 failed_send_posids = self._posids_where_tables_were_just_sent
             if self.schedule.expert_mode_is_on():
