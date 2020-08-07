@@ -303,7 +303,12 @@ class PECS:
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         enabled = self.get_enabled_posids(posids)
-        posids_by_petal = {self.pcid_lookup(posid): posid for posid in enabled}
+        posids_by_petal = {}
+        for posid in enabled:
+            pcid = self.pcid_lookup(posid)
+            if pcid not in posids_by_petal:
+                posids_by_petal = set()
+            posids_by_petal[pcid].add(posid)
         for pcid, these_posids in posids_by_petal.items():
             # 2020-07-12 [JHS] this happens sequentially petal by petal, only because
             # I haven't studied the PetalMan / PECS interfaces sufficiently well to

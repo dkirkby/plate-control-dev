@@ -79,7 +79,7 @@ try:
     get_posids = lambda: pecs.get_enabled_posids('sub')
 except:
     # still a useful case, for testing some portion of the script offline
-    logger.info(f'PECS initialization failed')
+    logger.info('PECS initialization failed')
     pecs_on = False
     get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
 logger.info(f'selected posids: {get_posids()}')
@@ -305,7 +305,7 @@ if new_phi_limits != old_phi_limits:
     if restored_phi_limits == old_phi_limits:
         logger.info(f'Phi limits restored to: {restored_phi_limits}')
     else:
-        logger.warning(f'Some error when restoring phi limits. Old limits were' +
+        logger.warning('Some error when restoring phi limits. Old limits were' +
                        f' {old_phi_limits} but restored values are different:' +
                        f' {restored_phi_limits}')
 
