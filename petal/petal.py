@@ -375,7 +375,8 @@ class Petal(object):
                     log_note    optional string to store alongside in the log data for this move
                                     ... gets stored in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
-                    allow_initial_interference ... rarely used, only by experts, see comments in posschedule.py
+                                    
+            allow_initial_interference ... rarely used, only by experts, see comments in posschedule.py
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
