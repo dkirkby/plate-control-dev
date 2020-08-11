@@ -1467,6 +1467,8 @@ class Petal(object):
                               'pos_neighbors', 'fixed_neighbor_cases', 'keepouts_T',
                               'keepouts_P']:
                 value = getattr(self.collider, dict_name)[posid]
+                if dict_name == 'fixed_neighbor_cases':
+                    value = {pc.case.names[x] for x in value}
                 out += f'\n {dict_name}: {value}'
             out += f'\n classified_as_retracted: {posid in self.collider.classified_as_retracted}'
         else:
