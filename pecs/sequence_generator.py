@@ -148,6 +148,25 @@ new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=simple_n
 print(new,'\n')
 tests.append(new)
 
+# Simple arc sequences
+cmd = 'posintTP'
+for axis in ['theta', 'phi']:
+    new = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits')
+    if axis == 'theta':
+        thetas = [-170+i*20 for i in range(18)]
+        phi = 130
+        targets = [[theta, phi] for theta in thetas]
+    else:
+        theta = 0
+        phis = [120+i*3 for i in range(18)]
+        targets = [[theta, phi] for phi in phis]
+    for i in range(len(targets)):
+        target = targets[i]
+        note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
+        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note)
+    print(new,'\n')
+    tests.append(new)
+
 # Hardstop debounce measurements
 details = '''Settings: default
 Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
