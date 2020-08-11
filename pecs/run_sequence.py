@@ -229,8 +229,14 @@ for move in seq:
     sec_since_last_move = time.time() - last_move_time
     need_to_wait = args.cycle_time - sec_since_last_move
     if need_to_wait > 0:
-        logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down.')
-        time.sleep(need_to_wait)
+        logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
+                    'It is safe to CTRL-C abort the test during this wait period.')
+        try:
+            for i in range(need_to_wait*10):
+                time.sleep(need_to_wait/10)
+        except KeyboardInterrupt:
+            logger.info('Safely aborting the sequence.')
+            break
     last_move_time = time.time()
     index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
