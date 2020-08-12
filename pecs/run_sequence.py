@@ -232,9 +232,9 @@ for move in seq:
         logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
                     'It is safe to CTRL-C abort the test during this wait period.')
         try:
-            dt_factor = 100
-            for i in range(int(np.ceil(need_to_wait*dt_factor))):
-                time.sleep(need_to_wait/dt_factor)
+            dt = 0.2  # sec
+            for i in range(int(np.ceil(need_to_wait/dt))):
+                time.sleep(dt)
         except KeyboardInterrupt:
             logger.info('Safely aborting the sequence.')
             break
