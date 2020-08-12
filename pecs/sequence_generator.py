@@ -166,6 +166,21 @@ for axis in ['theta', 'phi']:
         new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note)
     print(new,'\n')
     tests.append(new)
+    
+cmd = 'dTdP'
+deltas = [1.0 for i in range(10)]
+for axis in ['theta', 'phi']:
+    new = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance')
+    if axis == 'theta':
+        targets = [[delta, 0] for delta in deltas]
+    else:
+        targets = [[0, delta] for delta in deltas]
+    for i in range(len(targets)):
+        target = targets[i]
+        note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
+        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note)
+    print(new,'\n')
+    tests.append(new)
 
 # Hardstop debounce measurements
 details = '''Settings: default
