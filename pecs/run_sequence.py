@@ -233,7 +233,7 @@ for move in seq:
                     'It is safe to CTRL-C abort the test during this wait period.')
         try:
             dt_factor = 100
-            for i in range(int(need_to_wait*dt_factor)):
+            for i in range(int(np.ceil(need_to_wait*dt_factor))):
                 time.sleep(need_to_wait/dt_factor)
         except KeyboardInterrupt:
             logger.info('Safely aborting the sequence.')
