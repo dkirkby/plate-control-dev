@@ -60,7 +60,7 @@ logger.addHandler(sh)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
 logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {args.infile}')
-logger.info(f'Contents:\n{seq}')
+logger.info(f'Contents:\n\n{seq}')
 response = input('\nDoes the sequence look correct? (y/n) >> ')
 if 'n' in response.lower():
     logger.info('User rejected the sequence prior to running. Now quitting.')
