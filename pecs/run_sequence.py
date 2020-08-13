@@ -64,6 +64,7 @@ logger.info(f'Contents:\n{seq}')
 response = input('\nDoes the sequence look correct? (y/n) >> ')
 if 'n' in response.lower():
     logger.info('User rejected the sequence prior to running. Now quitting.')
+    import sys
     sys.exit(0)
 
 def assert2(test, message):
