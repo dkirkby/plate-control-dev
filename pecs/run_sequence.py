@@ -61,6 +61,10 @@ logger.info(f'Running {script_name} to perform a positioner move + measure seque
 logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {args.infile}')
 logger.info(f'Contents:\n{seq}')
+response = input('\nDoes the sequence look correct? (y/n) >> ')
+if 'n' in response.lower():
+    logger.info('User rejected the sequence prior to running. Now quitting.')
+    sys.exit(0)
 
 def assert2(test, message):
     '''Like an assert, but cleaner handling of logging.'''
