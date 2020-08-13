@@ -150,8 +150,10 @@ tests.append(new)
 
 # Simple arc sequences
 cmd = 'posintTP'
+settings = {'ALLOW_EXCEED_LIMITS': True}
+name_note = ', travel limits OFF'
 for axis in ['theta', 'phi']:
-    new = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits')
+    new = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}')
     if axis == 'theta':
         thetas = [-170+i*20 for i in range(18)]
         phi = 130
@@ -163,14 +165,14 @@ for axis in ['theta', 'phi']:
     for i in range(len(targets)):
         target = targets[i]
         note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
-        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note)
+        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
     print(new,'\n')
     tests.append(new)
     
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
 for axis in ['theta', 'phi']:
-    new = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance')
+    new = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance{name_note}')
     if axis == 'theta':
         targets = [[delta, 0] for delta in deltas]
     else:
@@ -178,7 +180,7 @@ for axis in ['theta', 'phi']:
     for i in range(len(targets)):
         target = targets[i]
         note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
-        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note)
+        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
     print(new,'\n')
     tests.append(new)
 
