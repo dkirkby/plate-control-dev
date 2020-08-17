@@ -139,6 +139,9 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+# Tolerance for theta guesses when performing xy2tp transform
+default_t_guess_tol = 30.0  # deg
+
 # Nominal value for when positioner is sufficiently off-center, to ensure that
 # a theta measurement by the FVC will be valid. Also a tol value meant for identifying
 # when the off-center phi would cause an intolerably large theta jump.
