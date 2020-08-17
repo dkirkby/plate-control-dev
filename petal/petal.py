@@ -1295,7 +1295,7 @@ class Petal(object):
         
         Valid keys are:
             'posintTP, 'poslocXY', 'poslocTP',
-            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
+            'QS', 'flatXY', 'obsXY', 'ptlXY'
         See comments in posmodel.py for explanation of these values.
         """
         if key == 'posintTP':

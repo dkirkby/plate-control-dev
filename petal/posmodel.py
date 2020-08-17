@@ -103,14 +103,10 @@ class PosModel(object):
                         curvature is flattened out to an approximate plane
             'ptlXY'     tuple in mm, petal local XY projection of ptlXYZ
             'obsXY'     tuple in mm, dependent, expected global x position
-            'motTP'     tuple in deg, dependent variable, expected position
-                        of theta motor
         """
         posintTP = self.expected_current_posintTP
         QS = self.trans.posintTP_to_QS(posintTP)
         return {'posintTP': posintTP,
-                'motTP': (self.axis[pc.T].shaft_to_motor(posintTP[0]),
-                          self.axis[pc.P].shaft_to_motor(posintTP[1])),
                 'poslocTP': self.trans.posintTP_to_poslocTP(posintTP),
                 'poslocXY': self.trans.posintTP_to_poslocXY(posintTP),
                 'flatXY': self.trans.posintTP_to_flatXY(posintTP),
@@ -130,16 +126,14 @@ class PosModel(object):
              'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} |'
              'poslocX:{:8.3f}{}, poslocY:{:8.3f}{} | '
              'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
-             'posintT:{:8.3f}{}, posintP:{:8.3f}{} | '
-             'motT:{:8.1f}{}, motP:{:8.1f}{}'). \
+             'posintT:{:8.3f}{}, posintP:{:8.3f}{}'). \
             format(pos['QS'][0],       pc.deg, pos['QS'][1],       pc.mm,
                    pos['flatXY'][0],   pc.mm,  pos['flatXY'][1],   pc.mm,
                    pos['obsXY'][0],    pc.mm,  pos['obsXY'][1],    pc.mm,
                    pos['ptlXY'][0],    pc.mm,  pos['ptlXY'][1],    pc.mm,
                    pos['poslocXY'][0], pc.mm,  pos['poslocXY'][1], pc.mm,
                    pos['poslocTP'][0], pc.deg, pos['poslocTP'][1], pc.deg,
-                   pos['posintTP'][0], pc.deg, pos['posintTP'][1], pc.deg,
-                   pos['motTP'][0],    pc.deg, pos['motTP'][1],    pc.deg)
+                   pos['posintTP'][0], pc.deg, pos['posintTP'][1], pc.deg)
         return s
 
     @property
