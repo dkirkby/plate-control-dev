@@ -87,6 +87,7 @@ petal/tests_and_demos/test_tp_update_transform.py -text
 petal/tests_and_demos/tile541.txt -text
 petal/tests_and_demos/tile560.txt -text
 petal/tests_and_demos/time_trial.py -text
+petal/xy2tp.py -text
 posfidfvc/PFS_ID_Map.csv -text
 posfidfvc/SBIG/SBIG_dev/51-sbig-debian.rules -text
 posfidfvc/SBIG/SBIG_dev/arm/libsbigudrv.a -text

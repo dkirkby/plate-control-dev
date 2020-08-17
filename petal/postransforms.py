@@ -2,6 +2,7 @@ import sys
 import math
 import posconstants as pc
 import petaltransforms
+import xy2tp
 
 class PosTransforms(petaltransforms.PetalTransforms):
     """This class provides transformations between positioner coordinate systems.
@@ -161,11 +162,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     # LOWEST LEVEL CALIBRATED XY <--> TP CONVERSIONS
     # These two methods grab calibration values and then call the fundametnal
-    # xy2tp() and tp2xy() static methods.
+    # xy2tp() and tp2xy() methods.
     def poslocTP_to_poslocXY(self, poslocTP):
         ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return PosTransforms.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
+        return xy2tp.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
 
     def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
@@ -175,7 +176,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
                          [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return PosTransforms.xy2tp(poslocXY, r, posloc_ranges)
+        return xy2tp.xy2tp(poslocXY, r, posloc_ranges)
 
     # OFFSET TRANSFORMATIONS
     def posintTP_to_poslocTP(self, posintTP):
@@ -479,98 +480,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
             return try_plus
         else:
             return try_minus
-
-    # FUNDAMENTAL CONVERSIONS BETWEEN MOTOR SHAFT ANGLES AND CARTESIAN SPACE
-    # I.E. TP --> XY AND XY --> TP
-    @staticmethod
-    def tp2xy(tp, r):
-        """Converts TP angles into XY cartesian coordinates, where arm lengths
-        associated with angles theta and phi are respectively r[1] and r[2].
-        INPUTS:  tp ... [theta,phi], unit degrees
-                  r ... [central arm length, eccentric arm length]
-        OUTPUT:  xy ... [x,y]
-        """
-        t = math.radians(tp[0])
-        t_plus_p = t + math.radians(tp[1])
-        x = r[0] * math.cos(t) + r[1] * math.cos(t_plus_p)
-        y = r[0] * math.sin(t) + r[1] * math.sin(t_plus_p)
-        return x, y
-
-    @staticmethod
-    def xy2tp(xy, r, ranges):
-        """Converts XY cartesian coordinates into TP angles, where arm lengths
-         associated with angles theta and phi are respectively r[1] and r[2].
-
-        INPUTS:   xy ... [x,y]
-                   r ... [central arm length, eccentric arm length]
-              ranges ... [[min(theta), max(theta)], [min(phi), max(phi)]]
-
-        OUTPUTS:  tp ... [theta,phi], unit degrees
-         unreachable ... boolean, True if the requested xy cannot be reached
-                         by any tp
-
-        In cases where unreachable == True, the returned tp value will be a
-        closest possible approach to the unreachable point requested at xy.
-        """
-        theta_centralizing_err_tol = 1e-4 # within this much xy error allowance, adjust theta toward center of its range
-        n_theta_centralizing_iters = 3 # number of points to try when attempting to centralize theta
-        numeric_contraction = sys.float_info.epsilon*10 # slight contraction to avoid numeric divide-by-zero type of errors
-        x, y, r1, r2 = xy[0], xy[1], r[0], r[1]
-        unreachable = False
-        
-        # adjust targets within reachable annulus
-        hypot = (x**2.0 + y**2.0)**0.5
-        angle = math.atan2(y, x)
-        outer = r[0] + r[1]
-        inner = abs(r[0] - r[1])
-        if hypot > outer or hypot < inner:
-            unreachable = True
-        inner += numeric_contraction
-        outer -= numeric_contraction
-        HYPOT = hypot
-        if hypot >= outer:
-            HYPOT = outer
-        elif hypot <= inner:
-            HYPOT = inner
-        X = HYPOT*math.cos(angle)
-        Y = HYPOT*math.sin(angle)
-        
-        # transform from cartesian XY to angles TP
-        arccos_arg = (X**2.0 + Y**2.0 - (r1**2.0 + r2**2.0)) / (2.0 * r1 * r2)
-        arccos_arg = max(arccos_arg, -1.0) # deal with slight numeric errors where arccos_arg comes back like -1.0000000000000002
-        arccos_arg = min(arccos_arg, +1.0) # deal with slight numeric errors where arccos_arg comes back like +1.0000000000000002
-        P = math.acos(arccos_arg)
-        T = angle - math.atan2(r2*math.sin(P), r1 + r2*math.cos(P))
-        TP = [math.degrees(T), math.degrees(P)]
-        
-        # wrap angles into travel ranges
-        for i in [0, 1]:
-            range_min, range_max = min(ranges[i]), max(ranges[i])
-            if TP[i] < range_min: # try +360 phase wrap
-                TP[i] += math.floor((range_max - TP[i])/360.0)*360.0 
-                if TP[i] < range_min:
-                    TP[i] = range_min
-                    unreachable = True
-            elif TP[i] > range_max: # try -360 phase wrap
-                TP[i] -= math.floor((TP[i] - range_min)/360.0)*360.0
-                if TP[i] > range_max:
-                    TP[i] = range_max
-                    unreachable = True
-                    
-        # centralize theta
-        T_ctr = (ranges[0][0] + ranges[0][1])/2.0
-        T_options = pc.linspace(TP[0], T_ctr, n_theta_centralizing_iters)
-        for T_try in T_options:
-            xy_try = PosTransforms.tp2xy([T_try, TP[1]], r)
-            x_err = xy_try[0] - X
-            y_err = xy_try[1] - Y
-            vector_err = (x_err**2.0 + y_err**2.0)**0.5
-            if vector_err <= theta_centralizing_err_tol:
-                TP[0] = T_try
-                break
-            
-        return tuple(TP), unreachable
-
 
 if __name__ == '__main__':
     '''
