@@ -168,15 +168,27 @@ class PosTransforms(petaltransforms.PetalTransforms):
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
         return xy2tp.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
 
-    def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
-        ''' input is list or tuple or 1D array '''
+    def poslocXY_to_poslocTP(self, poslocXY, range_limits='full',
+                             t_guess=None, t_guess_tol=pc.default_t_guess_tol):
+        '''Converts a poslocXY coordinate pair to poslocTP.
+        
+        INPUTS:  poslocXY ... 1x2 list or tuple or array
+                 range_limits ... see definitions in shaft_ranges()
+                 t_guess ... optional theta guess, in poslocTP system
+                 t_guess_tol ... optional tol value on theta guess
+        
+        OUTPUTS: (poslocTP, unreachable)
+                   
+        Regarding behavior of t_guess and t_guess_tol, as well as meaning of the
+        "unreachable" output boolean, see detailed comments in the xy2tp module.
+        '''
         posintT_range, posintP_range = self.shaft_ranges(range_limits)
         poslocTP_min = self.posintTP_to_poslocTP([posintT_range[0], posintP_range[0]])
         poslocTP_max = self.posintTP_to_poslocTP([posintT_range[1], posintP_range[1]])
         posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
                          [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return xy2tp.xy2tp(poslocXY, r, posloc_ranges)
+        return xy2tp.xy2tp(poslocXY, r, posloc_ranges, t_guess, t_guess_tol)
 
     # OFFSET TRANSFORMATIONS
     def posintTP_to_poslocTP(self, posintTP):
@@ -219,13 +231,16 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocTP = self.posintTP_to_poslocTP(posintTP)
         return self.poslocTP_to_poslocXY(poslocTP)  # (poslocX, poslocY)
 
-    def poslocXY_to_posintTP(self, poslocXY, range_limits='full'):
+    def poslocXY_to_posintTP(self, poslocXY, range_limits='full',
+                             t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         ''' Composite transformation, performs poslocXY --> poslocTP --> posintTP.
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
-        poslocTP, unreachable = self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits)
+        poslocTP, unreachable = self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits,
+                                                          t_guess=t_guess, t_guess_tol=t_guess_tol)
         return self.poslocTP_to_posintTP(poslocTP), unreachable  # (t, p), unr
 
     def obsXY_to_poslocXY(self, obsXY):
@@ -248,14 +263,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocXY = self.posintTP_to_poslocXY(posintTP)  # (poslocX, poslocY)
         return self.poslocXY_to_flatXY(poslocXY)  # return (flatX, flatY)
 
-    def flatXY_to_posintTP(self, flatXY, range_limits='full'):
+    def flatXY_to_posintTP(self, flatXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         """Composite transformation, performs obsXY --> posXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         """
         poslocXY = self.flatXY_to_poslocXY(flatXY)  # (poslocX, poslocY)
-        return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
+        return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
 
     def ptlXY_to_flatXY(self, ptlXY):
         '''Direct transformation from ptlXY to flatXY coordinates.
@@ -284,14 +302,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         flatXY = self.ptlXY_to_flatXY(ptlXY)
         return self.flatXY_to_poslocXY(flatXY)
         
-    def ptlXY_to_posintTP(self, ptlXY, range_limits='full'):
+    def ptlXY_to_posintTP(self, ptlXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         '''Composite transformation, performs ptlXY --> flatXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
         flatXY = self.ptlXY_to_flatXY(ptlXY)
-        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
     
     def poslocXY_to_ptlXY(self, poslocXY):
         ''' input is 2-element list or tuple like [x,y] '''
@@ -309,23 +330,29 @@ class PosTransforms(petaltransforms.PetalTransforms):
         QS = self.flatXY_to_QS(flatXY, cast=True).flatten()  # 1D array
         return tuple(QS)
 
-    def QS_to_posintTP(self, QS, range_limits='full'):
+    def QS_to_posintTP(self, QS, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         '''Composite transformation, performs QS --> flatXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
         flatXY = self.QS_to_flatXY(QS, cast=True).flatten()  # 1D array
-        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
 
-    def obsXY_to_posintTP(self, obsXY, range_limits='full'):
+    def obsXY_to_posintTP(self, obsXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         """Composite transformation, performs obsXY --> ptlXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         """
         ptlXY = self.obsXY_to_ptlXY(obsXY)
-        return self.ptlXY_to_posintTP(ptlXY, range_limits=range_limits)
+        return self.ptlXY_to_posintTP(ptlXY, range_limits=range_limits,
+                                      t_guess=t_guess, t_guess_tol=t_guess_tol)
 
     def posintTP_to_obsXY(self, posintTP):
         """Composite transformation, performs posintTP --> ptlXY --> obsXY"""

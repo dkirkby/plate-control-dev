@@ -144,9 +144,11 @@ class PosCalibrations(PECS):
         calib_fit['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']
         for posid, row in calib_fit.iterrows():
             role = self.ptl_role_lookup(posid)
+            exp_poslocTP = self.ptlm.expected_current_position(posid, 'poslocTP', participating_petals=role)
             mea_posintTP, _ = self.ptlm.postrans(
                 posid, 'QS_to_posintTP',
                 row[['mea_Q', 'mea_S']].values.astype(float),
+                t_guess=exp_poslocTP[0],
                 participating_petals=role)
             tgt_flatXY = self.ptlm.postrans(
                 posid, 'posintTP_to_flatXY',
@@ -317,8 +319,9 @@ class PosCalibrations(PECS):
         self.logger.info(f'Starting run_extra_points(), with n_points={len(tgt_xy)} and max_radius={max_radius}')
         trans = PosTransforms(stateless=True)
         targets = []
+        t_guess = None  # thus phi targets will always be selected within [0,180]
         for poslocXY in tgt_xy:
-            posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY)
+            posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY, t_guess=t_guess)
             # Ignore "unreachable" here, since really we're just interested in
             # making a set of (theta, phi).
             targets.append(posintTP)

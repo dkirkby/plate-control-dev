@@ -104,35 +104,42 @@ class PosSchedule(object):
                 return False
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
+        
+        # options used below, for control of t_guess parameter in some coord conversions
+        t_guess_OFF = None  # Using this option always puts target poslocP within [0, 180].
+        t_guess_START = current_position['poslocTP'][pc.T]  # For "small" moves (where "small" means within
+                                                            # t_guess_tol), this picks whichever of the possible
+                                                            # poslocTP options that is closer to starting position.
+                                                            # Here, poslocP may go outside [0, 180].
+        
         lims = 'targetable'
         unreachable = False
         if uv_type == 'QS':
-            targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims, t_guess=t_guess_OFF)
         elif uv_type == 'dQdS':
             start_uv = current_position['QS']
             targt_uv = posmodel.trans.addto_QS(start_uv, [u, v])
-            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
+            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims, t_guess=t_guess_START)
         elif uv_type == 'poslocXY':
-            targt_posintTP, unreachable = trans.poslocXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.poslocXY_to_posintTP([u, v], lims, t_guess=t_guess_OFF)
         elif uv_type == 'obsdXdY':
             # global cs5 projected xy, as returned by platemaker
             start_uv = current_position['obsXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
-                targt_uv, lims)
+            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(targt_uv, lims, t_guess=t_guess_START)
         elif uv_type == 'poslocdXdY':
             # in poslocXY coordinates in local tangent plane, not global cs5
             start_uv = current_position['poslocXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(targt_uv, lims)
+            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(targt_uv, lims, t_guess=t_guess_START)
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dTdP':
             targt_posintTP = trans.addto_posintTP(start_posintTP, [u, v], lims)
         elif uv_type == 'obsXY':
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims, t_guess=t_guess_OFF)
         elif uv_type == 'ptlXY':
-            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims, t_guess=t_guess_OFF)
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
