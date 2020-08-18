@@ -1476,6 +1476,29 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
+    def get_posmodel_params(self, posid):
+        '''Returns a formatted string describing the current parameters known to
+        the posmodel instance for a given positioner.
+        
+        INPUTS:
+            posid ... string identifying the positioner
+        '''
+        properties = ['canid', 'busid', 'deviceloc', 'is_enabled', 'expected_current_position',
+                     'full_range_T', 'full_range_P',  'targetable_range_T', 'targetable_range_P',
+                      'abs_shaft_speed_cruise_T', 'abs_shaft_speed_cruise_P']
+        if posid in self.posmodels:
+            out = f'{posid}:'
+            for name in properties:
+                prop = getattr(self.posmodels[posid], name)
+                if isinstance(prop, dict):
+                    for k, v in prop.items():
+                        out += f'\n {k:12s} : {v}'
+                else:
+                    out += f'\n {name:12s} : {prop}'
+        else:
+            out = f'No posid {posid} found'
+        return out
+    
     def quick_query(self, key=None, op='', value='', posids='all', mode='compact'):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
