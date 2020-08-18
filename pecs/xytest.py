@@ -90,7 +90,7 @@ class XYTest(PECS):
         '''
         keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y',
                 'OFFSET_T', 'OFFSET_P']
-        props = ['targetable_range_T', 'targetable_range_P']
+        props = ['targetable_range_posintT', 'targetable_range_posintP']
         self.data.posids = []
         self.data.posids_pc = {}
         self.data.posids_disabled = set()
@@ -125,7 +125,7 @@ class XYTest(PECS):
             l1['PCID'] = pcid  # add pcid as a column
             l1s[pcid] = l1
         ret1 = self.ptlm.get_pos_vals(keys, self.data.posids)
-        # read posmodel properties, for now just targetable_range_T
+        # read posmodel properties, for now just targetable_range_posintT
         ret2 = self.ptlm.get_posmodel_prop(props, self.data.posids)
         dfs = []
         for pcid in self.data.pcids:

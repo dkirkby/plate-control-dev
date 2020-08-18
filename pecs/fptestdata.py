@@ -531,7 +531,7 @@ class XYTestData(FPTestData):
         row = self.posdf.loc[posid]  # row containing calibration values
         offX, offY = 0, 0
         pcid, r1, r2, posintT = row[
-            ['PCID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_T']]
+            ['PCID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_posintT']]
         rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[pcid],

@@ -459,7 +459,7 @@ class PosScheduleStage(object):
         jog_times = {} # will hold corresponding move time for each jog
         if 'extend' in method or 'retract' in method:
             axis = pc.P
-            limits = posmodels[posid].targetable_range_P
+            limits = posmodels[posid].targetable_range_posintP
             if 'retract' in method:
                 limits[1] = min(limits[1], self.collider.Ei_phi) # note deeper retraction than Eo, to give better chance of avoidance
                 direction = +1
@@ -469,12 +469,12 @@ class PosScheduleStage(object):
         elif 'rot' in method:
             axis = pc.T
             direction = +1 if 'ccw' in method else -1
-            jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[0], limits=posmodels[posid].targetable_range_T)
+            jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[0], limits=posmodels[posid].targetable_range_posintT)
         elif 'repel' in method:
             axis = pc.T
             for p,t in tables.items():
                 start = t.init_posintTP[0]
-                limits = posmodels[p].targetable_range_T
+                limits = posmodels[p].targetable_range_posintT
                 direction = 1 if p == posid else -1 # neighbor repels from primary
                 if 'cw' in method:
                     direction *= -1

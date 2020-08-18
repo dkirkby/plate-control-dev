@@ -139,9 +139,9 @@ class PosTransforms(petaltransforms.PetalTransforms):
         elif range_limits == 'exact':
             return [[-179.999999999, 180.0], [0.0, 180.0]]
         elif range_limits == 'full':
-            return [self.posmodel.full_range_T, self.posmodel.full_range_P]
+            return [self.posmodel.full_range_posintT, self.posmodel.full_range_posintP]
         elif range_limits == 'targetable':
-            return [self.posmodel.targetable_range_T, self.posmodel.targetable_range_P]
+            return [self.posmodel.targetable_range_posintT, self.posmodel.targetable_range_posintP]
         else:
             print(f'bad range_limits argument: {range_limits}')
             return None

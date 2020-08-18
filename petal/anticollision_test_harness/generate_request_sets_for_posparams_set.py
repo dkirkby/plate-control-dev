@@ -46,8 +46,8 @@ for i in range(num_sets_to_make):
     for posid,model in posmodels.items():
         attempts_remaining = 10000 # just to prevent infinite loop if there's a bug somewhere
         while posid not in targets_obsTP and attempts_remaining:
-            rangeT = model.targetable_range_T
-            rangeP = model.targetable_range_P
+            rangeT = model.targetable_range_posintT
+            rangeP = model.targetable_range_posintP
             max_patrol = posparams[posid]['LENGTH_R1'] + posparams[posid]['LENGTH_R2']
             min_patrol = abs(posparams[posid]['LENGTH_R1'] - posparams[posid]['LENGTH_R2'])
             x = random.uniform(-max_patrol,max_patrol)

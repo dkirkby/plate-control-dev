@@ -36,8 +36,8 @@ measured_posTP_targetable = p.trans.obsXY_to_posTP(xy_meas1,range_limits='target
 print('expect posT near: ' + str(p.expected_current_position['posT']))
 print('measured_posT (using full range transform): ' + str(measured_posTP_full[0]))
 print('measured_posT (using targetable range transform): ' + str(measured_posTP_targetable[0]))
-print('full range T: ' + str(p.full_range_T))
-print('targetable range T: ' + str(p.targetable_range_T))
+print('full range T: ' + str(p.full_range_posintT))
+print('targetable range T: ' + str(p.targetable_range_posintT))
 print('SUMMARY: This transform when updating posT and posP values was operating in the "full" range (hardstop to hardstop) rather than the "targetable" range (which leaves margin for backlash moves. In this case, when calculating the apparent theta angle based on the camera''s xy measurement, a theta angle 360 degrees away was chosen (mathematically correct, but in the "full" range). Then the posT got reset to this far off angle on the other side of the hardstop. So now the positioner was effectively pinning itself against the hardstop.')
 
 
@@ -62,8 +62,8 @@ measured_posTP_targetable = p.trans.obsXY_to_posTP(xy_meas,range_limits='targeta
 print('expect posT near: ' + str(p.expected_current_position['posT']))
 print('measured_posT (using full range transform): ' + str(measured_posTP_full[0]))
 print('measured_posT (using targetable range transform): ' + str(measured_posTP_targetable[0]))
-print('full range T: ' + str(p.full_range_T))
-print('targetable range T: ' + str(p.targetable_range_T))
+print('full range T: ' + str(p.full_range_posintT))
+print('targetable range T: ' + str(p.targetable_range_posintT))
 print('SUMMARY: Same thing happened as before, with positioner pinning itself against hardstop due to thinking it could be in the full range.')
 
 
@@ -88,8 +88,8 @@ measured_posTP_targetable = p.trans.obsXY_to_posTP(xy_meas,range_limits='targeta
 print('expect posT near: ' + str(p.expected_current_position['posT']))
 print('measured_posT (using full range transform): ' + str(measured_posTP_full[0]))
 print('measured_posT (using targetable range transform): ' + str(measured_posTP_targetable[0]))
-print('full range T: ' + str(p.full_range_T))
-print('targetable range T: ' + str(p.targetable_range_T))
+print('full range T: ' + str(p.full_range_posintT))
+print('targetable range T: ' + str(p.targetable_range_posintT))
 print('SUMMARY: This is not just due to full vs targetable range. Here we again have the 360 deg away mis-identification, but it happened regardless of the range provided to the transform function. Here we need an additional fix: check and use whichever is closest to expected theta: meas_posT +0, or +360, or -360.')
 T_meas = measured_posTP_targetable[0]
 T_options = np.array([T_meas,T_meas+360,T_meas-360])
@@ -120,8 +120,8 @@ measured_posTP_targetable = p.trans.obsXY_to_posTP(xy_meas,range_limits='targeta
 print('expect posT near: ' + str(p.expected_current_position['posT']))
 print('measured_posT (using full range transform): ' + str(measured_posTP_full[0]))
 print('measured_posT (using targetable range transform): ' + str(measured_posTP_targetable[0]))
-print('full range T: ' + str(p.full_range_T))
-print('targetable range T: ' + str(p.targetable_range_T))
+print('full range T: ' + str(p.full_range_posintT))
+print('targetable range T: ' + str(p.targetable_range_posintT))
 print('SUMMARY: Similar case as the first two, where restricting to targetable range was sufficient.')
 T_meas = measured_posTP_targetable[0]
 T_options = np.array([T_meas,T_meas+360,T_meas-360])

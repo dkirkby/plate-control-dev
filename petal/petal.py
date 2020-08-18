@@ -1484,17 +1484,20 @@ class Petal(object):
             posid ... string identifying the positioner
         '''
         properties = ['canid', 'busid', 'deviceloc', 'is_enabled', 'expected_current_position',
-                     'full_range_T', 'full_range_P',  'targetable_range_T', 'targetable_range_P',
+                      'full_range_posintT', 'full_range_posintP',
+                      'targetable_range_posintT', 'targetable_range_posintP',
                       'abs_shaft_speed_cruise_T', 'abs_shaft_speed_cruise_P']
+        def formatter(key, value):
+            return f'\n {key:12s} : {value}'
         if posid in self.posmodels:
             out = f'{posid}:'
             for name in properties:
                 prop = getattr(self.posmodels[posid], name)
                 if isinstance(prop, dict):
                     for k, v in prop.items():
-                        out += f'\n {k:12s} : {v}'
+                        out += formatter(k,v)
                 else:
-                    out += f'\n {name:12s} : {prop}'
+                    out += formatter(name, prop)
         else:
             out = f'No posid {posid} found'
         return out

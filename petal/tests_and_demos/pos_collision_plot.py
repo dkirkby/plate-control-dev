@@ -150,8 +150,8 @@ patches.append(ptl_polygon)
 patches.append(gfa_polygon)
 
 ### POS1 ###
-theta_min = trans1.posTP_to_obsTP([min(posmodel1.targetable_range_T),0])[0]
-theta_max = trans1.posTP_to_obsTP([max(posmodel1.targetable_range_T),0])[0]
+theta_min = trans1.posTP_to_obsTP([min(posmodel1.targetable_range_posintT),0])[0]
+theta_max = trans1.posTP_to_obsTP([max(posmodel1.targetable_range_posintT),0])[0]
 theta_range = [theta_min,theta_max]
 plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
 theta_polygon = Polygon(theta_temp, True)
@@ -166,8 +166,8 @@ patches.append(phi_polygon)
 plt.text(offset_X1,offset_Y1,posid1,fontsize=fontsize)
 
 ### POS2 ###
-theta_min = trans2.posTP_to_obsTP([min(posmodel2.targetable_range_T),0])[0]
-theta_max = trans2.posTP_to_obsTP([max(posmodel2.targetable_range_T),0])[0]
+theta_min = trans2.posTP_to_obsTP([min(posmodel2.targetable_range_posintT),0])[0]
+theta_max = trans2.posTP_to_obsTP([max(posmodel2.targetable_range_posintT),0])[0]
 theta_range = [theta_min,theta_max]
 plot_circle([offset_X2,offset_Y2],r1+r2,theta_range)
 theta_polygon = Polygon(theta_temp, True)

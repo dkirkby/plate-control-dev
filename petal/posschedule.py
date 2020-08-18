@@ -95,7 +95,7 @@ class PosSchedule(object):
             return False
         if self._deny_request_because_starting_out_of_range(posmodel):
             print_denied(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
-                         f' outside allowed range T={posmodel.full_range_T} and/or P={posmodel.full_range_P}')
+                         f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
             return False
         if not allow_initial_interference:
             interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
@@ -566,10 +566,10 @@ class PosSchedule(object):
         internally-tracked angular postion would cause nonsense moves.
         '''
         posintTP = posmodel.expected_current_posintTP
-        rangeT = posmodel.full_range_T
+        rangeT = posmodel.full_range_posintT
         if min(rangeT) > posintTP[pc.T] or max(rangeT) < posintTP[pc.T]:
             return True
-        rangeP = posmodel.full_range_P
+        rangeP = posmodel.full_range_posintP
         if min(rangeP) > posintTP[pc.P] or max(rangeP) < posintTP[pc.P]:
             return True
         return False

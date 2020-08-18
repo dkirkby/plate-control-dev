@@ -270,8 +270,8 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP',randomizer=np.random.
     for i,posmod in enumerate(posmodels):
         print(i,posmod)
         ## Get targetable ranges and convert to obsTP coordinate system
-        pos_mins = [posmod.targetable_range_T[0],posmod.targetable_range_P[0]]
-        pos_maxs = [posmod.targetable_range_T[1],posmod.targetable_range_P[1]]
+        pos_mins = [posmod.targetable_range_posintT[0], posmod.targetable_range_posintP[0]]
+        pos_maxs = [posmod.targetable_range_posintT[1], posmod.targetable_range_posintP[1]]
         theta_min,phi_min = posmod.trans.posTP_to_obsTP(pos_mins)
         theta_max,phi_max = posmod.trans.posTP_to_obsTP(pos_maxs)
 
