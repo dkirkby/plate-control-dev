@@ -26,6 +26,7 @@ class PosModel(object):
         self._stepsize_cruise            = 3.3    # deg
         self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
+        self.refresh_cache()
         
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
@@ -123,7 +124,7 @@ class PosModel(object):
         s = ('Q:{:8.3f}{}, S:{:8.3f}{} | '
              'flatX:{:8.3f}{}, flatY:{:8.3f}{} | '
              'obsX:{:8.3f}{}, obsY:{:8.3f}{} | '
-             'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} |'
+             'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} | '
              'poslocX:{:8.3f}{}, poslocY:{:8.3f}{} | '
              'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
              'posintT:{:8.3f}{}, posintP:{:8.3f}{}'). \
