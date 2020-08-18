@@ -323,9 +323,13 @@ class PosCalibrationFits:
             # done with phi arc, transform measured theta arc to posintTP
             trans.alt_override = True  # enable override in pos transforms
             trans.alt.update({key: poscal[key] for key in keys_fit})
+            
+            # 2020-08-17 [JHS] If we ever intend to use this script again, one
+            # should include here a t_guess value when doing flatXY_to_posintTP.
             t_exp_posintTP = np.array([
                 trans.flatXY_to_posintTP(flatXY, range_limits='full')[0]
                 for flatXY in posmea['T'].values])  # L x 1 array
+            
             data.loc[idx['T', posmea['T'].index, posid], 'exp_posintT'] = \
                 t_exp_posintT = t_exp_posintTP[:, 0]
             data.loc[idx['T', posmea['T'].index, posid], 'exp_posintP'] = \
