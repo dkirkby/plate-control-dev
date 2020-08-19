@@ -278,7 +278,15 @@ class PECS:
                      test_tp=False, anticollision=None):
         '''
         Wrapper for often repeated moving and measuring sequence.
-        Returns data merged with request
+        Returns data merged with request.
+        
+        2020-08-18 [JHS] presently, I find that the returned result dataframe
+        contains columns:   ['DQ', 'DS', 'FLAG', 'FWHM', 'MAG', 'MEAS_ERR',
+                             'mea_Q', 'mea_S', 'COMMAND', 'tgt_posintT',
+                             'tgt_posintP', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
+                             'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
+        and index column 'DEVICE_ID'
+        I believe the measured centroids themselves are 'mea_Q' and 'mea_S'.
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
