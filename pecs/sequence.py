@@ -8,6 +8,7 @@ move_defaults = {'command': '',
                  'target0': 0.0,
                  'target1': 0.0,
                  'log_note': '',
+                 'n_corr': 0,
                  }
 
 pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
@@ -57,14 +58,11 @@ nominals['spinupdown_dist_per_period'] = sum(range(round(nominals['stepsize_crui
 nominals['spinupdown_distance'] = nominals['spinupdown_dist_per_period'] * pos_defaults['SPINUPDOWN_PERIOD']
 nominals['spinupdown_distance_output'] = nominals['spinupdown_distance'] / nominals['gear_ratio']
 
-general_commands = {'QS', 'dQdS',
-                    'obsXY', 'obsdXdY',
-                    'ptlXY',
-                    'poslocXY', 'poslocdXdY',
-                    'poslocTP', 'posintTP', 'dTdP',
-                   }
-
+abs_commands = {'QS', 'obsXY', 'ptlXY', 'poslocXY', 'poslocTP', 'posintTP'}
+delta_commands = {'dQdS', 'obsdXdY', 'poslocdXdY', 'dTdP'}
+general_commands = abs_commands | delta_commands
 homing_commands = {'home_and_debounce', 'home_no_debounce'}
+
 # When setting up homing rows in a sequence table, set target0 = 1 if you want
 # to home theta axis, target1 = 1 to home phi axis, or both to home both axes.
 
@@ -157,7 +155,7 @@ class Sequence(object):
     def details(self, value):
         self.table.meta['details'] = str(value)
         
-    def add_move(self, command, target0, target1, log_note='', pos_settings={}, index=None):
+    def add_move(self, command, target0, target1, log_note='', pos_settings={}, n_corr=0, index=None):
         '''Add a move to the sequence.
         
         Inputs
@@ -166,6 +164,7 @@ class Sequence(object):
             target1      ... 2nd target coordinate or delta, as described in petal.request_targets()
             log_note     ... optional string to store alongside log data for this move
             pos_settings ... optional dict of positioner settings to apply during the move
+            n_corr       ... optional number of correction moves to perform after the primary ("blind") move
             index        ... optional index value to insert move at a particular location (default behavior is to append)
         '''
         assert command in valid_commands
@@ -174,6 +173,7 @@ class Sequence(object):
         row['target0'] = float(target0)
         row['target1'] = float(target1)
         row['log_note'] = str(log_note)
+        row['n_corr'] = int(n_corr)
         for key, value in pos_settings.items():
             assert key in pos_defaults
             example = pos_defaults[key]
@@ -233,7 +233,8 @@ class Sequence(object):
         s += 'ROW   '
         s += format('COMMAND', f'<{width_command}.{width_command}')
         s += '     U '
-        s += '      V  '
+        s += '      V '
+        s += ' N_CORR  '
         s += truncate_and_fill('LOG_NOTE', width_note) + '  '
         s += truncate_and_fill('SETTINGS', width_settings)
         for i in range(len(self.table)):
@@ -242,7 +243,8 @@ class Sequence(object):
             s += format(i, '3d') + ' '
             s += truncate_and_fill(f'  {move["command"]} ', width_command) + ' '
             s += format(move['target0'], '7g') + ' '
-            s += format(move['target1'], '7g') + '  '
+            s += format(move['target1'], '7g') + ' '
+            s += format(move['n_corr'], '7g') + '  '
             s += truncate_and_fill(str(move['log_note']), width_note) + '  '
             s += truncate_and_fill(str(self.non_default_pos_settings(i)), width_settings)
         return s

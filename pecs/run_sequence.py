@@ -81,7 +81,7 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: pecs.get_enabled_posids('sub')
+    get_posids = lambda: list(pecs.get_enabled_posids('sub'))
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info('PECS initialization failed')
@@ -92,6 +92,7 @@ logger.info(f'selected posids: {get_posids()}')
 # helpers for generating move requests
 import pandas as pd
 import numpy as np
+import math
 
 def is_number(x):
     '''Check type to see if it's a common number type.'''
@@ -105,16 +106,49 @@ def is_boolean(x, include01=True):
         return True
     return False
 
+def ptlcall(funcname, posid, *args, **kwargs):
+    '''Passes function calls off to the petal instance. Works exclusively for
+    functions whose first argument accepts a single positioner id.'''
+    role = pecs.ptl_role_lookup(posid)
+    extra_kwargs = {'participating_petals': role}
+    if kwargs:
+        kwargs.update(extra_kwargs)
+    else:
+        kwargs = extra_kwargs
+    function = getattr(pecs.ptlm, funcname)
+    result = function(posid, *args, **kwargs)
+    return result
+
+def trans(posid, conversion, *args, **kwargs):
+    '''Passes calls off to the petal instance to do postransforms conversions.
+    The argument "conversion" is the name of the function in postransforms that
+    you want to call.
+    '''
+    result = ptlcall('postrans', posid, method=conversion, *args, **kwargs) 
+    return result
+
 def make_requests(posids, command, target0, target1, log_note):
-    '''Make a structure with identical requests for all positioners in posids.
+    '''Make a structure with requests for all positioners in posids.
+    target0 and target1 can be either a single value (identical requests) or
+    a list of same length as posids.
+    
+    OUTPUT: dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
     '''
     if isinstance(posids, str):
         posids = [posids]
     else:
         posids = list(posids)
     assert2(command in sequence.valid_commands, f'unexpected command {command}')
+    if is_number(target0) and is_number(target1):
+        target0 = [target0] * len(posids)
+        target1 = [target1] * len(posids)
+    else:
+        for arg in [target0, target1]:
+            assert2(isinstance(arg, (list, tuple)), f'unexpected type {type(arg)}')
     for arg in [target0, target1]:
-        assert2(is_number(arg), f'unexpected type {type(arg)}')
+        assert2(len(arg) == len(posids), f'num targets {len(arg)} != num posids {len(posids)}')
+        for val in arg:
+            assert2(is_number(val), f'unexpected type {type(val)}')
     request_data = {'DEVICE_ID': posids,
                     'COMMAND': command,
                     'X1': target0,
@@ -122,7 +156,8 @@ def make_requests(posids, command, target0, target1, log_note):
                     'LOG_NOTE': log_note,
                     }
     requests = pd.DataFrame(request_data)
-    requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
+    if pecs_on:
+        requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
     return requests
 
 # general settings for the move measure function
@@ -144,11 +179,10 @@ def cache_current_pos_settings(posids):
     cache_path = os.path.join(log_dir, cache_name)
     settings = []
     for posid in posids:
-        role = pecs.ptl_role_lookup(posid)
         these_settings = {'POS_ID': posid}
         these_settings.update(sequence.pos_defaults.copy())
         for key in sequence.pos_defaults:
-            value = pecs.ptlm.get_posfid_val(posid, key, participating_petals=role)
+            value = ptlcall('get_posfid_val', posid, key)
             these_settings[key] = value
         settings.append(these_settings)
     frame = pd.DataFrame(data=settings)
@@ -192,9 +226,7 @@ def apply_pos_settings(settings):
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
             value = these_settings[key]                
-            val_accepted = pecs.ptlm.set_posfid_val(posid, key, value,
-                                                    check_existing=True,
-                                                    participating_petals=role)
+            val_accepted = ptlcall('set_posfid_val', posid, key, value, check_existing=True)
             if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
                 assert2(False, f'unable to set {key}={value} for {posid}')
             elif val_accepted == True:  # again, distinct from the None case
@@ -207,119 +239,211 @@ def apply_pos_settings(settings):
                     f' {motor_update_petals}')
         pecs.ptlm.set_motor_parameters(participating_petals=list(motor_update_petals))
 
-# cache the pos settings
-cache_path = cache_current_pos_settings(get_posids())
-logger.info('Initial settings of positioner(s) cached to: {cache_path}')
+def calc_poslocXY_errors(requests, results):
+    '''Calculates positioning errors based on initial requested targets and
+    FVC measured results. Error values are calculated and returned in poslocXY
+    coordinates. Only works for initial requests that were given in absolute
+    coordinates.
+    
+    INPUT:   requests ... dataframe as generated by make_requests()
+             results ... dataframe as generated by pecs.move_measure()
+                         assumed to contain 'mea_Q', 'mea_S', and index 'DEVICE_ID'
+             
+    OUTPUT:  dict with keys = posids and values = [err_locX, err_locY]
+    '''
+    if results.index.name == 'DEVICE_ID':
+        results = results.reset_index()
+    results = results[['mea_Q', 'mea_S']]  # just to reduce mental noise when debugging
+    combo = requests.merge(results, on='DEVICE_ID')
+    err = {}
+    for row in combo.iterrows():
+        data = row[1]
+        posid = data['DEVICE_ID']
+        qs_meas = (data['mea_Q'], data['mea_S'])
+        xy_meas = trans(posid, 'QS_to_poslocXY', qs_meas)
+        command = data['COMMAND']
+        uv_targ = [data['X1'], data['X2']]
+        assert2(command in sequence.abs_commands, 'error calc when initial request was a delta ' +
+                                                  f'move ({command}) is not currently supported')
+        if command == 'poslocXY':
+            xy_targ = uv_targ
+        else:
+            conversion = f'{command}_to_poslocXY'
+            xy_targ = trans(posid, conversion, uv_targ)
+        err_x = xy_meas[0] - xy_targ[0]
+        err_y = xy_meas[1] - xy_targ[1]
+        err[posid] = [err_x, err_y]
+    return err        
 
-# set phi limit angle for the test
-old_phi_limits = pecs.ptlm.get_phi_limit_angle()
-if args.enable_phi_limit:
-    some_petal = pecs.ptl_roles[0]
-    typical_phi_limit = pecs.ptlm.app_get('typical_phi_limit_angle', participating_petals=some_petal)
-    uniform_phi_limit = typical_phi_limit
-else:
-    uniform_phi_limit = None
-pecs.ptlm.set_phi_limit_angle(uniform_phi_limit)
-new_phi_limits = pecs.ptlm.get_phi_limit_angle()
-if new_phi_limits == old_phi_limits:
-    logger.info(f'Phi limits unchanged: {old_phi_limits}')
-else:
-    logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
-                f'new phi limits: {new_phi_limits}')
+if pecs_on:
+    # cache the pos settings
+    cache_path = cache_current_pos_settings(get_posids())
+    logger.info('Initial settings of positioner(s) cached to: {cache_path}')
+    
+    # set phi limit angle for the test
+    old_phi_limits = pecs.ptlm.get_phi_limit_angle()
+    if args.enable_phi_limit:
+        some_petal = pecs.ptl_roles[0]
+        typical_phi_limit = pecs.ptlm.app_get('typical_phi_limit_angle', participating_petals=some_petal)
+        uniform_phi_limit = typical_phi_limit
+    else:
+        uniform_phi_limit = None
+    pecs.ptlm.set_phi_limit_angle(uniform_phi_limit)
+    new_phi_limits = pecs.ptlm.get_phi_limit_angle()
+    if new_phi_limits == old_phi_limits:
+        logger.info(f'Phi limits unchanged: {old_phi_limits}')
+    else:
+        logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
+                    f'new phi limits: {new_phi_limits}')
 
 # do the sequence
 last_pos_settings = None
 last_move_time = time.time() - args.cycle_time
+real_moves = pecs_on and not args.no_movement
+cycle_time = args.cycle_time if real_moves else 4.0
 for move in seq:
-    sec_since_last_move = time.time() - last_move_time
-    need_to_wait = args.cycle_time - sec_since_last_move
-    if need_to_wait > 0:
-        logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
-                    'It is safe to CTRL-C abort the test during this wait period.')
-        try:
-            dt = 0.2  # sec
-            for i in range(int(np.ceil(need_to_wait/dt))):
-                time.sleep(dt)
-        except KeyboardInterrupt:
-            logger.info('Safely aborting the sequence.')
-            break
-    last_move_time = time.time()
     index = move.index
     posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     dict_repr = dict(zip(move.columns, move))
-    logger.info(f'Now doing move {index+1} of {len(seq)} (row idx {index}) on {len(posids)} positioner(s).')
+    move_num = index + 1
+    logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
     logger.info(f'Move settings are {dict_repr}')
-    command = move['command']
-    target0 = move['target0']
-    target1 = move['target1']
-    log_note = move['log_note']
-    if command in sequence.general_commands:
-        move_measure_func = pecs.move_measure
-        requests = make_requests(posids, command, target0, target1, log_note)
-        kwargs = {'request': requests}
-    elif command in sequence.homing_commands:
-        move_measure_func = pecs.rehome_and_measure
-        if not target0 and not target1:
-            logger.warning(f'Skipping move {index} because home request had neither'
-                           f' axis specified. (Need to set target0 to 1 for theta homing'
-                           f', target1 to 1 for phi homing, or both simultaneously.')
+    initial_command = move['command']
+    n_corr = int(move['n_corr']) if initial_command in sequence.general_commands else 0
+    for corr in range(1 + n_corr):
+        sec_since_last_move = time.time() - last_move_time
+        need_to_wait = cycle_time - sec_since_last_move
+        if need_to_wait > 0:
+            logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
+                        'It is safe to CTRL-C abort the test during this wait period.')
+            try:
+                dt = 0.2  # sec
+                for i in range(int(np.ceil(need_to_wait/dt))):
+                    time.sleep(dt)
+            except KeyboardInterrupt:
+                logger.info('Safely aborting the sequence.')
+                break
+        last_move_time = time.time()
+        if corr == 0:
+            command = move['command']
+            target0 = move['target0']
+            target1 = move['target1']
+        log_note = move['log_note']
+        if n_corr > 0:
+            log_note = pc.join_notes(log_note, f'submove {corr}')
+        if command in sequence.general_commands:
+            calc_errors = True
+            if pecs_on:
+                move_measure_func = pecs.move_measure
+            if corr == 0:
+                requests = make_requests(posids, command, target0, target1, log_note)
+                initial_requests = requests
+                errs = None
+            else:
+                command = 'poslocdXdY'
+                posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                target0 = [-errs[posid][0] for posid in posids]
+                target1 = [-errs[posid][1] for posid in posids]
+                requests = make_requests(posids, command, target0, target1, log_note)
+            kwargs = {'request': requests}
+        elif command in sequence.homing_commands:
+            calc_errors = False
+            if pecs_on:
+                move_measure_func = pecs.rehome_and_measure
+            if not target0 and not target1:
+                logger.warning(f'Skipping move {index} because home request had neither'
+                               f' axis specified. (Need to set target0 to 1 for theta homing'
+                               f', target1 to 1 for phi homing, or both simultaneously.')
+                continue
+            should_debounce = command == 'home_and_debounce'
+            axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
+            kwargs = {'posids': posids,
+                      'axis': axis,
+                      'debounce': should_debounce,
+                      'log_note': log_note,
+                      }
+        else:
+            logger.warning(f'Skipping move {index} due to unexpected command {command}')
             continue
-        should_debounce = command == 'home_and_debounce'
-        axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
-        kwargs = {'posids': posids,
-                  'axis': axis,
-                  'debounce': should_debounce,
-                  'log_note': log_note,
-                  }
-    else:
-        logger.warning(f'Skipping move {index} due to unexpected command {command}')
-        continue
-    kwargs.update(move_meas_settings)
-    new_settings = seq.pos_settings(index)
-    if new_settings != last_pos_settings:
-        all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
-        if pecs_on:
-            apply_pos_settings(all_settings)
-        logger.info(f'Positioner settings: {new_settings}')
-        last_pos_settings = new_settings
-    else:
-        logger.info('Positioner settings: (no change)')
-    if pecs_on and not args.no_movement:
-        result = move_measure_func(**kwargs)  # nothing is done here with result, data retrieval is a separate step, from the online DB
+        kwargs.update(move_meas_settings)
+        new_settings = seq.pos_settings(index)
+        if new_settings != last_pos_settings:
+            all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
+            if pecs_on:
+                apply_pos_settings(all_settings)
+            logger.info(f'Positioner settings: {new_settings}')
+            last_pos_settings = new_settings
+        else:
+            logger.info('Positioner settings: (no change)')
+        if real_moves:
+            results = move_measure_func(**kwargs)
+        if calc_errors:
+            if real_moves:
+                errs = calc_poslocXY_errors(initial_requests, results)
+            else:
+                dummy_err_x = np.random.normal(loc=0, scale=0.1, size=len(posids))
+                dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
+                errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
+            prev_posids = posids
+            posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+            if len(prev_posids) != len(posids):
+                logger.info(f'Num posids changed from {len(prev_posids)} to {len(posids)}. ' +
+                            'Check for auto-disabling after comm error. Lost positioners: ' +
+                            f'{set(prev_posids) - set(posids)}')
+            vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
+            vec_errs_um = [err*1000 for err in vec_errs]
+            err_str = f'move {move_num}, submove {corr}, n_pos={len(posids)}, errors (um): '
+            first = True
+            for name, func in {'max': max, 'min': min, 'mean': np.mean,
+                               'median': np.median, 'std': np.std,
+                               'rms': lambda X: (sum(x**2 for x in X)/len(X))**0.5,
+                               }.items():
+                if not first:
+                    err_str += ', '
+                err_str += f'{name}={func(vec_errs_um):.1f}'
+                first = False
+            logger.info(err_str)
+            for desc, func in {'best': min, 'worst': max}.items():
+                err = func(vec_errs_um)
+                pos = posids[vec_errs_um.index(err)]
+                logger.info(f'{desc} performer: {pos}, err={err:.1f} um')
+            
 logger.info(f'Sequence "{seq.short_name}" complete!')
 
-# restore the original pos settings
-orig_settings = retrieve_cached_pos_settings(cache_path)
-logger.info(f'Retrieved original positioner settings from {cache_path}')
-new_cache_path = cache_current_pos_settings(posids)
-new_settings = retrieve_cached_pos_settings(new_cache_path)
-if orig_settings == new_settings:
-    logger.info('No net change of positioner settings detected between start and finish' +
-                ' of sequence. No further modifications to postioner state required.')
-else:
-    logger.info('Some net change(s) of positioner settings detected between start and' +
-                ' finish of sequence. Now restoring system to original state.')
-    apply_pos_settings(orig_settings)
-    logger.info('Restoration of original positioner settings complete.')
+
+if pecs_on:
+    # restore the original pos settings
+    orig_settings = retrieve_cached_pos_settings(cache_path)
+    logger.info(f'Retrieved original positioner settings from {cache_path}')
+    new_cache_path = cache_current_pos_settings(posids)
+    new_settings = retrieve_cached_pos_settings(new_cache_path)
+    if orig_settings == new_settings:
+        logger.info('No net change of positioner settings detected between start and finish' +
+                    ' of sequence. No further modifications to postioner state required.')
+    else:
+        logger.info('Some net change(s) of positioner settings detected between start and' +
+                    ' finish of sequence. Now restoring system to original state.')
+        apply_pos_settings(orig_settings)
+        logger.info('Restoration of original positioner settings complete.')
     
-# restore old phi limit angles
-if new_phi_limits != old_phi_limits:
-    if isinstance(old_phi_limits, dict):
-        # 2020-07-13 [JHS] I'm unclear if the keys here are supposed to be role or
-        # pcid. Might be a bug, but hard for me to test at LBNL because only one petal.
-        # Frankly I'm not even 100% sure if it's a dict in the case of multiple petals.
-        roles_angles = [(role, angle) for role, angle in old_phi_limits.items()]
-    else:
-        roles_angles = [(None, old_phi_limits)]
-    for ra in roles_angles:
-        pecs.ptlm.set_phi_limit_angle(ra[1], participating_petals=ra[0])
-    restored_phi_limits = pecs.ptlm.get_phi_limit_angle()
-    if restored_phi_limits == old_phi_limits:
-        logger.info(f'Phi limits restored to: {restored_phi_limits}')
-    else:
-        logger.warning('Some error when restoring phi limits. Old limits were' +
-                       f' {old_phi_limits} but restored values are different:' +
-                       f' {restored_phi_limits}')
+    # restore old phi limit angles
+    if new_phi_limits != old_phi_limits:
+        if isinstance(old_phi_limits, dict):
+            # 2020-07-13 [JHS] I'm unclear if the keys here are supposed to be role or
+            # pcid. Might be a bug, but hard for me to test at LBNL because only one petal.
+            # Frankly I'm not even 100% sure if it's a dict in the case of multiple petals.
+            roles_angles = [(role, angle) for role, angle in old_phi_limits.items()]
+        else:
+            roles_angles = [(None, old_phi_limits)]
+        for ra in roles_angles:
+            pecs.ptlm.set_phi_limit_angle(ra[1], participating_petals=ra[0])
+        restored_phi_limits = pecs.ptlm.get_phi_limit_angle()
+        if restored_phi_limits == old_phi_limits:
+            logger.info(f'Phi limits restored to: {restored_phi_limits}')
+        else:
+            logger.warning('Some error when restoring phi limits. Old limits were' +
+                           f' {old_phi_limits} but restored values are different:' +
+                           f' {restored_phi_limits}')
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')

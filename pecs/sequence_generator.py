@@ -134,6 +134,14 @@ new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new
 print(new,'\n')
 tests.append(new)
 
+x = 1.0
+y = 1.0
+new = sequence.Sequence(short_name='debug poslocXY with corr',
+                        long_name=f'test the code with single small move to poslocXY = ({x}, {y}) and a followup correction move')
+new.add_move(command='poslocXY', target0=x, target1=y, log_note=debug_note(new), n_corr=1)
+print(new,'\n')
+tests.append(new)
+
 # Basic homing sequences
 simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
 new = sequence.Sequence(short_name='home_and_debounce',
