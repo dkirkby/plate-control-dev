@@ -380,11 +380,12 @@ for move in seq:
             logger.info('Positioner settings: (no change)')
         if real_moves:
             results = move_measure_func(**kwargs)
-            submeas = pecs.summarize_submeasurements(results)
-            
-            # to be implemented: Some method of storing the submeas strings to
-            # the online DB will replace the little loop below.
-            logger.info(f'sub-measurements: {submeas}')
+            if args.num_meas > 1:
+                submeas = pecs.summarize_submeasurements(results)
+                
+                # to be implemented: Some method of storing the submeas strings to
+                # the online DB will replace the little loop below.
+                logger.info(f'sub-measurements: {submeas}')
         if calc_errors:
             if real_moves:
                 errs = calc_poslocXY_errors(initial_requests, results)
