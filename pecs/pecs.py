@@ -496,7 +496,7 @@ class PECS:
         for posid in enabled_posids:
             role = self.ptl_role_lookup(posid)
             data = meapos.loc[posid]
-            this_dict = {'obsX':[], 'obsY':[]}
+            this_dict = {'Q':[], 'S':[], 'obsX':[], 'obsY':[]}
             for i in range(num_meas):
                 sub_QS = [data[f'Q{i}'], data[f'S{i}']]
                 sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS,
@@ -504,9 +504,16 @@ class PECS:
                 if isinstance(sub_obsXY, dict):
                     sub_obsXY = sub_obsXY[role]  # because weird inconsistencies of when petalman returns dicts
                 sub_obsXY = sub_obsXY.flatten()
+                this_dict['Q'] += [sub_QS[0]]
+                this_dict['S'] += [sub_QS[1]]
                 this_dict['obsX'] += [sub_obsXY[0]]
                 this_dict['obsY'] += [sub_obsXY[1]]
-            out[posid] = f'submeas={this_dict}'
+            fmt1 = lambda X: str([f'{x:.4f}' for x in X]).replace("'", '')
+            s = 'submeas={'
+            for k,v in this_dict.items():
+                s += f'\'{k}\': {fmt1(v)}, '
+            s = s[:-2] + '}'
+            out[posid] = s
         return out
     
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
