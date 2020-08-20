@@ -501,6 +501,8 @@ class PECS:
                 sub_QS = [data[f'Q{i}'], data[f'S{i}']]
                 sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS,
                                                cast=True, participating_petals=role)
+                if isinstance(sub_obsXY, dict):
+                    sub_obsXY = sub_obsXY[role]  # because weird inconsistencies of when petalman returns dicts
                 sub_obsXY = sub_obsXY.flatten()
                 this_dict['obsX'] += [sub_obsXY[0]]
                 this_dict['obsY'] += [sub_obsXY[1]]
