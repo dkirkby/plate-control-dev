@@ -270,7 +270,7 @@ class PECS:
             if i == 0:
                 meapos = this_meapos
             for column in this_meapos.columns:
-                meapos[f'{column}{i}'] = meapos[column]
+                meapos[f'{column}{i}'] = this_meapos[column]
         number_columns = ['Q', 'S', 'DQ', 'DS', 'FWHM', 'MAG', 'MEAS_ERR']
         for prefix in number_columns:
             these_columns = [f'{prefix}{i}' for i in range(num_meas)]
@@ -494,11 +494,13 @@ class PECS:
             return {posid: '' for posid in enabled_posids}
         out = {}
         for posid in enabled_posids:
+            role = self.ptl_role_lookup(posid)
             data = meapos.loc[posid]
             this_dict = {'obsX':[], 'obsY':[]}
             for i in range(num_meas):
                 sub_QS = [data[f'Q{i}'], data[f'S{i}']]
-                sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS, cast=True)
+                sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS,
+                                               cast=True, participating_petals=role)
                 sub_obsXY = sub_obsXY.flatten()
                 this_dict['obsX'] += [sub_obsXY[0]]
                 this_dict['obsY'] += [sub_obsXY[1]]
