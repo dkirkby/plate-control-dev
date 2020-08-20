@@ -336,7 +336,7 @@ class PECS:
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
-            check_unmatched=check_unmatched, test_tp=test_tp)
+            check_unmatched=check_unmatched, test_tp=test_tp, num_meas=num_meas)
         result = self._merge_match_and_rename_fvc_data(request, meapos, matched)
         self.ptlm.clear_exposure_info()
         return result
