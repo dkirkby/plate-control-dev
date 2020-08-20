@@ -227,12 +227,13 @@ class Sequence(object):
             truncated = string[:length-2] + '..' if len(string) > length else string
             filled = format(truncated, str(length) + 's')
             return filled
-        width_note = 40
+        width_note = 50
         width_settings = 50
         width_command = max(7, max({len(row['command']) for row in self.table}))
+        width_command = min(width_command, 14)
         s += 'ROW   '
         s += format('COMMAND', f'<{width_command}.{width_command}')
-        s += '     U '
+        s += '        U '
         s += '      V '
         s += ' N_CORR  '
         s += truncate_and_fill('LOG_NOTE', width_note) + '  '
@@ -241,7 +242,7 @@ class Sequence(object):
             move = self.table[i]
             s += '\n'
             s += format(i, '3d') + ' '
-            s += truncate_and_fill(f'  {move["command"]} ', width_command) + ' '
+            s += '  ' + truncate_and_fill(f'{move["command"]}', width_command) + '  '
             s += format(move['target0'], '7g') + ' '
             s += format(move['target1'], '7g') + ' '
             s += format(move['n_corr'], '7g') + '  '
