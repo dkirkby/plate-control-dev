@@ -119,12 +119,12 @@ def ptlcall(funcname, posid, *args, **kwargs):
     result = function(posid, *args, **kwargs)
     return result
 
-def trans(posid, conversion, *args, **kwargs):
+def trans(posid, method, *args, **kwargs):
     '''Passes calls off to the petal instance to do postransforms conversions.
-    The argument "conversion" is the name of the function in postransforms that
+    The argument "method" is the name of the function in postransforms that
     you want to call.
     '''
-    result = ptlcall('postrans', posid, method=conversion, *args, **kwargs) 
+    result = ptlcall('postrans', posid, method, *args, **kwargs) 
     return result
 
 def make_requests(posids, command, target0, target1, log_note):
