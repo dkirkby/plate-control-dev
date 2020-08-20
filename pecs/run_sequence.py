@@ -253,7 +253,8 @@ def calc_poslocXY_errors(requests, results):
     '''
     if results.index.name == 'DEVICE_ID':
         results = results.reset_index()
-    combo = requests.merge(results, on='DEVICE_ID')
+    useful_results = results['DEVICE_ID', 'mea_Q', 'mea_S']
+    combo = requests.merge(useful_results, on='DEVICE_ID')
     err = {}
     for row in combo.iterrows():
         data = row[1]
