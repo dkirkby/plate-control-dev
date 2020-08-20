@@ -374,7 +374,7 @@ for move in seq:
             all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
             if pecs_on:
                 apply_pos_settings(all_settings)
-            logger.info(f'Positioner settings: {new_settings}')
+            # logger.info(f'Positioner settings: {new_settings}')  # quite verbose / redundant
             last_pos_settings = new_settings
         else:
             logger.info('Positioner settings: (no change)')
