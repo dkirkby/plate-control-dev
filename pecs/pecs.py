@@ -213,13 +213,31 @@ class PECS:
         return posids
 
     def fvc_measure(self, exppos=None, match_radius=None, matched_only=True,
-                    check_unmatched=False, test_tp=False):
-        '''use the expected positions given, or by default use internallly
-        tracked current expected positions for fvc measurement
-        returns expected_positions (df), measured_positions (df)
-        (bot have DEVICE_ID as index and sorted) and
-        matched_posids (set), unmatched_posids (set)'''
-
+                    check_unmatched=False, test_tp=False, num_meas=1):
+        '''Measure positioner locations.
+        
+        INPUTS:  exppos ... expected positions in some format (?), though if None
+                            the code will just use the current expected positions
+                            (almost always what you want)
+                 match_radius ... passed to fvc proxy
+                 matched_only ... passed to fvc proxy
+                 check_unmatched ... passed to PetalApp.handle_fvc_feedback()
+                 test_tp ... passed to PetalApp.handle_fvc_feedback()
+                 num_meas ... how many FVC images to take (the results will be median-ed)
+        
+        OUTPUTS: exppos ... expected positions in some format (?)
+                 meapos ... measured results. pandas dataframe with columns:
+                            ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR', 'Q', 'S']
+                            Additionally, each sub-measurement (see num_meas arg) will
+                            have a complete set of identically-named columns, except with
+                            a suffix like '0', '1', '2' ... apended. So for example you
+                            would see columns ['Q0', 'Q1', 'Q2', ...]. If num_meas=1, you
+                            would only find 'Q0', and it would be identical to the values
+                            in column 'Q'.
+                 matched ... set of positioner ids matched to measured centroids
+                 unmatched ... set of unmatched positioner ids
+        '''
+        assert num_meas > 0, f'argued num_meas={num_meas}, but must do at least one measurement'
         if match_radius is None :
             match_radius = self.match_radius
         if exppos is None:
@@ -232,23 +250,33 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        self.print(f'Calling FVC.measure with exptime = {self.exptime} s, '
-                   f'expecting {len(exppos)} backlit positioners...')
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
-        # measured_QS, note that expected_pos was changed in place
-        meapos = (pd.DataFrame(self.fvc.measure(
-                      expected_positions=exppos, seqid=seqid,
-                      exptime=self.exptime, match_radius=match_radius,
-                      matched_only=matched_only,
-                      all_fiducials=self.all_fiducials))
-                  .rename(columns={'id': 'DEVICE_ID'})
-                  .set_index('DEVICE_ID').sort_index())
-        if np.any(['P' in device_id for device_id in meapos.index]):
-            self.print('Measured positions of positioners by FVC '
-                       'are contaminated by fiducials.')
-        meapos.columns = meapos.columns.str.upper()  # clean up header to save
+        for i in range(num_meas):
+            self.print(f'Calling FVC.measure with exptime = {self.exptime} s, '
+                   f'expecting {len(exppos)} backlit positioners. Image {i+1} of {num_meas}.')
+            this_meapos = (pd.DataFrame(self.fvc.measure(
+                              expected_positions=exppos, seqid=seqid,
+                              exptime=self.exptime, match_radius=match_radius,
+                              matched_only=matched_only,
+                              all_fiducials=self.all_fiducials))
+                          .rename(columns={'id': 'DEVICE_ID'})
+                          .set_index('DEVICE_ID').sort_index())
+            if np.any(['P' in device_id for device_id in this_meapos.index]):
+                self.print('Measured positions of positioners by FVC '
+                           'are contaminated by fiducials.')
+            this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
+            if i == 0:
+                meapos = this_meapos
+            for column in this_meapos.columns:
+                meapos[f'{column}{i}'] = meapos[column]
+        number_columns = ['Q', 'S', 'DQ', 'DS', 'FWHM', 'MAG', 'MEAS_ERR']
+        for prefix in number_columns:
+            these_columns = [f'{prefix}{i}' for i in range(num_meas)]
+            medians = meapos[these_columns].median(axis=1)
+            meapos[prefix] = medians
+            
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
         exppos.columns = exppos.columns.str.upper()
@@ -275,18 +303,32 @@ class PECS:
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request, match_radius=None, check_unmatched=False,
-                     test_tp=False, anticollision=None):
+                     test_tp=False, anticollision=None, num_meas=1):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request.
         
-        2020-08-18 [JHS] presently, I find that the returned result dataframe
-        contains columns:   ['DQ', 'DS', 'FLAG', 'FWHM', 'MAG', 'MEAS_ERR',
+        INPUTS:  request ... pandas dataframe that includes columns:
+                             ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
+                 match_radius ... passed to fvc_measure()
+                 check_umatched ... passed to PetalApp.handle_fvc_feedback()
+                 test_tp ... passed to PetalApp.handle_fvc_feedback()
+                 anticollison ... mode like 'default', 'freeze', 'adjust', or None
+                 num_meas ... how many FVC images to take (the results will be median-ed)
+        
+        OUTPUTS: result ... pandas dataframe that includes columns:
+                            ['DQ', 'DS', 'FLAG', 'FWHM', 'MAG', 'MEAS_ERR',
                              'mea_Q', 'mea_S', 'COMMAND', 'tgt_posintT',
                              'tgt_posintP', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
                              'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
-        and index column 'DEVICE_ID'
-        I believe the measured centroids themselves are 'mea_Q' and 'mea_S'.
+                            
+                            And also, ['Q0', 'Q1', 'Q2', etc ...]
+                            for the sub-measurements, depending on the value of
+                            argument num_meas. See fvc_measure() for details on
+                            this. These sub-meas columns I am not bothering to
+                            rename with the 'mea_' prefix.
+                            
+                            The dataframe has index column 'DEVICE_ID'
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
@@ -421,6 +463,47 @@ class PECS:
         if include_posinfo:
             return posids, posinfo
         return posids
+    
+    def summarize_submeasurements(self, meapos, posids='sub'):
+        '''Collects submeasurements (like from fvc_measure with num_meas > 1)
+        by positioner ID into suitable strings for logging purposes.
+        
+        INPUTS:   meapos ... dataframe including columns ['Q0', 'S0', 'Q1', 'S1', ...]
+                             and index 'DEVICE_ID'
+
+        OUTPUTS:  Dictionary with keys = posids and values = strings.
+                  Only includes entries for posids as defined by calling
+                  get_enabled_posids(posids, False)
+        
+        In cases where only the 0-th terms are found (i.e. we had num_meas==1)
+        the strings in the return dict will be empty, ''.
+        '''
+        included_posids = set(meapos.index)
+        enabled_posids = self.get_enabled_posids(posids=posids, include_posinfo=False)
+        missing_posids = set(enabled_posids) - set(included_posids)
+        assert len(missing_posids) == 0, f'{missing_posids} are missing from meapos data'
+        num_meas = 0
+        crazy_number_of_iterations = 100
+        for i in range(crazy_number_of_iterations):
+            if f'Q{i}' in meapos.columns and f'S{i}' in meapos.columns:
+                num_meas += 1
+            else:
+                break
+        assert num_meas != 0, 'meapos is missing columns "Q0" and/or "S0"'
+        if num_meas == 1:
+            return {posid: '' for posid in enabled_posids}
+        out = {}
+        for posid in enabled_posids:
+            data = meapos.loc[posid]
+            this_dict = {'obsX':[], 'obsY':[]}
+            for i in range(num_meas):
+                sub_QS = [data[f'Q{i}'], data[f'S{i}']]
+                sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS, cast=True)
+                sub_obsXY = sub_obsXY.flatten()
+                this_dict['obsX'] += [sub_obsXY[0]]
+                this_dict['obsY'] += [sub_obsXY[1]]
+            out[posid] = f'submeas={this_dict}'
+        return out
     
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
         '''Returns results of fvc measurement after checking for target matches

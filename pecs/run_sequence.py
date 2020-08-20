@@ -15,17 +15,20 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='Path to sequence file, readable by sequence.py. For some common pre-cooked sequences, run sequence_generator.py.')
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
-parser.add_argument('-m', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
+parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
 parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
 parser.add_argument('-t', '--test_tp', action='store_true', help='turns on auto-updating of POS_T, POS_P based on measurements, default is False')
-parser.add_argument('-n', '--no_movement', action='store_true', help='for debugging purposes, this option suppresses sending move tables to positioners, so they will not physically move')
+parser.add_argument('-x', '--no_movement', action='store_true', help='for debugging purposes, this option suppresses sending move tables to positioners, so they will not physically move')
 default_cycle_time = 60.0 # sec
 parser.add_argument('-c', '--cycle_time', type=float, default=default_cycle_time, help=f'min period of time (seconds) for successive moves (default={default_cycle_time})')
+max_fvc_iter = 10
+parser.add_argument('-n', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
     args.anticollision = None
 assert args.anticollision in {'adjust', 'freeze', None}, f'bad argument {args.anticollision} for anticollision parameter'
+assert 1 <= args.num_meas <= max_fvc_iter, f'out of range argument {args.num_meas} for num_meas parameter'
 
 # read sequence file
 import sequence
@@ -345,7 +348,7 @@ for move in seq:
                 target0 = [-errs[posid][0] for posid in posids]
                 target1 = [-errs[posid][1] for posid in posids]
                 requests = make_requests(posids, command, target0, target1, log_note)
-            kwargs = {'request': requests}
+            kwargs = {'request': requests, 'num_meas': args.num_meas}
         elif command in sequence.homing_commands:
             calc_errors = False
             if pecs_on:
@@ -377,6 +380,11 @@ for move in seq:
             logger.info('Positioner settings: (no change)')
         if real_moves:
             results = move_measure_func(**kwargs)
+            submeas = pecs.summarize_submeasurements(results)
+            
+            # to be implemented: Some method of storing the submeas strings to
+            # the online DB will replace the little loop below.
+            logger.info(f'sub-measurements: {submeas}')
         if calc_errors:
             if real_moves:
                 errs = calc_poslocXY_errors(initial_requests, results)
