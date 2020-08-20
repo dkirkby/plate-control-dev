@@ -330,7 +330,7 @@ for move in seq:
             target1 = move['target1']
         log_note = move['log_note']
         if n_corr > 0:
-            log_note = pc.join_notes(log_note, f'submove {corr}')
+            log_note = pc.join_notes(log_note, f'move {move_num}', f'submove {corr}')
         if command in sequence.general_commands:
             calc_errors = True
             if pecs_on:
