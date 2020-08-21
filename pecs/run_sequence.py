@@ -64,11 +64,15 @@ logger.info(f'Running {script_name} to perform a positioner move + measure seque
 logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {args.infile}')
 logger.info(f'Contents:\n\n{seq}')
-response = input('\nDoes the sequence look correct? (y/n) >> ')
-if 'n' in response.lower():
-    logger.info('User rejected the sequence prior to running. Now quitting.')
-    import sys
-    sys.exit(0)
+
+def quit_query(question):
+    response = input(f'\n{question} (y/n) >> ')
+    if 'n' in response.lower():
+        logger.info('User rejected the sequence prior to running. Now quitting.')
+        import sys
+        sys.exit(0)
+
+quit_query('Does the sequence look correct?')
 
 def assert2(test, message):
     '''Like an assert, but cleaner handling of logging.'''
@@ -85,6 +89,10 @@ try:
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     get_posids = lambda: list(pecs.get_enabled_posids('sub'))
+    these = len(get_posids)
+    allofthem = len(pecs.get_enabled_posids('all'))
+    if these == allofthem:
+        quit_query(f'Are you sure you want to be running ALL {allofthem} positioners?')
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info('PECS initialization failed')
