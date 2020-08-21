@@ -97,7 +97,7 @@ except:
 logger.info(f'selected posids: {get_posids()}')
 
 if pecs_on:
-    these = len(get_posids)
+    these = len(get_posids())
     allofthem = len(pecs.get_enabled_posids('all'))
     if these == allofthem:
         quit_query(f'Are you sure you want to be running ALL {allofthem} positioners?')
