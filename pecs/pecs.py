@@ -544,6 +544,11 @@ class PECS:
         for coordinate system 2. E.g. you could start with only 'Q' and 'S' in
         frame, and then 'obsX' and 'obsY' will be added.
         '''
+        # I know, I know... the implementation is hacky madness... But it's very
+        # hard to predict how these pandas frames behave going in and out of opaque
+        # interfaces through PetalMan to PetalApp and back. Meanwhile I need to move
+        # on with other work. I so much wish we could have just had normal python
+        # dicts and lists getting passed around.
         u_col = []
         v_col = []
         def breakup(cs):
@@ -554,16 +559,14 @@ class PECS:
         u1, v1 = breakup(cs1)
         u2, v2 = breakup(cs2)
         for posid in frame.index:
-            role = self.ptl_role_lookup(posid)
-            vals1 = [frame.loc[posid][u1], frame.loc[posid][u2]]
-            vals2 = self.ptlm.postrans(posid, f'{cs1}_to_{cs2}', vals1,
-                                       cast=True, participating_petals=role)
+            vals1 = [frame.loc[posid][u1], frame.loc[posid][v1]]
+            vals2 = self.ptlm.postrans(posid, f'{cs1}_to_{cs2}', vals1, cast=True)
             if isinstance(vals2, dict):
-                vals2 = vals1[role]
+                vals2 = list(vals2.values())[0]
             vals2 = vals2.flatten()
             u_col += vals2[0]
             v_col += vals2[1]
         new = frame.copy()
-        new['obsX'] = u_col
-        new['obsY'] = v_col
+        new[u2] = u_col
+        new[v2] = v_col
         return new
