@@ -273,6 +273,7 @@ class PECS:
                 meapos = this_meapos
             for column in ['obsX', 'obsY', 'Q', 'S']:
                 meapos[f'{column}{i}'] = this_meapos[column]
+            self.iteration += 1
         median_columns = ['obsX', 'obsY']
         for column in median_columns:
             these_columns = [f'{column}{i}' for i in range(num_meas)]
@@ -301,7 +302,7 @@ class PECS:
                                       test_tp=test_tp, auto_update=True,
                                       err_thresh=self.max_err, up_tol=self.tp_tol,
                                       up_frac=self.tp_frac)
-        self.iteration += 1
+        
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request, match_radius=None, check_unmatched=False,
