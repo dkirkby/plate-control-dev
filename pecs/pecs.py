@@ -500,7 +500,7 @@ class PECS:
             this_dict = {'Q':[], 'S':[], 'obsX':[], 'obsY':[]}
             for key in this_dict:
                 for i in range(num_meas):
-                    this_dict[key] += data[f'{key}{i}']
+                    this_dict[key] += [data[f'{key}{i}']]
             fmt1 = lambda X: str([f'{x:.4f}' for x in X]).replace("'", '')
             s = 'submeas={'
             for k,v in this_dict.items():
@@ -560,7 +560,7 @@ class PECS:
         u2, v2 = breakup(cs2)
         for posid in frame.index:
             vals1 = [frame.loc[posid][u1], frame.loc[posid][v1]]
-            vals2 = self.ptlm.postrans(posid, f'{cs1}_to_{cs2}', vals1, cast=True)
+            vals2 = self.ptlm.ptltrans(f'{cs1}_to_{cs2}', vals1, cast=True)
             if isinstance(vals2, dict):
                 vals2 = list(vals2.values())[0]
             vals2 = vals2.flatten()
