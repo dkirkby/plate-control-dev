@@ -138,7 +138,7 @@ x = 1.0
 y = 1.0
 new = sequence.Sequence(short_name='debug poslocXY with corr',
                         long_name=f'single move to poslocXY = ({x}, {y}) and a followup correction move')
-new.add_move(command='poslocXY', target0=x, target1=y, log_note=debug_note(new), n_corr=1)
+new.add_move(command='poslocXY', target0=x, target1=y, log_note=debug_note(new), allow_corr=True)
 print(new,'\n')
 tests.append(new)
 
@@ -146,7 +146,7 @@ t = 0.0
 p = 150.0
 new = sequence.Sequence(short_name='debug posintTP with corr',
                         long_name=f'single move to posintTP = ({t}, {p}) and a followup correction move')
-new.add_move(command='posintTP', target0=t, target1=p, log_note=debug_note(new), n_corr=1)
+new.add_move(command='posintTP', target0=t, target1=p, log_note=debug_note(new), allow_corr=True)
 print(new,'\n')
 tests.append(new)
 

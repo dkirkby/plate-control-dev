@@ -8,7 +8,7 @@ move_defaults = {'command': '',
                  'target0': 0.0,
                  'target1': 0.0,
                  'log_note': '',
-                 'n_corr': 0,
+                 'allow_corr': False,
                  }
 
 pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
@@ -155,7 +155,7 @@ class Sequence(object):
     def details(self, value):
         self.table.meta['details'] = str(value)
         
-    def add_move(self, command, target0, target1, log_note='', pos_settings={}, n_corr=0, index=None):
+    def add_move(self, command, target0, target1, log_note='', pos_settings={}, allow_corr=False, index=None):
         '''Add a move to the sequence.
         
         Inputs
@@ -164,7 +164,7 @@ class Sequence(object):
             target1      ... 2nd target coordinate or delta, as described in petal.request_targets()
             log_note     ... optional string to store alongside log data for this move
             pos_settings ... optional dict of positioner settings to apply during the move
-            n_corr       ... optional number of correction moves to perform after the primary ("blind") move
+            allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
             index        ... optional index value to insert move at a particular location (default behavior is to append)
         '''
         assert command in valid_commands
@@ -173,7 +173,7 @@ class Sequence(object):
         row['target0'] = float(target0)
         row['target1'] = float(target1)
         row['log_note'] = str(log_note)
-        row['n_corr'] = int(n_corr)
+        row['allow_corr'] = bool(allow_corr)
         for key, value in pos_settings.items():
             assert key in pos_defaults
             example = pos_defaults[key]
@@ -235,7 +235,7 @@ class Sequence(object):
         s += format('COMMAND', f'<{width_command}.{width_command}')
         s += '        U '
         s += '      V '
-        s += ' N_CORR  '
+        s += ' ALLOW_CORR  '
         s += truncate_and_fill('LOG_NOTE', width_note) + '  '
         s += truncate_and_fill('SETTINGS', width_settings)
         for i in range(len(self.table)):
@@ -245,7 +245,7 @@ class Sequence(object):
             s += '  ' + truncate_and_fill(f'{move["command"]}', width_command) + '  '
             s += format(move['target0'], '7g') + ' '
             s += format(move['target1'], '7g') + ' '
-            s += format(move['n_corr'], '7g') + '  '
+            s += format(move['allow_corr'], '11g') + '  '
             s += truncate_and_fill(str(move['log_note']), width_note) + '  '
             s += truncate_and_fill(str(self.non_default_pos_settings(i)), width_settings)
         return s

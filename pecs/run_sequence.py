@@ -22,13 +22,16 @@ parser.add_argument('-x', '--no_movement', action='store_true', help='for debugg
 default_cycle_time = 60.0 # sec
 parser.add_argument('-c', '--cycle_time', type=float, default=default_cycle_time, help=f'min period of time (seconds) for successive moves (default={default_cycle_time})')
 max_fvc_iter = 10
-parser.add_argument('-n', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
+parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
+max_corr = 5
+parser.add_argument('-nc', '--num_corr', type=int, default=0, help=f'int, number of correction moves, for those rows where allowed in sequence definition (default is 0, max is {max_corr})')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
     args.anticollision = None
 assert args.anticollision in {'adjust', 'freeze', None}, f'bad argument {args.anticollision} for anticollision parameter'
 assert 1 <= args.num_meas <= max_fvc_iter, f'out of range argument {args.num_meas} for num_meas parameter'
+assert 0 <= args.num_corr <= max_corr, f'out of range argument {args.num_corr} for num_corr parameter'
 
 # read sequence file
 import sequence
@@ -342,6 +345,7 @@ def pause_between_moves(last_move_time, cycle_time):
             return KeyboardInterrupt
     return time.time()
     
+# setup prior to running sequence
 if pecs_on:
     # cache the pos settings
     cache_path = cache_current_pos_settings(get_posids())
@@ -377,7 +381,8 @@ try:
         logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
         logger.info(f'Move settings are {dict_repr}')
         initial_command = move['command']
-        n_corr = int(move['n_corr']) if initial_command in sequence.general_commands else 0
+        correctable = initial_command in sequence.general_commands and move['allow_corr'] == True
+        n_corr = args.num_corr if correctable else 0
         for corr in range(1 + n_corr):
             last_move_time = pause_between_moves(last_move_time, cycle_time)
             if last_move_time == KeyboardInterrupt:
@@ -461,6 +466,7 @@ except StopIteration:
     logger.info('Safely aborting the sequence.')
 logger.info(f'Sequence "{seq.short_name}" complete!')
 
+# cleanup after running sequence
 if pecs_on:
     # restore the original pos settings
     orig_settings = retrieve_cached_pos_settings(cache_path)
