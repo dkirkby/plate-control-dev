@@ -281,7 +281,7 @@ def calc_poslocXY_errors(requests, results):
 if pecs_on:
     # cache the pos settings
     cache_path = cache_current_pos_settings(get_posids())
-    logger.info('Initial settings of positioner(s) cached to: {cache_path}')
+    logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
     
     # set phi limit angle for the test
     old_phi_limits = pecs.ptlm.get_phi_limit_angle()
