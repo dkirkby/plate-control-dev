@@ -564,8 +564,8 @@ class PECS:
             if isinstance(vals2, dict):
                 vals2 = list(vals2.values())[0]
             vals2 = vals2.flatten()
-            u_col += vals2[0]
-            v_col += vals2[1]
+            u_col += [vals2[0]]
+            v_col += [vals2[1]]
         new = frame.copy()
         new[u2] = u_col
         new[v2] = v_col
