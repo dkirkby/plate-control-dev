@@ -287,6 +287,61 @@ def calc_poslocXY_errors(requests, results):
         err[posid] = [err_x, err_y]
     return err        
 
+def summarize_errors(errs):
+    '''Produces a string summarizing errors for a set of positioners.
+    
+    INPUT:   errs ... same format as output by calc_poslocXY_errors, a dict with
+                      keys = posids and values = [err_locX, err_locY]
+    OUTPUT:  string
+    '''
+    vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
+    vec_errs_um = [err*1000 for err in vec_errs]
+    err_str = f'move {move_num}, submove {corr}, n_pos={len(posids)}, errors (um): '
+    first = True
+    for name, func in {'max': max, 'min': min, 'mean': np.mean,
+                       'median': np.median, 'std': np.std,
+                       'rms': lambda X: (sum(x**2 for x in X)/len(X))**0.5,
+                       }.items():
+        if not first:
+            err_str += ', '
+        err_str += f'{name}={func(vec_errs_um):.1f}'
+        first = False
+    for desc, func in {'best': min, 'worst': max}.items():
+        err = func(vec_errs_um)
+        pos = posids[vec_errs_um.index(err)]
+        err_str += f'\n{desc} performer: {pos}, err={err:.1f} um'
+    return err_str
+
+def pause_between_moves(last_move_time, cycle_time):
+    '''Pauses the sequence between moves. User is given the option to safely
+    CTRL-C exit the sequence during this period.
+    
+    INPUT:  last_move_time ... seconds since epoch, defining when the previous
+                               move was done
+            cycle_time ... seconds to wait after last_move_time
+    
+    OUTPUT: Returns the time now, if the pause was succesfully completed.
+            Returns KeyboardInterrupt if user did CTRL-C.
+            
+    When calling this function for the first time, you can argue last_move_time=None.
+    In this case, the function will immediately return a value suitable for use
+    as "last_move_time" for the *next* time you call the function.
+    '''
+    if last_move_time == None:
+        return time.time() - cycle_time
+    sec_since_last_move = time.time() - last_move_time
+    need_to_wait = cycle_time - sec_since_last_move
+    if need_to_wait > 0:
+        logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
+                    'It is safe to CTRL-C abort the test during this wait period.')
+        try:
+            dt = 0.2  # sec
+            for i in range(int(np.ceil(need_to_wait/dt))):
+                time.sleep(dt)
+        except KeyboardInterrupt:
+            return KeyboardInterrupt
+    return time.time()
+    
 if pecs_on:
     # cache the pos settings
     cache_path = cache_current_pos_settings(get_posids())
@@ -310,124 +365,101 @@ if pecs_on:
 
 # do the sequence
 last_pos_settings = None
-last_move_time = time.time() - args.cycle_time
 real_moves = pecs_on and not args.no_movement
 cycle_time = args.cycle_time if real_moves else 4.0
-for move in seq:
-    index = move.index
-    posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-    dict_repr = dict(zip(move.columns, move))
-    move_num = index + 1
-    logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
-    logger.info(f'Move settings are {dict_repr}')
-    initial_command = move['command']
-    n_corr = int(move['n_corr']) if initial_command in sequence.general_commands else 0
-    for corr in range(1 + n_corr):
-        sec_since_last_move = time.time() - last_move_time
-        need_to_wait = cycle_time - sec_since_last_move
-        if need_to_wait > 0:
-            logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
-                        'It is safe to CTRL-C abort the test during this wait period.')
-            try:
-                dt = 0.2  # sec
-                for i in range(int(np.ceil(need_to_wait/dt))):
-                    time.sleep(dt)
-            except KeyboardInterrupt:
-                logger.info('Safely aborting the sequence.')
-                break
-        last_move_time = time.time()
-        if corr == 0:
-            command = move['command']
-            target0 = move['target0']
-            target1 = move['target1']
-        log_note = move['log_note']
-        if n_corr > 0:
-            log_note = pc.join_notes(log_note, f'move {move_num}', f'submove {corr}')
-        if command in sequence.general_commands:
-            calc_errors = True
-            if pecs_on:
-                move_measure_func = pecs.move_measure
+last_move_time = pause_between_moves(None, cycle_time)
+try:
+    for move in seq:
+        index = move.index
+        posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+        dict_repr = dict(zip(move.columns, move))
+        move_num = index + 1
+        logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
+        logger.info(f'Move settings are {dict_repr}')
+        initial_command = move['command']
+        n_corr = int(move['n_corr']) if initial_command in sequence.general_commands else 0
+        for corr in range(1 + n_corr):
+            last_move_time = pause_between_moves(last_move_time, cycle_time)
+            if last_move_time == KeyboardInterrupt:
+                raise StopIteration
             if corr == 0:
-                requests = make_requests(posids, command, target0, target1, log_note)
-                initial_requests = requests
-                errs = None
+                command = move['command']
+                target0 = move['target0']
+                target1 = move['target1']
+            log_note = move['log_note']
+            if n_corr > 0:
+                log_note = pc.join_notes(log_note, f'move {move_num}', f'submove {corr}')
+            if command in sequence.general_commands:
+                calc_errors = True
+                if pecs_on:
+                    move_measure_func = pecs.move_measure
+                if corr == 0:
+                    requests = make_requests(posids, command, target0, target1, log_note)
+                    initial_requests = requests
+                    errs = None
+                else:
+                    command = 'poslocdXdY'
+                    posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                    target0 = [-errs[posid][0] for posid in posids]
+                    target1 = [-errs[posid][1] for posid in posids]
+                    requests = make_requests(posids, command, target0, target1, log_note)
+                kwargs = {'request': requests, 'num_meas': args.num_meas}
+            elif command in sequence.homing_commands:
+                calc_errors = False
+                if pecs_on:
+                    move_measure_func = pecs.rehome_and_measure
+                if not target0 and not target1:
+                    logger.warning(f'Skipping move {index} because home request had neither'
+                                   f' axis specified. (Need to set target0 to 1 for theta homing'
+                                   f', target1 to 1 for phi homing, or both simultaneously.')
+                    continue
+                should_debounce = command == 'home_and_debounce'
+                axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
+                kwargs = {'posids': posids,
+                          'axis': axis,
+                          'debounce': should_debounce,
+                          'log_note': log_note,
+                          }
             else:
-                command = 'poslocdXdY'
-                posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-                target0 = [-errs[posid][0] for posid in posids]
-                target1 = [-errs[posid][1] for posid in posids]
-                requests = make_requests(posids, command, target0, target1, log_note)
-            kwargs = {'request': requests, 'num_meas': args.num_meas}
-        elif command in sequence.homing_commands:
-            calc_errors = False
-            if pecs_on:
-                move_measure_func = pecs.rehome_and_measure
-            if not target0 and not target1:
-                logger.warning(f'Skipping move {index} because home request had neither'
-                               f' axis specified. (Need to set target0 to 1 for theta homing'
-                               f', target1 to 1 for phi homing, or both simultaneously.')
+                logger.warning(f'Skipping move {index} due to unexpected command {command}')
                 continue
-            should_debounce = command == 'home_and_debounce'
-            axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
-            kwargs = {'posids': posids,
-                      'axis': axis,
-                      'debounce': should_debounce,
-                      'log_note': log_note,
-                      }
-        else:
-            logger.warning(f'Skipping move {index} due to unexpected command {command}')
-            continue
-        kwargs.update(move_meas_settings)
-        new_settings = seq.pos_settings(index)
-        if new_settings != last_pos_settings:
-            all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
-            if pecs_on:
-                apply_pos_settings(all_settings)
-            # logger.info(f'Positioner settings: {new_settings}')  # quite verbose / redundant
-            last_pos_settings = new_settings
-        else:
-            logger.info('Positioner settings: (no change)')
-        if real_moves:
-            results = move_measure_func(**kwargs)
-            if args.num_meas > 1:
-                submeas = pecs.summarize_submeasurements(results)
-                
-                # to be implemented: Some method of storing the submeas strings to
-                # the online DB will replace the little loop below.
-                logger.info(f'sub-measurements: {submeas}')
-        if calc_errors:
-            if real_moves:
-                errs = calc_poslocXY_errors(initial_requests, results)
+            kwargs.update(move_meas_settings)
+            new_settings = seq.pos_settings(index)
+            if new_settings != last_pos_settings:
+                all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
+                if pecs_on:
+                    apply_pos_settings(all_settings)
+                # logger.info(f'Positioner settings: {new_settings}')  # quite verbose / redundant
+                last_pos_settings = new_settings
             else:
-                dummy_err_x = np.random.normal(loc=0, scale=0.1, size=len(posids))
-                dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
-                errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
-            prev_posids = posids
-            posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-            if len(prev_posids) != len(posids):
-                logger.info(f'Num posids changed from {len(prev_posids)} to {len(posids)}. ' +
-                            'Check for auto-disabling after comm error. Lost positioners: ' +
-                            f'{set(prev_posids) - set(posids)}')
-            vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
-            vec_errs_um = [err*1000 for err in vec_errs]
-            err_str = f'move {move_num}, submove {corr}, n_pos={len(posids)}, errors (um): '
-            first = True
-            for name, func in {'max': max, 'min': min, 'mean': np.mean,
-                               'median': np.median, 'std': np.std,
-                               'rms': lambda X: (sum(x**2 for x in X)/len(X))**0.5,
-                               }.items():
-                if not first:
-                    err_str += ', '
-                err_str += f'{name}={func(vec_errs_um):.1f}'
-                first = False
-            logger.info(err_str)
-            for desc, func in {'best': min, 'worst': max}.items():
-                err = func(vec_errs_um)
-                pos = posids[vec_errs_um.index(err)]
-                logger.info(f'{desc} performer: {pos}, err={err:.1f} um')
-            
+                logger.info('Positioner settings: (no change)')
+            if real_moves:
+                results = move_measure_func(**kwargs)
+                if args.num_meas > 1:
+                    submeas = pecs.summarize_submeasurements(results)
+                    
+                    # to be implemented: Some method of storing the submeas strings to
+                    # the online DB will replace the little loop below.
+                    logger.info(f'sub-measurements: {submeas}')
+    
+                prev_posids = posids
+                posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                if len(prev_posids) != len(posids):
+                    logger.info(f'Num posids changed from {len(prev_posids)} to {len(posids)}. ' +
+                                'Check for auto-disabling after comm error. Lost positioners: ' +
+                                f'{set(prev_posids) - set(posids)}')
+            if calc_errors:
+                if real_moves:
+                    errs = calc_poslocXY_errors(initial_requests, results)
+                else:
+                    dummy_err_x = np.random.normal(loc=0, scale=0.1, size=len(posids))
+                    dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
+                    errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
+                err_str = summarize_errors(errs)
+                logger.info(err_str)
+except StopIteration:
+    logger.info('Safely aborting the sequence.')
 logger.info(f'Sequence "{seq.short_name}" complete!')
-
 
 if pecs_on:
     # restore the original pos settings
