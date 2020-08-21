@@ -89,16 +89,18 @@ try:
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     get_posids = lambda: list(pecs.get_enabled_posids('sub'))
-    these = len(get_posids)
-    allofthem = len(pecs.get_enabled_posids('all'))
-    if these == allofthem:
-        quit_query(f'Are you sure you want to be running ALL {allofthem} positioners?')
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info('PECS initialization failed')
     pecs_on = False
     get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
 logger.info(f'selected posids: {get_posids()}')
+
+if pecs_on:
+    these = len(get_posids)
+    allofthem = len(pecs.get_enabled_posids('all'))
+    if these == allofthem:
+        quit_query(f'Are you sure you want to be running ALL {allofthem} positioners?')
 
 # helpers for generating move requests
 import pandas as pd
