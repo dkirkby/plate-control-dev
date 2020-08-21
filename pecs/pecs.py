@@ -223,7 +223,8 @@ class PECS:
                  matched_only ... passed to fvc proxy
                  check_unmatched ... passed to PetalApp.handle_fvc_feedback()
                  test_tp ... passed to PetalApp.handle_fvc_feedback()
-                 num_meas ... how many FVC images to take (the results will be median-ed)
+                 num_meas ... how many FVC images to take (the results will be
+                                                           median-ed in XY space)
         
         OUTPUTS: exppos ... expected positions in some format (?)
                  meapos ... measured results. pandas dataframe with columns:
@@ -267,16 +268,17 @@ class PECS:
                 self.print('Measured positions of positioners by FVC '
                            'are contaminated by fiducials.')
             this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
+            this_meapos = self._batch_transform(this_meapos, 'QS', 'obsXY')
             if i == 0:
                 meapos = this_meapos
-            for column in this_meapos.columns:
+            for column in ['obsX', 'obsY', 'Q', 'S']:
                 meapos[f'{column}{i}'] = this_meapos[column]
-        number_columns = ['Q', 'S', 'DQ', 'DS', 'FWHM', 'MAG', 'MEAS_ERR']
-        for prefix in number_columns:
-            these_columns = [f'{prefix}{i}' for i in range(num_meas)]
+        median_columns = ['obsX', 'obsY']
+        for column in median_columns:
+            these_columns = [f'{column}{i}' for i in range(num_meas)]
             medians = meapos[these_columns].median(axis=1)
-            meapos[prefix] = medians
-            
+            meapos[column] = medians
+        meapos = self._batch_transform(meapos, 'obsXY', 'QS')
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
         exppos.columns = exppos.columns.str.upper()
@@ -494,20 +496,11 @@ class PECS:
             return {posid: '' for posid in enabled_posids}
         out = {}
         for posid in enabled_posids:
-            role = self.ptl_role_lookup(posid)
             data = meapos.loc[posid]
             this_dict = {'Q':[], 'S':[], 'obsX':[], 'obsY':[]}
-            for i in range(num_meas):
-                sub_QS = [data[f'Q{i}'], data[f'S{i}']]
-                sub_obsXY = self.ptlm.postrans(posid, 'QS_to_obsXY', QS=sub_QS,
-                                               cast=True, participating_petals=role)
-                if isinstance(sub_obsXY, dict):
-                    sub_obsXY = sub_obsXY[role]  # because weird inconsistencies of when petalman returns dicts
-                sub_obsXY = sub_obsXY.flatten()
-                this_dict['Q'] += [sub_QS[0]]
-                this_dict['S'] += [sub_QS[1]]
-                this_dict['obsX'] += [sub_obsXY[0]]
-                this_dict['obsY'] += [sub_obsXY[1]]
+            for key in this_dict:
+                for i in range(num_meas):
+                    this_dict[key] += data[f'{key}{i}']
             fmt1 = lambda X: str([f'{x:.4f}' for x in X]).replace("'", '')
             s = 'submeas={'
             for k,v in this_dict.items():
@@ -543,3 +536,34 @@ class PECS:
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
         result = merged.join(exppos, on='DEVICE_ID')
         return result
+    
+    def _batch_transform(self, frame, cs1, cs2):
+        '''Calculate values in cs2 for a frame that has columns for coordinate
+        system cs1. E.g. cs1='QS', cs2='obsXY'. Index is 'DEVICE_ID'. Then return
+        a new frame that now includes new columns (or replaces existing columns)
+        for coordinate system 2. E.g. you could start with only 'Q' and 'S' in
+        frame, and then 'obsX' and 'obsY' will be added.
+        '''
+        u_col = []
+        v_col = []
+        def breakup(cs):
+            if cs == 'QS':
+                return 'Q', 'S'
+            if cs == 'obsXY':
+                return 'obsX', 'obsY'
+        u1, v1 = breakup(cs1)
+        u2, v2 = breakup(cs2)
+        for posid in frame.index:
+            role = self.ptl_role_lookup(posid)
+            vals1 = [frame.loc[posid][u1], frame.loc[posid][u2]]
+            vals2 = self.ptlm.postrans(posid, f'{cs1}_to_{cs2}', vals1,
+                                       cast=True, participating_petals=role)
+            if isinstance(vals2, dict):
+                vals2 = vals1[role]
+            vals2 = vals2.flatten()
+            u_col += vals2[0]
+            v_col += vals2[1]
+        new = frame.copy()
+        new['obsX'] = u_col
+        new['obsY'] = v_col
+        return new
