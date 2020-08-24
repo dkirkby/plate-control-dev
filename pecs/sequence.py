@@ -5,20 +5,13 @@ and move scheduling parameters.
 """
 
 import os
-from astropy.table import Table
+from astropy.table import Table, vstack
 import numpy as np
 import datetime
 import pandas
 import sys
 sys.path.append('../petal')
 import posconstants as pc
-
-move_defaults = {'command': '',
-                 'target0': 0.0,
-                 'target1': 0.0,
-                 'log_note': '',
-                 'allow_corr': False,
-                 }
 
 pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
                 'CURR_CRUISE': 70,
@@ -36,9 +29,6 @@ pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
                 'MOTOR_CCW_DIR_P': -1,
                 'MOTOR_CCW_DIR_T': -1,
                 }
-
-col_defaults = move_defaults.copy()
-col_defaults.update(pos_defaults)
 
 pos_comments = {'CURR_SPIN_UP_DOWN': 'int, 0-100, spin up / spin down current',
                 'CURR_CRUISE': 'int, 0-100, cruise current',
@@ -74,60 +64,24 @@ abs_commands = global_commands | abs_local_commands
 general_commands = abs_commands | delta_commands
 homing_commands = {'home_and_debounce', 'home_no_debounce'}
 local_commands = abs_local_commands | delta_commands | homing_commands
-
-# When setting up homing rows in a sequence table, set target0 = 1 if you want
-# to home theta axis, target1 = 1 to home phi axis, or both to home both axes.
-
 valid_commands = general_commands.copy()
 valid_commands.update(homing_commands)
 
 is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
 is_bool = lambda x: isinstance(x, (bool, np.bool_))
 
-def read(path):
-    '''Reads in and validates format for a saved Sequence from a file. E.g.
-        sequence = Sequence.read(path)
-    '''
-    table = Table.read(path)
-    example = Sequence(short_name='dummy')
-    example.add_move(command='QS', target0=0.0, target1=0.0)
-    for col in table.columns:
-        assert col in example.table.columns
-        for i in range(len(table)):
-            val = table[col][i]
-            test = example.table[col][0]
-            if is_number(val) and is_number(test) or is_bool(val) and is_bool(test):
-                continue
-            assert isinstance(val, type(test))
-        try:
-            np.isfinite(example.table[col][0])
-            isnumber = True
-        except:
-            isnumber = False
-        if isnumber:
-            assert all(np.isfinite(table[col]))
-    for row in table:
-        assert row['command'] in valid_commands
-    missing_col = set(col_defaults) - set(table.columns)
-    for col in missing_col:
-        values = pos_defaults[col]*len(table)
-        table[col] = values
-    sequence = Sequence(short_name=table.meta['short_name'])
-    sequence.table = table
-    return sequence
-
 class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
+    Typical operations you can do on a list work here (indexing, slices, del, etc).
+    However, all elements must have type Move (see class lower in this module).
     
         short_name ... string, brief name for the test
         long_name  ... string, optional longer descriptive name for the test
         details ... string, optional additional string to explain the test's purpose, etc
         
     After initialization, populate the sequence using the "add_move" function.
-    '''
+    '''    
     def __init__(self, short_name, long_name='', details=''):
-        names = [key for key in col_defaults.keys()]
-        types = [type(val) for val in col_defaults.values()]
         self.moves = []
         self.short_name = short_name
         self.long_name = str(long_name)
@@ -138,47 +92,39 @@ class Sequence(object):
     def normalized_short_name(self):
         '''A particular format, used for example when saving files to disk.'''
         return self.short_name.replace(' ','_').upper()
-        
-    def add_move(self, command, target0, target1, log_note='', pos_settings={},
-                 allow_corr=False, posloc='any', index=None):
-        '''Add a move to the sequence.
-        
-        INPUTS:
-            index        ... optional index value to insert a new move at a particular location (default behavior is to append)
-            
-        How to add multiple positioners 
+    
+    @staticmethod
+    def read(path):
+        '''Reads in and validates format for a saved Sequence from a file. E.g.
+        sequence = Sequence.read(path)
         '''
-        assert command in valid_commands
-        row = col_defaults.copy()
-        row['command'] = command
-        row['target0'] = float(target0)
-        row['target1'] = float(target1)
-        row['log_note'] = str(log_note)
-        row['allow_corr'] = bool(allow_corr)
-        for key, value in pos_settings.items():
-            assert key in pos_defaults
-            example = pos_defaults[key]
-            expected_type =  type(example)
-            if isinstance(value, (int, np.integer)) and isinstance(example, (float, np.floating)):
-                value = float(value)
-            assert isinstance(value, expected_type)
-            row[key] = value
-        if index:
-            self.table.insert_row(index, row)
-        else:
-            self.table.add_row(row)
-            
-    def delete_move(self, index):
-        '''Delete a move from the sequence. (Note you can also use the more
-        generic and pythonic del syntax.)'''
-        assert 0 <= index <= len(self.table), f'error index {index} not in sequence'
-        del self.table[index]
+        table = Table.read(path)
+        table = Sequence._validate_table(table)
+        sequence = Sequence(short_name='dummy')
+        for key, value in table.meta.items():
+            setattr(sequence, key, value)
+        move_idxs = sorted(set(table['move_idx']))
+        for m in move_idxs:
+            subtable = table[m == table['move_idx']]
+            kwargs = {key: subtable[key][0] for key in Move.single_keys}
+            kwargs.update({key: subtable[key] for key in Move.multi_keys})
+            move = Move(**kwargs)
+            sequence.append(move)
+        return sequence
     
     def save(self, directory='.', basename=''):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
         '''
         if not basename:
             basename = f'seq_{self.normalized_short_name}'
+        tables = []
+        for i in range(len(self)):
+            move = self.moves[i]
+            this_dict = move.to_dict()
+            this_table = Table(this_dict())
+            this_table['move_idx'] = [i] * len(this_table)
+            tables.append(this_table)
+        table = vstack(tables)
         path = os.path.join(directory, basename + '.ecsv')
         self.table.write(path, overwrite=True, delimiter=',')
     
@@ -265,6 +211,43 @@ class Sequence(object):
     def __contains__(self, value):
         return value in self.moves
     
+    def _validate_table(table):
+        '''Validates an astropy table representing a sequence. Returns a new
+        table, which may be slightly modified. For example, adding any new columns
+        which have been added to sequence since that table was saved to disk.
+        '''
+        new = table.copy()
+        assert move
+        example_move = Move(command='dTdP', target0=0.0, target1=0.0)
+        example_dict = example_move.to_table()
+        example_table = Table(example_dict)
+        for col in new.columns:
+            assert col in example_table.columns
+            for i in range(len(new)):
+                val = new[col][i]
+                test = example_table[col][0]
+                if is_number(val) and is_number(test) or is_bool(val) and is_bool(test):
+                    continue
+                assert isinstance(val, type(test))
+            try:
+                np.isfinite(example_table[col][0])
+                isnumber = True
+            except:
+                isnumber = False
+            if isnumber:
+                assert all(np.isfinite(new[col]))
+        for row in new:
+            assert row['command'] in valid_commands
+        missing_col = set(example_table.columns) - set(new.columns)
+        defaults = pos_defaults.copy()  # future-proof in case someone wants to add entries to defaults
+        missing_col_default_available = missing_col & set(defaults)
+        for col in missing_col_default_available:
+            values = defaults[col]*len(new)
+            new[col] = values
+        if 'move_idx' not in new.columns:
+            new['move_idx'] = range(len(new))
+        return new
+    
 class Move(object):
     '''Encapsulates the command and settings data for a simultaneous movement of
     one or more fiber positioners.
@@ -288,6 +271,10 @@ class Move(object):
         can specify different targets for different positioners. The command will be
         the same in all cases, and must be one of general_commands, as defined in this
         module.
+        
+    Homing commands:
+        Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
+        or set both to home both axes.
     '''
     def __init__(self, command, target0, target1, posloc='any', log_note='', pos_settings={}, allow_corr=False):
         if posloc=='any':
@@ -312,6 +299,10 @@ class Move(object):
         self.pos_settings = self._validate_pos_settings(pos_settings)
         self.allow_corr = bool(allow_corr)
     
+    # properties of Move with single values vs multiple values
+    single_keys = {'command', 'log_note', 'pos_settings', 'allow_corr'}
+    multi_keys = {'target0', 'target1', 'posloc'}         
+    
     @staticmethod
     def _validate_pos_settings(settings):
         '''Returns a new, validated pos_settings dict, with possible type casts
@@ -335,14 +326,16 @@ class Move(object):
         '''Boolean whether this move has mulitple targets.'''
         return len(self) > 1
     
-    def to_table(self):
-        '''Returns a tabular form, as a dict with keys = column names and
-        values = equal-length lists of column data.
+    def to_dict(self):
+        '''Returns a dict, which is ready for direct conversion to an astropy
+        table or pandas dataframe. Keys = column names and values = equal-length
+        lists of column data.
         '''
-        singletons = {'command', 'log_note', 'pos_settings', 'allow_corr'}
-        multiples = {'target0', 'target1', 'posloc'}                
-        data = {k: [v]*len(self) for k, v in singletons.items()}
-        data.update(multiples)
+        data = {}
+        for key in self.single_keys:
+            data[key] = getattr(self, key)] * len(self)
+        for key in self.multi_keys:
+            data[key] = getattr(self, key)
         return data
     
     def make_request(self, posid_map, log_note=''):
