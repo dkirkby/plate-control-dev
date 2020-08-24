@@ -6,10 +6,153 @@ Produces positioner move sequences, for any of several pre-cooked types of test.
 import sequence
 import numpy as np
 
-tests = []
+seqs = []
 
-# HELPER FUNCTIONS
+# DEBUGGING / CODE SYNTAX seqs
+# -----------------------------
 
+debug_note = lambda seq: f'move sequence code test, {seq.normalized_short_name}'
+seq = sequence.Sequence(short_name='debug dTdP', long_name='test the code with single tiny move')
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq),
+                     pos_settings={'ANTIBACKLASH_ON': False})
+seq.append(move)
+seqs.append(seq)
+
+seq = sequence.Sequence(short_name='debug dTdP full current',
+                        long_name='test the code with single tiny move and motor current set to 100')
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq),
+                     pos_settings={'ANTIBACKLASH_ON': False,
+                                   'CURR_SPIN_UP_DOWN': 100,
+                                   'CURR_CRUISE': 100,
+                                   'CURR_CREEP': 100})
+seq.append(move)
+seqs.append(seq)
+
+x = 1.0
+y = 1.0
+seq = sequence.Sequence(short_name='debug poslocXY with corr',
+                        long_name=f'single move to poslocXY = ({x}, {y}) and a followup correction move')
+move = sequence.Move(command='poslocXY', target0=x, target1=y, log_note=debug_note(seq), allow_corr=True)
+seq.append(move)
+seqs.append(seq)
+
+t = 0.0
+p = 150.0
+seq = sequence.Sequence(short_name='debug posintTP with corr',
+                        long_name=f'single move to posintTP = ({t}, {p}) and a followup correction move')
+move = sequence.Move(command='posintTP', target0=t, target1=p, log_note=debug_note(seq), allow_corr=True)
+seq.append(move)
+seqs.append(seq)
+
+
+# BASIC HOMING SEQUENCES
+# ----------------------
+
+simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
+seq = sequence.Sequence(short_name='home_and_debounce',
+                        long_name='run a single rehome on both axes, followed by debounce moves')
+move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(seq))
+seq.append(move)
+print(seq,'\n')
+seqs.append(seq)
+
+seq = sequence.Sequence(short_name='home_no_debounce', 
+                        long_name='run a single rehome on both axes, with no debounce moves')
+move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(seq))
+seq.append(move)
+seqs.append(seq)
+
+
+# SIMPLE ARC SEQUENCES
+# --------------------
+
+cmd = 'posintTP'
+settings = {'ALLOW_EXCEED_LIMITS': True}
+name_note = ', travel limits OFF'
+for axis in ['theta', 'phi']:
+    seq = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}')
+    if axis == 'theta':
+        thetas = [-170+i*20 for i in range(18)]
+        phi = 130
+        targets = [[theta, phi] for theta in thetas]
+    else:
+        theta = 0
+        phis = [120+i*3 for i in range(18)]
+        targets = [[theta, phi] for phi in phis]
+    for i in range(len(targets)):
+        target = targets[i]
+        note = f'{simple_note(seq)}, move {i+1} of {len(targets)}'
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        seq.append(move)
+    print(seq,'\n')
+    seqs.append(seq)
+    
+cmd = 'dTdP'
+deltas = [1.0 for i in range(10)]
+for axis in ['theta', 'phi']:
+    seq = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance{name_note}')
+    if axis == 'theta':
+        targets = [[delta, 0] for delta in deltas]
+    else:
+        targets = [[0, delta] for delta in deltas]
+    for i in range(len(targets)):
+        target = targets[i]
+        note = f'{simple_note(seq)}, move {i+1} of {len(targets)}'
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        seq.append(move)
+    print(seq,'\n')
+    seqs.append(seq)
+
+
+# HARDSTOP DEBOUNCE MEASUREMENTS
+# ------------------------------
+
+details = '''Settings: default
+Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
+Purpose: Measure the debounce distance needed when coming off the hardstops.'''
+clearance_vals = {'theta': [3.0, 4.0, 5.0, 6.0],
+                 'phi': [3.0, 4.0, 5.0, 6.0]}
+test_step_away = {'theta': 30.0, 'phi': -30.0}
+num_test_steps = {'theta': 3, 'phi': 3}
+for axis in ['theta', 'phi']:
+    seq = sequence.Sequence(short_name=f'{axis} hardstop test',
+                            long_name=f'seqs varying debounce distances, when coming off {axis} hard limit',
+                            details=details)
+    init_cmd = 'posintTP'
+    init_pos = [0, 130]
+    move = sequence.Move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
+                         log_note=f'{seq.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
+    seq.append(move)
+    n_loops = len(clearance_vals[axis])
+    for i in range(n_loops):
+        clearance_val = clearance_vals[axis][i]
+        clearance_key = f'PRINCIPLE_HARDSTOP_CLEARANCE_{"T" if axis=="theta" else "P"}'
+        settings = {clearance_key: clearance_val}
+        note = f'{seq.short_name}, loop {i+1} of {n_loops}, {clearance_key}={clearance_val}'
+        move = sequence.Move(command='home_and_debounce',
+                             target0=(axis=='theta'),
+                             target1=(axis=='phi'),
+                             log_note=note,
+                             pos_settings=settings,
+                             )
+        for j in range(num_test_steps[axis]):
+            for direction in ['away from', 'toward']:
+                sign = 1 if direction == 'away from' else -1
+                step = sign * test_step_away[axis]
+                move = sequence.Move(command='dTdP',
+                                     target0=step * (axis=='theta'),
+                                     target1=step * (axis=='phi'),
+                                     log_note=f'{note}, step {j+1} of {num_test_steps[axis]}, {direction} hardstop',
+                                     pos_settings=settings,
+                                     )
+                seq.append(move)
+    seqs.append(seq)
+
+
+# MOTOR TESTS
+# -----------
+
+# Helper functions
 def wiggle(forward, case=0):
     '''Generates a wiggly sequence with lots of back and forth, using a starting list
     of forward direction deltas. Several pre-cooked cases are provided.'''
@@ -32,7 +175,7 @@ def describe(seq, axis):
     # print('running total: ' + str(cumsum))
     
 def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_deltas, settings):
-    new = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
+    seq = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
                             long_name = prefix + ' ' + long_suffix,
                             details = details)
     i = 0 if prefix.lower()[0] == 't' else 1
@@ -40,14 +183,13 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
     for j in range(len(deltas)):
         target = [0,0]
         target[i] = deltas[j]
-        note = 'motortest: ' + str(new.short_name) + ', move: ' + str(j)
-        new.add_move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
-    print(new)
-    describe(new, i)
+        note = 'motortest ' + str(seq.short_name)
+        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        seq.append(move)
+    print(seq)
+    describe(seq, i)
     print('')
-    return new
-
-# TEST DEFINITIONS
+    return seq
 
 # Theta and phi performance at nominal settings
 details = '''Settings: default
@@ -57,8 +199,8 @@ options = {}
 short_suffix = 'nominal'
 long_suffix = 'performance at nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
 # Theta and phi cruise-only at otherwise nominal settings
 details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON
@@ -71,11 +213,10 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise only'
 long_suffix = 'cruise-only, at otherwise nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
 # Theta and phi cruise-only, with spinup/down power disabled
-# TEST 5 - Phi cruise-only, with spinup/down power disabled
 details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON. Set CURR_SPIN_UP_DOWN = 0.
 Moves: Several moves at cruise speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in typical cruise mode.'''
@@ -88,8 +229,8 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise no spinupdown'
 long_suffix = 'cruise-only, with spinup/down power disabled'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
 # Theta and phi creep-only at otherwise nominal settings
 details = '''Settings: Turn on parameter ONLY_CREEP.
@@ -100,8 +241,8 @@ options = {'ONLY_CREEP': True,
 short_suffix = 'creep only'
 long_suffix = 'creep-only, at otherwise nominal settings'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
 # Theta and phi fast creep
 details = '''Settings: Halve the creep period thereby doubling the creep speed.
@@ -113,135 +254,20 @@ options = {'ONLY_CREEP': True,
 short_suffix = 'fast creep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
 
-# Debugging / code syntax tests
-debug_note = lambda seq: f'move sequence code test, {seq.normalized_short_name}'
-new = sequence.Sequence(short_name='debug dTdP', long_name='test the code with single tiny move')
-new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new),
-             pos_settings={'ANTIBACKLASH_ON': False})
-print(new,'\n')
-tests.append(new)
 
-new = sequence.Sequence(short_name='debug dTdP full current',
-                        long_name='test the code with single tiny move and motor current set to 100')
-new.add_move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(new),
-             pos_settings={'ANTIBACKLASH_ON': False,
-                           'CURR_SPIN_UP_DOWN': 100,
-                           'CURR_CRUISE': 100,
-                           'CURR_CREEP': 100})
-print(new,'\n')
-tests.append(new)
-
-x = 1.0
-y = 1.0
-new = sequence.Sequence(short_name='debug poslocXY with corr',
-                        long_name=f'single move to poslocXY = ({x}, {y}) and a followup correction move')
-new.add_move(command='poslocXY', target0=x, target1=y, log_note=debug_note(new), allow_corr=True)
-print(new,'\n')
-tests.append(new)
-
-t = 0.0
-p = 150.0
-new = sequence.Sequence(short_name='debug posintTP with corr',
-                        long_name=f'single move to posintTP = ({t}, {p}) and a followup correction move')
-new.add_move(command='posintTP', target0=t, target1=p, log_note=debug_note(new), allow_corr=True)
-print(new,'\n')
-tests.append(new)
-
-# Basic homing sequences
-simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
-new = sequence.Sequence(short_name='home_and_debounce',
-                        long_name='run a single rehome on both axes, followed by debounce moves')
-new.add_move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(new))
-print(new,'\n')
-tests.append(new)
-
-new = sequence.Sequence(short_name='home_no_debounce', 
-                        long_name='run a single rehome on both axes, with no debounce moves')
-new.add_move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(new))
-print(new,'\n')
-tests.append(new)
-
-# Simple arc sequences
-cmd = 'posintTP'
-settings = {'ALLOW_EXCEED_LIMITS': True}
-name_note = ', travel limits OFF'
-for axis in ['theta', 'phi']:
-    new = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}')
-    if axis == 'theta':
-        thetas = [-170+i*20 for i in range(18)]
-        phi = 130
-        targets = [[theta, phi] for theta in thetas]
-    else:
-        theta = 0
-        phis = [120+i*3 for i in range(18)]
-        targets = [[theta, phi] for phi in phis]
-    for i in range(len(targets)):
-        target = targets[i]
-        note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
-        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
-    print(new,'\n')
-    tests.append(new)
+# SAVE ALL TO DISK
+# ----------------
+paths = []
+for seq in seqs:
+    path = seqs.save()
+    paths.append(path)
     
-cmd = 'dTdP'
-deltas = [1.0 for i in range(10)]
-for axis in ['theta', 'phi']:
-    new = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance{name_note}')
-    if axis == 'theta':
-        targets = [[delta, 0] for delta in deltas]
-    else:
-        targets = [[0, delta] for delta in deltas]
-    for i in range(len(targets)):
-        target = targets[i]
-        note = f'{simple_note(new)}, move {i+1} of {len(targets)}'
-        new.add_move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
-    print(new,'\n')
-    tests.append(new)
-
-# Hardstop debounce measurements
-details = '''Settings: default
-Moves: Repeatedly strike hard-limit. After each, try a different debounce amount, then some test moves.
-Purpose: Measure the debounce distance needed when coming off the hardstops.'''
-clearance_vals = {'theta': [3.0, 4.0, 5.0, 6.0],
-                 'phi': [3.0, 4.0, 5.0, 6.0]}
-test_step_away = {'theta': 30.0, 'phi': -30.0}
-num_test_steps = {'theta': 3, 'phi': 3}
-for axis in ['theta', 'phi']:
-    new = sequence.Sequence(short_name=f'{axis} hardstop test',
-                            long_name=f'tests varying debounce distances, when coming off {axis} hard limit',
-                            details=details)
-    init_cmd = 'posintTP'
-    init_pos = [0, 130]
-    new.add_move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
-                 log_note=f'{new.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
-    n_loops = len(clearance_vals[axis])
-    for i in range(n_loops):
-        clearance_val = clearance_vals[axis][i]
-        clearance_key = f'PRINCIPLE_HARDSTOP_CLEARANCE_{"T" if axis=="theta" else "P"}'
-        settings = {clearance_key: clearance_val}
-        note = f'{new.short_name}, loop {i+1} of {n_loops}, {clearance_key}={clearance_val}'
-        new.add_move(command='home_and_debounce',
-                     target0=(axis=='theta'),
-                     target1=(axis=='phi'),
-                     log_note=note,
-                     pos_settings=settings,
-                     )
-        for j in range(num_test_steps[axis]):
-            for direction in ['away from', 'toward']:
-                sign = 1 if direction == 'away from' else -1
-                step = sign * test_step_away[axis]
-                new.add_move(command='dTdP',
-                             target0=step * (axis=='theta'),
-                             target1=step * (axis=='phi'),
-                             log_note=f'{note}, step {j+1} of {num_test_steps[axis]}, {direction} hardstop',
-                             pos_settings=settings,
-                             )
-    print(new,'\n')
-    tests.append(new)
-
-# SAVE TO DISK
-for test in tests:
-    test.save()
+# READ FROM DISK AND PRINT TO STDOUT
+# ----------------------------------
+for path in paths:
+    seq = sequence.Sequence.read(path)
+    print(seq,'\n')
     

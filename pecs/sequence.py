@@ -114,6 +114,7 @@ class Sequence(object):
     
     def save(self, directory='.', basename=''):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
+        Returns the path of the saved file.
         '''
         if not basename:
             basename = f'seq_{self.normalized_short_name}'
@@ -126,22 +127,8 @@ class Sequence(object):
             tables.append(this_table)
         table = vstack(tables)
         path = os.path.join(directory, basename + '.ecsv')
-        self.table.write(path, overwrite=True, delimiter=',')
-    
-    def pos_settings(self, row_index):
-        '''Return dict containing all pos settings. Will be shaped like
-        pos_defaults.'''
-        row = self.table[row_index]
-        d = {key:row[key] for key in pos_defaults if key}
-        return d
-    
-    def non_default_pos_settings(self, row_index):
-        '''Return dict containing only those fields for which the given row
-        has non-default pos settings values (as defined in pos_defaults).
-        '''
-        row = self.table[row_index]
-        d = {key:row[key] for key in pos_defaults if pos_defaults[key] != row[key]}
-        return d
+        table.write(path, overwrite=True, delimiter=',')
+        return path
     
     def __str__(self):
         s = f'{self.normalized_short_name}'
@@ -158,25 +145,28 @@ class Sequence(object):
             return filled
         width_note = 50
         width_settings = 50
-        width_command = max(7, max({len(row['command']) for row in self.table}))
+        width_command = max(7, max({len(move.command) for move in self}))
         width_command = min(width_command, 14)
-        s += 'ROW   '
+        s += 'MOVE   '
         s += format('COMMAND', f'<{width_command}.{width_command}')
-        s += '        U '
+        s += '         U '
         s += '      V '
+        s += ' LOC '
         s += ' ALLOW_CORR  '
         s += truncate_and_fill('LOG_NOTE', width_note) + '  '
         s += truncate_and_fill('SETTINGS', width_settings)
-        for i in range(len(self.table)):
-            move = self.table[i]
-            s += '\n'
-            s += format(i, '3d') + ' '
-            s += '  ' + truncate_and_fill(f'{move["command"]}', width_command) + '  '
-            s += format(move['target0'], '7g') + ' '
-            s += format(move['target1'], '7g') + ' '
-            s += format(move['allow_corr'], '11g') + '  '
-            s += truncate_and_fill(str(move['log_note']), width_note) + '  '
-            s += truncate_and_fill(str(self.non_default_pos_settings(i)), width_settings)
+        for m in range(len(self)):
+            move = self.moves[m]
+            for i in range(len(move)):
+                s += '\n'
+                s += format(m, '4d') + ' '
+                s += '  ' + truncate_and_fill(f'{move.command}', width_command) + '  '
+                s += format(move.target0[i], '7g') + ' '
+                s += format(move.target1[i], '7g') + ' '
+                s += format(move.posloc[i], '3g') + ' '
+                s += format(move.allow_corr, '11g') + '  '
+                s += truncate_and_fill(str(move.log_note), width_note) + '  '
+                s += truncate_and_fill(str(move.non_default_pos_settings), width_settings)
         return s
     
     def __repr__(self):
@@ -217,7 +207,6 @@ class Sequence(object):
         which have been added to sequence since that table was saved to disk.
         '''
         new = table.copy()
-        assert move
         example_move = Move(command='dTdP', target0=0.0, target1=0.0)
         example_dict = example_move.to_table()
         example_table = Table(example_dict)
@@ -277,7 +266,7 @@ class Move(object):
         or set both to home both axes.
     '''
     def __init__(self, command, target0, target1, posloc='any', log_note='', pos_settings={}, allow_corr=False):
-        if posloc=='any':
+        if posloc == 'any':
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
                 assert is_number(x), f'target {x} is not a number'
@@ -292,11 +281,14 @@ class Move(object):
             self.posloc = list(posloc)
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
+        if command in homing_commands:
+            assert target0[0] or target1[0], 'for a homing command, need to set target0 to 1 for theta ' + \
+                                             'homing, target1 to 1 for phi homing, or both simultaneously'
         possible_device_locs = pc.generic_pos_neighbor_locs.keys()
         assert all([x in possible_device_locs for x in self.posloc]), 'all elements of posloc must be valid device locations'
         self.command = command
         self.log_note = str(log_note)
-        self.pos_settings = self._validate_pos_settings(pos_settings)
+        self._pos_settings = self._validate_pos_settings(pos_settings)
         self.allow_corr = bool(allow_corr)
     
     # properties of Move with single values vs multiple values
@@ -318,6 +310,21 @@ class Move(object):
             assert isinstance(value, expected_type)
         return new
     
+    @property
+    def pos_settings(self):
+        '''Dict containing all pos settings. Will be shaped like pos_defaults.'''
+        d = pos_defaults.copy()
+        d.update(self._pos_settings)
+        return d
+    
+    @property
+    def non_default_pos_settings(self):
+        '''Dict containing only those pos settings which have non-default values
+        (as defined in pos_defaults).
+        '''
+        d = {key: self._pos_settings[key] for key in pos_defaults if pos_defaults[key] != self._pos_settings[key]}
+        return d        
+    
     def __len__(self):
         return len(self.posloc)
     
@@ -333,31 +340,32 @@ class Move(object):
         '''
         data = {}
         for key in self.single_keys:
-            data[key] = getattr(self, key)] * len(self)
+            data[key] = [getattr(self, key)] * len(self)
         for key in self.multi_keys:
             data[key] = getattr(self, key)
         return data
     
-    def make_request(self, posid_map, log_note=''):
+    def make_request(self, loc2id_map, log_note=''):
         '''Make a move request data structure, ready for sending to the online control system.
-        Any positioners known to this move instance, but not included in posid_map, will be
+        Any positioners known to this move instance, but not included in loc2id_map, will be
         skipped.
         
-        INPUT:  posid_map ... keys=posloc, values=posids
+        INPUT:  loc2id_map ... keys=posloc, values=posids
                 log_note ... optional string, will be appended to any existing log note
         
         OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
         '''
+        assert self.command not in homing_commands, 'Cannot make a request for homing. Try make_homing_kwargs() instead.'
         posids, target0, target1 = [], [], []
         if self.has_multiple_targets:
             for i in range(len(self)):
                 posloc = self.posloc[i]
-                if posloc in posid_map:
-                    posids += [posid_map[posloc]]
+                if posloc in loc2id_map:
+                    posids += [loc2id_map[posloc]]
                     target0 += [self.target0[i]]
                     target1 += [self.target1[i]]
         else:
-            posids = [posid_map.values()]
+            posids = [loc2id_map.values()]
             target0 = self.target0[0] * len(posids)
             target1 = self.target1[0] * len(posids)  
         log_note = pc.join_notes(self.log_note, log_note)
@@ -367,5 +375,26 @@ class Move(object):
                         'X2': target1,
                         'LOG_NOTE': log_note,
                         }
-        requests = pandas.DataFrame(request_data)
-        return requests
+        request = pandas.DataFrame(request_data)
+        return request
+        
+    def make_homing_kwargs(self, posids, log_note=''):
+        '''Make a kwargs dictionary for homing moves, ready for sending to the online
+        control system.
+        
+        INPUT:  posids ... positioners to home
+                log_note ... optional string, will be appended to any existing log note
+        
+        OUTPUT: kwargs dictionary
+        '''
+        assert self.command in homing_commands, 'Cannot make homing kwargs for non-homing. Try make_request() instead.'
+        should_debounce = self.command == 'home_and_debounce'
+        axis = 'theta_only' if not self.target1[0] else 'phi_only' if not self.target0[0] else 'both'
+        log_note = pc.join_notes(self.log_note, log_note)
+        kwargs = {'posids': posids,
+                  'axis': axis,
+                  'debounce': should_debounce,
+                  'log_note': log_note,
+                  }
+        return kwargs
+        

@@ -35,7 +35,7 @@ assert 0 <= args.num_corr <= max_corr, f'out of range argument {args.num_corr} f
 
 # read sequence file
 import sequence
-seq = sequence.read(args.infile)
+seq = sequence.Sequence.read(args.infile)
 
 # set up a log file
 import logging
@@ -91,13 +91,43 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: list(pecs.get_enabled_posids('sub'))
+    get_posids = lambda: list(pecs.get_enabled_posids('sub'), include_posinfo=False)
+    _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
+    temp = all_posinfo[['DEVICE_LOC','DEVICE_ID']].to_dict(orient='list')
+    all_loc2id = {temp['DEVICE_LOC'][i]: temp['DEVICE_ID'][i] for i in range(len(all_posinfo))}
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info('PECS initialization failed')
     pecs_on = False
     get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
+    temp = sorted(get_posids())
+    all_loc2id = {i: temp[i] for i in range(len(temp))}
+all_id2loc = {val: key for key, val in all_loc2id.items()}
 logger.info(f'selected posids: {get_posids()}')
+
+_loc2id_cache = {}  # reduces overhead for function below
+_id2loc_cache = {}  # reduces overhead for function below
+def get_map(key='loc', posids=[]):
+    '''Returns dict with containing positioner locations and corresponding ids.
+    By default, positioners will be only those delivered dynamically by get_posids().
+    
+    INPUTS:  key ... 'loc' --> output has keys = locations, values = posids
+                     'ids' --> output has keys = posids, values = locations
+             posids ... (optional) collection of posids, to skip get_posids() call
+    
+    OUTPUT:  dict, with keys/values as determined by key arg above
+    '''
+    posids = posids if posids else get_posids()
+    if key == 'loc':
+        global _loc2id_cache
+        if set(_loc2id_cache.values()) != set(posids):
+            _loc2id_cache = {k:v for k,v in all_loc2id.items() if v in posids}
+        return _loc2id_cache
+    else:
+        global _id2loc_cache
+        if set(_id2loc_cache.values()) != set(posids):
+            _id2loc_cache = {k:v for k,v in all_id2loc.items() if k in posids}
+        return _id2loc_cache
 
 if pecs_on:
     these = len(get_posids())
@@ -258,16 +288,17 @@ def calc_poslocXY_errors(requests, results):
         err[posid] = [err_x, err_y]
     return err        
 
-def summarize_errors(errs):
+def summarize_errors(errs, move_num, submove_num):
     '''Produces a string summarizing errors for a set of positioners.
     
     INPUT:   errs ... same format as output by calc_poslocXY_errors, a dict with
                       keys = posids and values = [err_locX, err_locY]
     OUTPUT:  string
     '''
+    posids = sorted(errs.keys())
     vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
     vec_errs_um = [err*1000 for err in vec_errs]
-    err_str = f'move {move_num}, submove {corr}, n_pos={len(posids)}, errors (um): '
+    err_str = f'move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors (um): '
     first = True
     for name, func in {'max': max, 'min': min, 'mean': np.mean,
                        'median': np.median, 'std': np.std,
@@ -341,70 +372,59 @@ real_moves = pecs_on and not args.no_movement
 cycle_time = args.cycle_time if real_moves else 4.0
 last_move_time = pause_between_moves(None, cycle_time)
 try:
-    for move in seq:
-        index = move.index
+    for m in range(len(seq)):
+        move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
         dict_repr = dict(zip(move.columns, move))
-        move_num = index + 1
+        move_num = m + 1
         logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
         logger.info(f'Move settings are {dict_repr}')
-        initial_command = move['command']
-        correctable = initial_command in sequence.general_commands and move['allow_corr'] == True
+        correctable = move.command in sequence.general_commands and move.allow_corr
         n_corr = args.num_corr if correctable else 0
-        for corr in range(1 + n_corr):
+        errs = None
+        calc_errors = True
+        for submove_num in range(1 + n_corr):
             last_move_time = pause_between_moves(last_move_time, cycle_time)
             if last_move_time == KeyboardInterrupt:
                 raise StopIteration
-            if corr == 0:
-                command = move['command']
-                target0 = move['target0']
-                target1 = move['target1']
-            log_note = move['log_note']
+            extra_log_note = f'move {move_num}'
             if n_corr > 0:
-                log_note = pc.join_notes(log_note, f'move {move_num}', f'submove {corr}')
-            if command in sequence.general_commands:
-                calc_errors = True
+                extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
+            if move.command in sequence.general_commands:
                 if pecs_on:
                     move_measure_func = pecs.move_measure
-                if corr == 0:
-                    requests = make_requests(posids, command, target0, target1, log_note)
-                    initial_requests = requests
-                    errs = None
-                else:
-                    command = 'poslocdXdY'
-                    posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-                    target0 = [-errs[posid][0] for posid in posids]
-                    target1 = [-errs[posid][1] for posid in posids]
-                    requests = make_requests(posids, command, target0, target1, log_note)
+                if submove_num > 0:
+                    posids = get_posids()   # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                    posloc_map = get_map(key='loc', posids=posids)
+                    # note below how order is preserved for target0, target1, and posloc
+                    # lists, on the assumption that get_posids() returns a list
+                    corr = sequence.Move(command='poslocdXdY',
+                                         target0=[-errs[posid][0] for posid in posids],
+                                         target1=[-errs[posid][1] for posid in posids],
+                                         posloc=[posloc_map[posid] for posid in posids],
+                                         log_note=move.log_note,
+                                         pos_settings=move.pos_settings,
+                                         allow_corr=move.allow_corr)
+                request = corr.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
+                if submove_num == 0:
+                    initial_request = request
                 if pecs_on:
-                    requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
-                kwargs = {'request': requests, 'num_meas': args.num_meas}
-            elif command in sequence.homing_commands:
+                    request = request.merge(pecs.posinfo, on='DEVICE_ID')
+                kwargs = {'request': request, 'num_meas': args.num_meas}
+            elif move.command in sequence.homing_commands:
                 calc_errors = False
                 if pecs_on:
                     move_measure_func = pecs.rehome_and_measure
-                if not target0 and not target1:
-                    logger.warning(f'Skipping move {index} because home request had neither'
-                                   f' axis specified. (Need to set target0 to 1 for theta homing'
-                                   f', target1 to 1 for phi homing, or both simultaneously.')
-                    continue
-                should_debounce = command == 'home_and_debounce'
-                axis = 'theta_only' if not target1 else 'phi_only' if not target0 else 'both'
-                kwargs = {'posids': posids,
-                          'axis': axis,
-                          'debounce': should_debounce,
-                          'log_note': log_note,
-                          }
+                kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
             else:
-                logger.warning(f'Skipping move {index} due to unexpected command {command}')
+                logger.warning(f'Skipping move {move_num} due to unexpected command {move.command}')
                 continue
             kwargs.update(move_meas_settings)
-            new_settings = seq.pos_settings(index)
+            new_settings = move.pos_settings
             if new_settings != last_pos_settings:
                 all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
                 if pecs_on:
                     apply_pos_settings(all_settings)
-                # logger.info(f'Positioner settings: {new_settings}')  # quite verbose / redundant
                 last_pos_settings = new_settings
             else:
                 logger.info('Positioner settings: (no change)')
@@ -425,7 +445,7 @@ try:
                                 f'{set(prev_posids) - set(posids)}')
             if calc_errors:
                 if real_moves:
-                    errs = calc_poslocXY_errors(initial_requests, results)
+                    errs = calc_poslocXY_errors(initial_request, results)
                 else:
                     dummy_err_x = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
