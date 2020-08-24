@@ -4,6 +4,15 @@ Represents a sequence of positioner moves, with detailed control over motor
 and move scheduling parameters.
 """
 
+import os
+from astropy.table import Table
+import numpy as np
+import datetime
+import pandas
+import sys
+sys.path.append('../petal')
+import posconstants as pc
+
 move_defaults = {'command': '',
                  'target0': 0.0,
                  'target1': 0.0,
@@ -58,20 +67,19 @@ nominals['spinupdown_dist_per_period'] = sum(range(round(nominals['stepsize_crui
 nominals['spinupdown_distance'] = nominals['spinupdown_dist_per_period'] * pos_defaults['SPINUPDOWN_PERIOD']
 nominals['spinupdown_distance_output'] = nominals['spinupdown_distance'] / nominals['gear_ratio']
 
-abs_commands = {'QS', 'obsXY', 'ptlXY', 'poslocXY', 'poslocTP', 'posintTP'}
+global_commands = {'QS', 'obsXY', 'ptlXY'}
+abs_local_commands = {'poslocXY', 'poslocTP', 'posintTP'}
 delta_commands = {'dQdS', 'obsdXdY', 'poslocdXdY', 'dTdP'}
+abs_commands = global_commands | abs_local_commands
 general_commands = abs_commands | delta_commands
 homing_commands = {'home_and_debounce', 'home_no_debounce'}
+local_commands = abs_local_commands | delta_commands | homing_commands
 
 # When setting up homing rows in a sequence table, set target0 = 1 if you want
 # to home theta axis, target1 = 1 to home phi axis, or both to home both axes.
 
 valid_commands = general_commands.copy()
 valid_commands.update(homing_commands)
-
-import os
-from astropy.table import Table
-import numpy as np
 
 is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
 is_bool = lambda x: isinstance(x, (bool, np.bool_))
@@ -104,8 +112,7 @@ def read(path):
     for col in missing_col:
         values = pos_defaults[col]*len(table)
         table[col] = values
-    sequence = Sequence(short_name=table.meta['short_name'],
-                        long_name=table.meta['long_name'])
+    sequence = Sequence(short_name=table.meta['short_name'])
     sequence.table = table
     return sequence
 
@@ -121,51 +128,25 @@ class Sequence(object):
     def __init__(self, short_name, long_name='', details=''):
         names = [key for key in col_defaults.keys()]
         types = [type(val) for val in col_defaults.values()]
-        self.table = Table(names=names, dtype=types)
+        self.moves = []
         self.short_name = short_name
         self.long_name = str(long_name)
         self.details = str(details)
-        
-    @property
-    def short_name(self):
-        return self.table.meta['short_name']
-    
-    @short_name.setter
-    def short_name(self, value):
-        self.table.meta['short_name'] = str(value)
+        self.creation_date = datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
 
     @property
     def normalized_short_name(self):
         '''A particular format, used for example when saving files to disk.'''
         return self.short_name.replace(' ','_').upper()
-
-    @property
-    def long_name(self):
-        return self.table.meta['long_name']
-    
-    @long_name.setter
-    def long_name(self, value):
-        self.table.meta['long_name'] = str(value)
         
-    @property
-    def details(self):
-        return self.table.meta['details']
-    
-    @details.setter
-    def details(self, value):
-        self.table.meta['details'] = str(value)
-        
-    def add_move(self, command, target0, target1, log_note='', pos_settings={}, allow_corr=False, index=None):
+    def add_move(self, command, target0, target1, log_note='', pos_settings={},
+                 allow_corr=False, posloc='any', index=None):
         '''Add a move to the sequence.
         
-        Inputs
-            command      ... move command string as described in petal.request_targets()
-            target0      ... 1st target coordinate or delta, as described in petal.request_targets()
-            target1      ... 2nd target coordinate or delta, as described in petal.request_targets()
-            log_note     ... optional string to store alongside log data for this move
-            pos_settings ... optional dict of positioner settings to apply during the move
-            allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
-            index        ... optional index value to insert move at a particular location (default behavior is to append)
+        INPUTS:
+            index        ... optional index value to insert a new move at a particular location (default behavior is to append)
+            
+        How to add multiple positioners 
         '''
         assert command in valid_commands
         row = col_defaults.copy()
@@ -220,6 +201,8 @@ class Sequence(object):
         s = f'{self.normalized_short_name}'
         if self.long_name:
             s += f': {self.long_name}'
+        if self.creation_date:
+            s += f'\nCreated: {self.creation_date}'
         if self.details:
             s += f'\n{self.details}'
         s += '\n'
@@ -260,23 +243,136 @@ class Sequence(object):
         
     def __next__(self):
         if self.__idx < len(self.table):
-            row = self.table[self.__idx]
+            move = self.moves[self.__idx]
             self.__idx += 1
-            return row
+            return move
         else:
             raise StopIteration
     
     def __len__(self):
-        return len(self.table)
+        return len(self.moves)
     
     def __getitem__(self, key):
-        return self.table[key]
+        return self.moves[key]
         
     def __setitem__(self, key, value):
-        self.table[key] = value
+        assert isinstance(value, Move), f'{value} must be an instance of Move class'
+        self.moves[key] = value
 
     def __delitem__(self, key):
-        del self.table[key]
+        del self.moves[key]
         
     def __contains__(self, value):
-        return value in self.table
+        return value in self.moves
+    
+class Move(object):
+    '''Encapsulates the command and settings data for a simultaneous movement of
+    one or more fiber positioners.
+    
+        command      ... move command string as described in petal.request_targets()
+        target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
+        target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
+        posloc       ... optional sequence of which positioner device locations should be commanded
+        log_note     ... optional string to store alongside log data for this move
+        pos_settings ... optional dict of positioner settings to apply during the move
+        allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
+        
+    Multiple positioners, same targets:
+        By default, posloc='any', which means that the move command should be applied
+        to any positioners selected at runtime (presumably by the PECS initialization
+        process). In this case, all positioners get the same target0 and target1. The
+        command string must be one of local_commands, as defined in this module.
+        
+    Multiple positioners, multiple targets:
+        By arguing ordered sequences for target0, target1, and posloc, the user
+        can specify different targets for different positioners. The command will be
+        the same in all cases, and must be one of general_commands, as defined in this
+        module.
+    '''
+    def __init__(self, command, target0, target1, posloc='any', log_note='', pos_settings={}, allow_corr=False):
+        if posloc=='any':
+            assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
+            for x in [target0, target1]:
+                assert is_number(x), f'target {x} is not a number'
+            self.target0 = [target0]
+            self.target1 = [target1]
+            self.posloc = [posloc]
+        else:
+            assert command in general_commands, f'command {command} not recognized, see general_commands collection'
+            assert len(target0) == len(target1) == len(posloc), 'args target0, target1, and posloc are not of equal length'
+            self.target0 = list(target0)
+            self.target1 = list(target1)
+            self.posloc = list(posloc)
+        for X in [self.target0, self.target1]:
+            assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
+        possible_device_locs = pc.generic_pos_neighbor_locs.keys()
+        assert all([x in possible_device_locs for x in self.posloc]), 'all elements of posloc must be valid device locations'
+        self.command = command
+        self.log_note = str(log_note)
+        self.pos_settings = self._validate_pos_settings(pos_settings)
+        self.allow_corr = bool(allow_corr)
+    
+    @staticmethod
+    def _validate_pos_settings(settings):
+        '''Returns a new, validated pos_settings dict, with possible type casts
+        of values.'''
+        new = settings.copy()
+        for key, value in settings.items():
+            assert key in pos_defaults
+            example = pos_defaults[key]
+            expected_type =  type(example)
+            if isinstance(value, (int, np.integer)) and isinstance(example, (float, np.floating)):
+                value = float(value)
+                new[key] = value
+            assert isinstance(value, expected_type)
+        return new
+    
+    def __len__(self):
+        return len(self.posloc)
+    
+    @property
+    def has_multiple_targets(self):
+        '''Boolean whether this move has mulitple targets.'''
+        return len(self) > 1
+    
+    def to_table(self):
+        '''Returns a tabular form, as a dict with keys = column names and
+        values = equal-length lists of column data.
+        '''
+        singletons = {'command', 'log_note', 'pos_settings', 'allow_corr'}
+        multiples = {'target0', 'target1', 'posloc'}                
+        data = {k: [v]*len(self) for k, v in singletons.items()}
+        data.update(multiples)
+        return data
+    
+    def make_request(self, posid_map, log_note=''):
+        '''Make a move request data structure, ready for sending to the online control system.
+        Any positioners known to this move instance, but not included in posid_map, will be
+        skipped.
+        
+        INPUT:  posid_map ... keys=posloc, values=posids
+                log_note ... optional string, will be appended to any existing log note
+        
+        OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
+        '''
+        posids, target0, target1 = [], [], []
+        if self.has_multiple_targets:
+            for i in range(len(self)):
+                posloc = self.posloc[i]
+                if posloc in posid_map:
+                    posids += [posid_map[posloc]]
+                    target0 += [self.target0[i]]
+                    target1 += [self.target1[i]]
+        else:
+            posids = [posid_map.values()]
+            target0 = self.target0[0] * len(posids)
+            target1 = self.target1[0] * len(posids)  
+        log_note = pc.join_notes(self.log_note, log_note)
+        request_data = {'DEVICE_ID': posids,
+                        'COMMAND': self.command,
+                        'X1': target0,
+                        'X2': target1,
+                        'LOG_NOTE': log_note,
+                        }
+        requests = pandas.DataFrame(request_data)
+        return requests

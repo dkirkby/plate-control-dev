@@ -143,38 +143,6 @@ def trans(posid, method, *args, **kwargs):
     result = ptlcall('postrans', posid, method, *args, **kwargs) 
     return result
 
-def make_requests(posids, command, target0, target1, log_note):
-    '''Make a structure with requests for all positioners in posids.
-    target0 and target1 can be either a single value (identical requests) or
-    a list of same length as posids.
-    
-    OUTPUT: dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
-    '''
-    if isinstance(posids, str):
-        posids = [posids]
-    else:
-        posids = list(posids)
-    assert2(command in sequence.valid_commands, f'unexpected command {command}')
-    if is_number(target0) and is_number(target1):
-        target0 = [target0] * len(posids)
-        target1 = [target1] * len(posids)
-    else:
-        for arg in [target0, target1]:
-            assert2(isinstance(arg, (list, tuple)), f'unexpected type {type(arg)}')
-    for arg in [target0, target1]:
-        assert2(len(arg) == len(posids), f'num targets {len(arg)} != num posids {len(posids)}')
-        for val in arg:
-            assert2(is_number(val), f'unexpected type {type(val)}')
-    request_data = {'DEVICE_ID': posids,
-                    'COMMAND': command,
-                    'X1': target0,
-                    'X2': target1,
-                    'LOG_NOTE': log_note,
-                    }
-    requests = pd.DataFrame(request_data)
-    if pecs_on:
-        requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
-    return requests
 
 # general settings for the move measure function
 if args.match_radius == None and pecs_on:
@@ -408,6 +376,8 @@ try:
                     target0 = [-errs[posid][0] for posid in posids]
                     target1 = [-errs[posid][1] for posid in posids]
                     requests = make_requests(posids, command, target0, target1, log_note)
+                if pecs_on:
+                    requests = requests.merge(pecs.posinfo, on='DEVICE_ID')
                 kwargs = {'request': requests, 'num_meas': args.num_meas}
             elif command in sequence.homing_commands:
                 calc_errors = False
