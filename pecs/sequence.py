@@ -82,7 +82,7 @@ class Sequence(object):
         details ... string, optional additional string to explain the test's purpose, etc
         
     After initialization, populate the sequence using the "add_move" function.
-    '''    
+    '''
     def __init__(self, short_name, long_name='', details=''):
         self.moves = []
         self.short_name = short_name
@@ -127,6 +127,14 @@ class Sequence(object):
         '''
         if not basename:
             basename = f'seq_{self.normalized_short_name}'
+        table = self.to_table()
+        path = os.path.join(directory, basename + '.ecsv')
+        table.write(path, overwrite=True, delimiter=',')
+        return path
+    
+    def to_table(self):
+        '''Generates an astropy table which completely summarizes the sequence.
+        '''
         tables = []
         for i in range(len(self)):
             move = self.moves[i]
@@ -135,9 +143,10 @@ class Sequence(object):
             this_table['move_idx'] = [i] * len(this_table)
             tables.append(this_table)
         table = vstack(tables)
-        path = os.path.join(directory, basename + '.ecsv')
-        table.write(path, overwrite=True, delimiter=',')
-        return path
+        not_meta = {'moves'}
+        meta = set(vars(self)) - not_meta
+        table.meta = {k:v for k,v in vars(self).items() if k in meta}
+        return table
     
     def __str__(self):
         s = f'{self.normalized_short_name}'
@@ -148,44 +157,15 @@ class Sequence(object):
         if self.details:
             s += f'\n{self.details}'
         s += '\n'
-        headers = {'MOVE': 'move_idx',
-                   'COMMAND': 'command',
-                   'U': 'target0',
-                   'V': 'target1',
-                   'LOC': 'posloc',
-                   'ALLOW_CORR': 'allow_corr',
-                   'LOG_NOTE': 'log_note',
-                   'SETTINGS': 'pos_settings'}
-        table = {key: [] for key in headers}
-        for m in range(len(self)):
-            move = self.moves[m]
-            subdict = move.to_dict()
-            subdict['move_idx'] = [m] * len(move)
-            
-                                     
-        width_command = max([len(move.command) for move in self] + [len('COMMAND')])
-        width_note = max([len(move.log_note) for move in self] + [len('LOG_NOTE')])
-        width_settings = max([len(str(move.pos_settings)) for move in self] + [len('SETTINGS')])
-        s += 'MOVE   '
-        s += format('COMMAND', f'<{width_command}')
-        s += '        U '
-        s += '      V '
-        s += ' LOC '
-        s += ' ALLOW_CORR  '
-        s += format('LOG_NOTE', f'<{width_note}') + '  '
-        s += format('SETTINGS', f'<{width_settings}')
-        for m in range(len(self)):
-            move = self.moves[m]
-            for i in range(len(move)):
-                s += '\n'
-                s += format(m, '4d') + '   '
-                s += format(move.command, f'<{width_command}') + '  '
-                s += format(move.target0[i], '7g') + ' '
-                s += format(move.target1[i], '7g') + '  '
-                s += format(str(move.posloc[i]), '3s') + '  '
-                s += format(str(move.allow_corr), '11s') + ' '
-                s += format(move.log_note, f'<{width_note}') + '  '
-                s += format(str(move.non_default_pos_settings), f'<{width_settings}')
+        table = self.to_table()
+        used_settings = set()
+        for move in self:
+            used_settings |= set(move.non_default_pos_settings)
+        removals = set(pos_defaults) - used_settings
+        for name in removals:
+            table.remove_column(name)
+        lines = table.pformat_all(align='<')
+        s += '\n'.join(lines)
         return s
     
     def __repr__(self):
