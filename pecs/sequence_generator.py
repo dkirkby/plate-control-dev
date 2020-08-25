@@ -45,6 +45,9 @@ seq.append(move)
 seqs.append(seq)
 
 
+# to-do: multitarget test here
+
+
 # BASIC HOMING SEQUENCES
 # ----------------------
 
@@ -53,7 +56,6 @@ seq = sequence.Sequence(short_name='home_and_debounce',
                         long_name='run a single rehome on both axes, followed by debounce moves')
 move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(seq))
 seq.append(move)
-print(seq,'\n')
 seqs.append(seq)
 
 seq = sequence.Sequence(short_name='home_no_debounce', 
@@ -81,10 +83,9 @@ for axis in ['theta', 'phi']:
         targets = [[theta, phi] for phi in phis]
     for i in range(len(targets)):
         target = targets[i]
-        note = f'{simple_note(seq)}, move {i+1} of {len(targets)}'
+        note = f'{simple_note(seq)}'
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
         seq.append(move)
-    print(seq,'\n')
     seqs.append(seq)
     
 cmd = 'dTdP'
@@ -97,10 +98,9 @@ for axis in ['theta', 'phi']:
         targets = [[0, delta] for delta in deltas]
     for i in range(len(targets)):
         target = targets[i]
-        note = f'{simple_note(seq)}, move {i+1} of {len(targets)}'
+        note = f'{simple_note(seq)}'
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
         seq.append(move)
-    print(seq,'\n')
     seqs.append(seq)
 
 
@@ -165,14 +165,6 @@ def wiggle(forward, case=0):
     if case == 1:
         deltas = backward + backandforth + forward + backward_reversed + forward_reversed
     return deltas
-
-def describe(seq, axis):
-    deltas = [move[f'target{axis}'] for move in seq.table]
-    cumsum = np.cumsum(deltas).tolist()
-    print('num test points: '  + str(len(deltas)))
-    print(f'min and max excursions: [{min(cumsum)} deg, {max(cumsum)} deg]')
-    # print('delta sequence: ' + str(deltas))
-    # print('running total: ' + str(cumsum))
     
 def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_deltas, settings):
     seq = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
@@ -186,9 +178,6 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
         note = 'motortest ' + str(seq.short_name)
         move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
         seq.append(move)
-    print(seq)
-    describe(seq, i)
-    print('')
     return seq
 
 # Theta and phi performance at nominal settings
@@ -262,7 +251,7 @@ seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, 
 # ----------------
 paths = []
 for seq in seqs:
-    path = seqs.save()
+    path = seq.save()
     paths.append(path)
     
 # READ FROM DISK AND PRINT TO STDOUT
@@ -270,4 +259,13 @@ for seq in seqs:
 for path in paths:
     seq = sequence.Sequence.read(path)
     print(seq,'\n')
+    if 'motortest' in seq[0].log_note:
+        axis = 0 if 'THETA' in seq.normalized_short_name else 1
+        deltas = [getattr(move, f'target{axis}') for move in seq]
+        cumsum = np.cumsum(deltas).tolist()
+        print('num test points: '  + str(len(deltas)))
+        print(f'min and max excursions: [{min(cumsum)} deg, {max(cumsum)} deg]')
+        # print('delta sequence: ' + str(deltas))
+        # print('running total: ' + str(cumsum))
+    
     

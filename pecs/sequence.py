@@ -67,8 +67,10 @@ local_commands = abs_local_commands | delta_commands | homing_commands
 valid_commands = general_commands.copy()
 valid_commands.update(homing_commands)
 
-is_number = lambda x: isinstance(x, (int, float, np.integer, np.floating))
-is_bool = lambda x: isinstance(x, (bool, np.bool_))
+is_float = lambda x: isinstance(x, (float, np.floating))
+is_int = lambda x: isinstance(x, (int, np.integer))
+is_number = lambda x: is_float(x) or is_int(x)
+is_bool = lambda x: isinstance(x, (bool, np.bool, np.bool_))
 
 class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
@@ -107,7 +109,14 @@ class Sequence(object):
         for m in move_idxs:
             subtable = table[m == table['move_idx']]
             kwargs = {key: subtable[key][0] for key in Move.single_keys}
-            kwargs.update({key: subtable[key] for key in Move.multi_keys})
+            kwargs.update({key: subtable[key].tolist() for key in Move.multi_keys})
+            other_keys = set(subtable.columns) - (Move.single_keys | Move.multi_keys)
+            pos_settings = {key: subtable[key][0] for key in other_keys if key in pos_defaults}
+            kwargs['pos_settings'] = pos_settings
+            if len(subtable) == 1:
+                for key, val in kwargs.items():
+                    if isinstance(val, list) and len(val) == 1:
+                        kwargs[key] = val[0]
             move = Move(**kwargs)
             sequence.append(move)
         return sequence
@@ -122,7 +131,7 @@ class Sequence(object):
         for i in range(len(self)):
             move = self.moves[i]
             this_dict = move.to_dict()
-            this_table = Table(this_dict())
+            this_table = Table(this_dict)
             this_table['move_idx'] = [i] * len(this_table)
             tables.append(this_table)
         table = vstack(tables)
@@ -139,34 +148,44 @@ class Sequence(object):
         if self.details:
             s += f'\n{self.details}'
         s += '\n'
-        def truncate_and_fill(string, length):
-            truncated = string[:length-2] + '..' if len(string) > length else string
-            filled = format(truncated, str(length) + 's')
-            return filled
-        width_note = 50
-        width_settings = 50
-        width_command = max(7, max({len(move.command) for move in self}))
-        width_command = min(width_command, 14)
+        headers = {'MOVE': 'move_idx',
+                   'COMMAND': 'command',
+                   'U': 'target0',
+                   'V': 'target1',
+                   'LOC': 'posloc',
+                   'ALLOW_CORR': 'allow_corr',
+                   'LOG_NOTE': 'log_note',
+                   'SETTINGS': 'pos_settings'}
+        table = {key: [] for key in headers}
+        for m in range(len(self)):
+            move = self.moves[m]
+            subdict = move.to_dict()
+            subdict['move_idx'] = [m] * len(move)
+            
+                                     
+        width_command = max([len(move.command) for move in self] + [len('COMMAND')])
+        width_note = max([len(move.log_note) for move in self] + [len('LOG_NOTE')])
+        width_settings = max([len(str(move.pos_settings)) for move in self] + [len('SETTINGS')])
         s += 'MOVE   '
-        s += format('COMMAND', f'<{width_command}.{width_command}')
-        s += '         U '
+        s += format('COMMAND', f'<{width_command}')
+        s += '        U '
         s += '      V '
         s += ' LOC '
         s += ' ALLOW_CORR  '
-        s += truncate_and_fill('LOG_NOTE', width_note) + '  '
-        s += truncate_and_fill('SETTINGS', width_settings)
+        s += format('LOG_NOTE', f'<{width_note}') + '  '
+        s += format('SETTINGS', f'<{width_settings}')
         for m in range(len(self)):
             move = self.moves[m]
             for i in range(len(move)):
                 s += '\n'
-                s += format(m, '4d') + ' '
-                s += '  ' + truncate_and_fill(f'{move.command}', width_command) + '  '
+                s += format(m, '4d') + '   '
+                s += format(move.command, f'<{width_command}') + '  '
                 s += format(move.target0[i], '7g') + ' '
-                s += format(move.target1[i], '7g') + ' '
-                s += format(move.posloc[i], '3g') + ' '
-                s += format(move.allow_corr, '11g') + '  '
-                s += truncate_and_fill(str(move.log_note), width_note) + '  '
-                s += truncate_and_fill(str(move.non_default_pos_settings), width_settings)
+                s += format(move.target1[i], '7g') + '  '
+                s += format(str(move.posloc[i]), '3s') + '  '
+                s += format(str(move.allow_corr), '11s') + ' '
+                s += format(move.log_note, f'<{width_note}') + '  '
+                s += format(str(move.non_default_pos_settings), f'<{width_settings}')
         return s
     
     def __repr__(self):
@@ -178,7 +197,7 @@ class Sequence(object):
         return self
         
     def __next__(self):
-        if self.__idx < len(self.table):
+        if self.__idx < len(self):
             move = self.moves[self.__idx]
             self.__idx += 1
             return move
@@ -192,7 +211,7 @@ class Sequence(object):
         return self.moves[key]
         
     def __setitem__(self, key, value):
-        assert isinstance(value, Move), f'{value} must be an instance of Move class'
+        self._validate_move(value)
         self.moves[key] = value
 
     def __delitem__(self, key):
@@ -201,6 +220,14 @@ class Sequence(object):
     def __contains__(self, value):
         return value in self.moves
     
+    def append(self, value):
+        self._validate_move(value)
+        self.moves.append(value)
+        
+    @staticmethod
+    def _validate_move(move):
+        assert isinstance(move, Move), f'{move} must be an instance of Move class'
+    
     def _validate_table(table):
         '''Validates an astropy table representing a sequence. Returns a new
         table, which may be slightly modified. For example, adding any new columns
@@ -208,9 +235,11 @@ class Sequence(object):
         '''
         new = table.copy()
         example_move = Move(command='dTdP', target0=0.0, target1=0.0)
-        example_dict = example_move.to_table()
+        example_dict = example_move.to_dict()
         example_table = Table(example_dict)
-        for col in new.columns:
+        exclude_columns = {'move_idx'}
+        test_columns = set(new.columns) - exclude_columns
+        for col in test_columns:
             assert col in example_table.columns
             for i in range(len(new)):
                 val = new[col][i]
@@ -282,9 +311,9 @@ class Move(object):
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
         if command in homing_commands:
-            assert target0[0] or target1[0], 'for a homing command, need to set target0 to 1 for theta ' + \
-                                             'homing, target1 to 1 for phi homing, or both simultaneously'
-        possible_device_locs = pc.generic_pos_neighbor_locs.keys()
+            assert target0 or target1, 'for a homing command, need to set target0 to 1 for theta ' + \
+                                       'homing, target1 to 1 for phi homing, or both simultaneously'
+        possible_device_locs = set(pc.generic_pos_neighbor_locs) | {'any'}
         assert all([x in possible_device_locs for x in self.posloc]), 'all elements of posloc must be valid device locations'
         self.command = command
         self.log_note = str(log_note)
@@ -292,7 +321,7 @@ class Move(object):
         self.allow_corr = bool(allow_corr)
     
     # properties of Move with single values vs multiple values
-    single_keys = {'command', 'log_note', 'pos_settings', 'allow_corr'}
+    single_keys = {'command', 'log_note', 'allow_corr'}
     multi_keys = {'target0', 'target1', 'posloc'}         
     
     @staticmethod
@@ -304,10 +333,13 @@ class Move(object):
             assert key in pos_defaults
             example = pos_defaults[key]
             expected_type =  type(example)
-            if isinstance(value, (int, np.integer)) and isinstance(example, (float, np.floating)):
-                value = float(value)
-                new[key] = value
-            assert isinstance(value, expected_type)
+            if is_bool(value):
+                new[key] = bool(value)
+            elif is_number(value) and is_float(example):
+                    new[key] = float(value)
+            elif is_int(value):
+                new[key] = int(value)
+            assert isinstance(new[key], expected_type)
         return new
     
     @property
@@ -322,7 +354,8 @@ class Move(object):
         '''Dict containing only those pos settings which have non-default values
         (as defined in pos_defaults).
         '''
-        d = {key: self._pos_settings[key] for key in pos_defaults if pos_defaults[key] != self._pos_settings[key]}
+        p = self._pos_settings
+        d = {key: p[key] for key in p if pos_defaults[key] != p[key]}
         return d        
     
     def __len__(self):
@@ -343,6 +376,8 @@ class Move(object):
             data[key] = [getattr(self, key)] * len(self)
         for key in self.multi_keys:
             data[key] = getattr(self, key)
+        for key, val in self.pos_settings.items():
+            data[key] = [val]
         return data
     
     def make_request(self, loc2id_map, log_note=''):
