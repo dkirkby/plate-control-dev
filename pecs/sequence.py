@@ -72,6 +72,10 @@ is_int = lambda x: isinstance(x, (int, np.integer))
 is_number = lambda x: is_float(x) or is_int(x)
 is_bool = lambda x: isinstance(x, (bool, np.bool, np.bool_))
 
+move_idx_key = 'move_idx'
+possible_device_locs = set(pc.generic_pos_neighbor_locs)
+get_datestr = lambda: datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
+
 class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
     Typical operations you can do on a list work here (indexing, slices, del, etc).
@@ -88,7 +92,7 @@ class Sequence(object):
         self.short_name = short_name
         self.long_name = str(long_name)
         self.details = str(details)
-        self.creation_date = datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
+        self.creation_date = get_datestr()
 
     @property
     def normalized_short_name(self):
@@ -100,14 +104,20 @@ class Sequence(object):
         '''Reads in and validates format for a saved Sequence from a file. E.g.
         sequence = Sequence.read(path)
         '''
+        path = os.path.abspath(path)
         table = Table.read(path)
         table = Sequence._validate_table(table)
-        sequence = Sequence(short_name='dummy')
+        basename = os.path.basename(path)
+        fallback_short_name = os.path.splitext(basename)[0]
+        fallback_details = f'Read in from {path} on {get_datestr()}'
+        fallback_creation_date = 'unknown_date'
+        seq = Sequence(short_name=fallback_short_name, details=fallback_details)
+        seq.creation_date = fallback_creation_date
         for key, value in table.meta.items():
-            setattr(sequence, key, value)
-        move_idxs = sorted(set(table['move_idx']))
+            setattr(seq, key, value)  # overrides the fallback values where possible
+        move_idxs = sorted(set(table[move_idx_key]))
         for m in move_idxs:
-            subtable = table[m == table['move_idx']]
+            subtable = table[m == table[move_idx_key]]
             kwargs = {key: subtable[key][0] for key in Move.single_keys}
             kwargs.update({key: subtable[key].tolist() for key in Move.multi_keys})
             other_keys = set(subtable.columns) - (Move.single_keys | Move.multi_keys)
@@ -117,9 +127,11 @@ class Sequence(object):
                 for key, val in kwargs.items():
                     if isinstance(val, list) and len(val) == 1:
                         kwargs[key] = val[0]
+            if not kwargs['log_note']:
+                kwargs['log_note'] = seq.normalized_short_name
             move = Move(**kwargs)
-            sequence.append(move)
-        return sequence
+            seq.append(move)
+        return seq
     
     def save(self, directory='.', basename=''):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
@@ -138,9 +150,9 @@ class Sequence(object):
         tables = []
         for i in range(len(self)):
             move = self.moves[i]
-            this_dict = move.to_dict()
+            this_dict = {move_idx_key: [i] * len(move)}
+            this_dict.update(move.to_dict(sparse=False))
             this_table = Table(this_dict)
-            this_table['move_idx'] = [i] * len(this_table)
             tables.append(this_table)
         table = vstack(tables)
         not_meta = {'moves'}
@@ -149,13 +161,7 @@ class Sequence(object):
         return table
     
     def __str__(self):
-        s = f'{self.normalized_short_name}'
-        if self.long_name:
-            s += f': {self.long_name}'
-        if self.creation_date:
-            s += f'\nCreated: {self.creation_date}'
-        if self.details:
-            s += f'\n{self.details}'
+        s = self._meta_str()
         s += '\n'
         table = self.to_table()
         used_settings = set()
@@ -164,12 +170,39 @@ class Sequence(object):
         removals = set(pos_defaults) - used_settings
         for name in removals:
             table.remove_column(name)
-        lines = table.pformat_all(align='<')
+        align = []
+        for col in table.columns:
+            if col.lower() in {'log_note'}:
+                align += ['<']
+            elif col.lower() in {'command', 'allow_corr'}:
+                align += ['^']
+            else:
+                align += ['>']
+        lines = table.pformat_all(align=align)
         s += '\n'.join(lines)
+        if len(lines) > 50:
+            # repeat headers and metadata for convenience with long tables
+            s += f'\n{lines[1]}\n{lines[0]}\n'
+            s += f'\n{self._meta_str()}'
         return s
     
     def __repr__(self):
-        return self.__str__()
+        s = object.__repr__(self)
+        s += '\n'
+        s += self._meta_str()
+        return s
+        
+    def _meta_str(self):
+        '''Returns a few lines of descriptive meta data.'''
+        s = f'{self.normalized_short_name}'
+        if self.long_name:
+            s += f': {self.long_name}'
+        if self.creation_date:
+            s += f'\nCreated: {self.creation_date}'
+        if self.details:
+            s += f'\n{self.details}'
+        s += f'\nTotal moves = {len(self)}'
+        return s
     
     # Standard sequence functions
     def __iter__(self):
@@ -211,13 +244,14 @@ class Sequence(object):
     def _validate_table(table):
         '''Validates an astropy table representing a sequence. Returns a new
         table, which may be slightly modified. For example, adding any new columns
-        which have been added to sequence since that table was saved to disk.
+        which have been added to sequence since that table was saved to disk, or
+        putting in placeholder metadata.
         '''
         new = table.copy()
         example_move = Move(command='dTdP', target0=0.0, target1=0.0)
         example_dict = example_move.to_dict()
         example_table = Table(example_dict)
-        exclude_columns = {'move_idx'}
+        exclude_columns = {move_idx_key}
         test_columns = set(new.columns) - exclude_columns
         for col in test_columns:
             assert col in example_table.columns
@@ -226,7 +260,10 @@ class Sequence(object):
                 test = example_table[col][0]
                 if is_number(val) and is_number(test) or is_bool(val) and is_bool(test):
                     continue
-                assert isinstance(val, type(test))
+                if col == 'device_loc':
+                    assert is_number(val) or isinstance(val, str)
+                else:
+                    assert isinstance(val, type(test))
             try:
                 np.isfinite(example_table[col][0])
                 isnumber = True
@@ -237,13 +274,17 @@ class Sequence(object):
         for row in new:
             assert row['command'] in valid_commands
         missing_col = set(example_table.columns) - set(new.columns)
-        defaults = pos_defaults.copy()  # future-proof in case someone wants to add entries to defaults
+        defaults = example_move.to_dict(sparse=True)
+        for k, v in defaults.items():
+            if isinstance(v, list):
+                defaults[k] = v[0]
+        defaults.update(pos_defaults)
         missing_col_default_available = missing_col & set(defaults)
         for col in missing_col_default_available:
-            values = defaults[col]*len(new)
+            values = [defaults[col]] * len(new)
             new[col] = values
-        if 'move_idx' not in new.columns:
-            new['move_idx'] = range(len(new))
+        if move_idx_key not in new.columns:
+            new[move_idx_key] = range(len(new))
         return new
     
 class Move(object):
@@ -253,19 +294,19 @@ class Move(object):
         command      ... move command string as described in petal.request_targets()
         target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
         target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
-        posloc       ... optional sequence of which positioner device locations should be commanded
+        device_loc   ... optional sequence of which positioner device locations should be commanded
         log_note     ... optional string to store alongside log data for this move
         pos_settings ... optional dict of positioner settings to apply during the move
         allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
         
     Multiple positioners, same targets:
-        By default, posloc='any', which means that the move command should be applied
+        By default, device_loc='any', which means that the move command should be applied
         to any positioners selected at runtime (presumably by the PECS initialization
         process). In this case, all positioners get the same target0 and target1. The
         command string must be one of local_commands, as defined in this module.
         
     Multiple positioners, multiple targets:
-        By arguing ordered sequences for target0, target1, and posloc, the user
+        By arguing ordered sequences for target0, target1, and device_loc, the user
         can specify different targets for different positioners. The command will be
         the same in all cases, and must be one of general_commands, as defined in this
         module.
@@ -274,27 +315,27 @@ class Move(object):
         Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
         or set both to home both axes.
     '''
-    def __init__(self, command, target0, target1, posloc='any', log_note='', pos_settings={}, allow_corr=False):
-        if posloc == 'any':
+    def __init__(self, command, target0, target1, device_loc='any', log_note='', pos_settings={}, allow_corr=True):
+        if device_loc == 'any':
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
                 assert is_number(x), f'target {x} is not a number'
             self.target0 = [target0]
             self.target1 = [target1]
-            self.posloc = [posloc]
+            self.device_loc = [device_loc]
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
-            assert len(target0) == len(target1) == len(posloc), 'args target0, target1, and posloc are not of equal length'
+            assert len(target0) == len(target1) == len(device_loc), 'args target0, target1, and device_loc are not of equal length'
             self.target0 = list(target0)
             self.target1 = list(target1)
-            self.posloc = list(posloc)
+            self.device_loc = list(device_loc)
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
         if command in homing_commands:
             assert target0 or target1, 'for a homing command, need to set target0 to 1 for theta ' + \
                                        'homing, target1 to 1 for phi homing, or both simultaneously'
-        possible_device_locs = set(pc.generic_pos_neighbor_locs) | {'any'}
-        assert all([x in possible_device_locs for x in self.posloc]), 'all elements of posloc must be valid device locations'
+        allowed_posloc = possible_device_locs | {'any'}
+        assert all([x in allowed_posloc for x in self.device_loc]), 'all elements of device_loc must be valid device locations'
         self.command = command
         self.log_note = str(log_note)
         self._pos_settings = self._validate_pos_settings(pos_settings)
@@ -302,7 +343,7 @@ class Move(object):
     
     # properties of Move with single values vs multiple values
     single_keys = {'command', 'log_note', 'allow_corr'}
-    multi_keys = {'target0', 'target1', 'posloc'}         
+    multi_keys = {'target0', 'target1', 'device_loc'}
     
     @staticmethod
     def _validate_pos_settings(settings):
@@ -339,25 +380,55 @@ class Move(object):
         return d        
     
     def __len__(self):
-        return len(self.posloc)
+        return len(self.device_loc)
     
     @property
     def has_multiple_targets(self):
         '''Boolean whether this move has mulitple targets.'''
         return len(self) > 1
     
-    def to_dict(self):
+    def is_defined_for_locations(self, device_locs):
+        '''Returns boolean whether the move has valid command definitions for
+        the argued collection of device locations.
+        '''
+        if self.device_loc == 'any':
+            return True
+        missing = set(device_locs) - set(self.device_loc)
+        if any(missing):
+            return False
+        return True
+    
+    def to_dict(self, sparse=False, device_loc='any'):
         '''Returns a dict, which is ready for direct conversion to an astropy
         table or pandas dataframe. Keys = column names and values = equal-length
         lists of column data.
+        
+        INPUTS:  sparse ... Optional boolean, if True, will make a more sparse
+                            representation (non-arrays not expanded). This form
+                            is not suitable for direct conversion to table.
+                            
+                 device_loc ... Optional set, tuple, or list of locations. Any
+                                arrays in the returned dictionary will only contain
+                                entries corresponding to these locations.
         '''
         data = {}
+        key_order = ['command', 'target0', 'target1', 'device_loc', 'allow_corr', 'log_note']
         for key in self.single_keys:
             data[key] = [getattr(self, key)] * len(self)
         for key in self.multi_keys:
             data[key] = getattr(self, key)
         for key, val in self.pos_settings.items():
-            data[key] = [val]
+            data[key] = [val] * len(self)
+        key_order = key_order + sorted(set(data) - set(key_order))
+        data = {key: data[key] for key in key_order}
+        if device_loc != 'any':
+            locs = sorted(device_loc)
+            selection = [i for i in range(len(locs)) if locs[i] in self.device_loc]
+            for key, value in data.items():
+                data[key] = [value[i] for i in selection]
+        if sparse:
+            for key in self.single_keys | set(self.pos_settings):
+                data[key] = data[key][0] if len(data[key]) > 0 else []
         return data
     
     def make_request(self, loc2id_map, log_note=''):
@@ -365,7 +436,7 @@ class Move(object):
         Any positioners known to this move instance, but not included in loc2id_map, will be
         skipped.
         
-        INPUT:  loc2id_map ... keys=posloc, values=posids
+        INPUT:  loc2id_map ... keys=device_loc, values=posids
                 log_note ... optional string, will be appended to any existing log note
         
         OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
@@ -374,9 +445,9 @@ class Move(object):
         posids, target0, target1 = [], [], []
         if self.has_multiple_targets:
             for i in range(len(self)):
-                posloc = self.posloc[i]
-                if posloc in loc2id_map:
-                    posids += [loc2id_map[posloc]]
+                device_loc = self.device_loc[i]
+                if device_loc in loc2id_map:
+                    posids += [loc2id_map[device_loc]]
                     target0 += [self.target0[i]]
                     target1 += [self.target1[i]]
         else:
@@ -413,3 +484,9 @@ class Move(object):
                   }
         return kwargs
         
+    def __str__(self):
+        
+        return s
+    
+    def __repr__(self):
+        return self.__str__()

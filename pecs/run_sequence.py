@@ -54,7 +54,13 @@ log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-[logger.removeHandler(h) for h in logger.handlers]
+def clear_loggers():
+    '''Mysteriously (to me) this doesn't seem to work on the second run of script in
+    the same ipython/debugger session, but does seem to work on the third... Weird,
+    not gonna bother trying to track it down --- just adds duplicate printouts.'''
+    for h in logger.handlers:
+        logger.removeHandler(h)
+clear_loggers()
 fh = logging.FileHandler(filename=log_path, mode='a', encoding='utf-8')
 sh = logging.StreamHandler()
 formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
@@ -330,7 +336,7 @@ def pause_between_moves(last_move_time, cycle_time):
     as "last_move_time" for the *next* time you call the function.
     '''
     if last_move_time == None:
-        return time.time() - cycle_time
+        return time.time()
     sec_since_last_move = time.time() - last_move_time
     need_to_wait = cycle_time - sec_since_last_move
     if need_to_wait > 0:
@@ -375,10 +381,15 @@ try:
     for m in range(len(seq)):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-        dict_repr = dict(zip(move.columns, move))
+        device_loc_unordered = set(get_map(key='loc', posids=posids))
         move_num = m + 1
-        logger.info(f'Now doing move {move_num} of {len(seq)} on {len(posids)} positioner(s).')
-        logger.info(f'Move settings are {dict_repr}')
+        move_num_text = f'move {move_num} of {len(seq)}'
+        if not move.is_defined_for_locations(device_loc_unordered):
+            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.')
+            continue
+        logger.info(f'Now doing {move_num_text} on {len(posids)} positioner(s).')
+        descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
+        logger.info(f'Move settings are {descriptive_dict}')
         correctable = move.command in sequence.general_commands and move.allow_corr
         n_corr = args.num_corr if correctable else 0
         errs = None
@@ -393,19 +404,21 @@ try:
             if move.command in sequence.general_commands:
                 if pecs_on:
                     move_measure_func = pecs.move_measure
-                if submove_num > 0:
+                if submove_num == 0:
+                    submove = move
+                else:
                     posids = get_posids()   # dynamically retrieved, in case some positioner gets disabled mid-sequence
-                    posloc_map = get_map(key='loc', posids=posids)
-                    # note below how order is preserved for target0, target1, and posloc
+                    device_loc_map = get_map(key='ids', posids=posids)
+                    # note below how order is preserved for target0, target1, and device_loc
                     # lists, on the assumption that get_posids() returns a list
-                    corr = sequence.Move(command='poslocdXdY',
-                                         target0=[-errs[posid][0] for posid in posids],
-                                         target1=[-errs[posid][1] for posid in posids],
-                                         posloc=[posloc_map[posid] for posid in posids],
-                                         log_note=move.log_note,
-                                         pos_settings=move.pos_settings,
-                                         allow_corr=move.allow_corr)
-                request = corr.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
+                    submove = sequence.Move(command='poslocdXdY',
+                                            target0=[-errs[posid][0] for posid in posids],
+                                            target1=[-errs[posid][1] for posid in posids],
+                                            device_loc=[device_loc_map[posid] for posid in posids],
+                                            log_note=move.log_note,
+                                            pos_settings=move.pos_settings,
+                                            allow_corr=move.allow_corr)
+                request = submove.make_request(loc2id_map=get_map('loc'),log_note=extra_log_note)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
@@ -417,7 +430,7 @@ try:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
             else:
-                logger.warning(f'Skipping move {move_num} due to unexpected command {move.command}')
+                logger.warning(f'Skipping move {move_num} submove {submove_num} due to unexpected command {move.command}')
                 continue
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
@@ -450,7 +463,7 @@ try:
                     dummy_err_x = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
-                err_str = summarize_errors(errs)
+                err_str = summarize_errors(errs, move_num, submove_num)
                 logger.info(err_str)
 except StopIteration:
     logger.info('Safely aborting the sequence.')
@@ -493,3 +506,4 @@ if pecs_on:
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
+clear_loggers()

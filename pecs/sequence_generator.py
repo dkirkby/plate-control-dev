@@ -5,22 +5,26 @@ Produces positioner move sequences, for any of several pre-cooked types of test.
 
 import sequence
 import numpy as np
+import itertools
+import math
+import os
 
 seqs = []
+make_sparse_csv = []
 
 # DEBUGGING / CODE SYNTAX seqs
 # -----------------------------
 
 debug_note = lambda seq: f'move sequence code test, {seq.normalized_short_name}'
 seq = sequence.Sequence(short_name='debug dTdP', long_name='test the code with single tiny move')
-move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq),
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq), allow_corr=False,
                      pos_settings={'ANTIBACKLASH_ON': False})
 seq.append(move)
 seqs.append(seq)
 
 seq = sequence.Sequence(short_name='debug dTdP full current',
                         long_name='test the code with single tiny move and motor current set to 100')
-move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq),
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq), allow_corr=False,
                      pos_settings={'ANTIBACKLASH_ON': False,
                                    'CURR_SPIN_UP_DOWN': 100,
                                    'CURR_CRUISE': 100,
@@ -45,7 +49,33 @@ seq.append(move)
 seqs.append(seq)
 
 
-# to-do: multitarget test here
+seq = sequence.Sequence(short_name='debug multitarget',
+                        long_name='test the code with differing simultaneous targets on several positioners')
+locs = sequence.possible_device_locs
+targ_val_options = [i*.5-2.0 for i in range(9)]
+targ_val_unique_combos = list(itertools.combinations(targ_val_options,2))
+fill_repeats = math.ceil(len(locs) / len(targ_val_unique_combos))
+targ_val_combos = []
+for i in range(fill_repeats):
+    targ_val_combos += targ_val_unique_combos
+targets = [[], []]
+for axis in [0,1]:
+    targets[axis] = [targ_val_combos[k][axis] for k in range(len(locs))]
+n_moves = 2
+shift = lambda X: X[1:] + [X[0]]
+for i in range(n_moves):
+    for axis in range(len(targets)):
+        targets[axis] = shift(targets[axis])
+    move = sequence.Move(command='poslocXY',
+                         target0=targets[0],
+                         target1=targets[1],
+                         device_loc=locs,
+                         log_note=debug_note(seq),
+                         allow_corr=True,
+                         )
+    seq.append(move)
+seqs.append(seq)
+make_sparse_csv.append(seq)
 
 
 # BASIC HOMING SEQUENCES
@@ -54,13 +84,13 @@ seqs.append(seq)
 simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
 seq = sequence.Sequence(short_name='home_and_debounce',
                         long_name='run a single rehome on both axes, followed by debounce moves')
-move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(seq))
+move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(seq), allow_corr=False)
 seq.append(move)
 seqs.append(seq)
 
 seq = sequence.Sequence(short_name='home_no_debounce', 
                         long_name='run a single rehome on both axes, with no debounce moves')
-move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(seq))
+move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(seq), allow_corr=False)
 seq.append(move)
 seqs.append(seq)
 
@@ -84,7 +114,7 @@ for axis in ['theta', 'phi']:
     for i in range(len(targets)):
         target = targets[i]
         note = f'{simple_note(seq)}'
-        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
     
@@ -99,7 +129,7 @@ for axis in ['theta', 'phi']:
     for i in range(len(targets)):
         target = targets[i]
         note = f'{simple_note(seq)}'
-        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
 
@@ -120,7 +150,7 @@ for axis in ['theta', 'phi']:
                             details=details)
     init_cmd = 'posintTP'
     init_pos = [0, 130]
-    move = sequence.Move(command=init_cmd, target0=init_pos[0], target1=init_pos[1],
+    move = sequence.Move(command=init_cmd, target0=init_pos[0], target1=init_pos[1], allow_corr=False,
                          log_note=f'{seq.short_name}, going to initial {init_cmd}={init_pos} (away from stops)')
     seq.append(move)
     n_loops = len(clearance_vals[axis])
@@ -133,6 +163,7 @@ for axis in ['theta', 'phi']:
                              target0=(axis=='theta'),
                              target1=(axis=='phi'),
                              log_note=note,
+                             allow_corr=False,
                              pos_settings=settings,
                              )
         for j in range(num_test_steps[axis]):
@@ -143,6 +174,7 @@ for axis in ['theta', 'phi']:
                                      target0=step * (axis=='theta'),
                                      target1=step * (axis=='phi'),
                                      log_note=f'{note}, step {j+1} of {num_test_steps[axis]}, {direction} hardstop',
+                                     allow_corr=False,
                                      pos_settings=settings,
                                      )
                 seq.append(move)
@@ -176,7 +208,7 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
         target = [0,0]
         target[i] = deltas[j]
         note = 'motortest ' + str(seq.short_name)
-        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings)
+        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
         seq.append(move)
     return seq
 
@@ -253,6 +285,15 @@ paths = []
 for seq in seqs:
     path = seq.save()
     paths.append(path)
+    if seq in make_sparse_csv:
+        table = seq.to_table()
+        all_cols = set(table.columns)
+        keep_cols = {sequence.move_idx_key, 'command', 'target0', 'target1', 'device_loc'}
+        for col in all_cols - keep_cols:
+            del table[col]
+        sparse_path = os.path.splitext(path)[0] + '_sparse.csv'
+        table.write(sparse_path, overwrite=True, delimiter=',')
+        paths.append(sparse_path)
     
 # READ FROM DISK AND PRINT TO STDOUT
 # ----------------------------------
