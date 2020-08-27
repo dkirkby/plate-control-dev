@@ -453,8 +453,8 @@ class Move(object):
                     target1 += [self.target1[i]]
         else:
             posids = list(loc2id_map.values())
-            target0 = self.target0[0] * len(posids)
-            target1 = self.target1[0] * len(posids)  
+            target0 = self.target0[0]
+            target1 = self.target1[0] 
         log_note = pc.join_notes(self.log_note, log_note)
         request_data = {'DEVICE_ID': posids,
                         'COMMAND': self.command,
