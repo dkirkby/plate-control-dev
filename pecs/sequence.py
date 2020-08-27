@@ -486,7 +486,9 @@ class Move(object):
         return kwargs
         
     def __str__(self):
-        
+        s = object.__repr__(self)
+        s += '\n'
+        s += str(self.to_dict(sparse=True))
         return s
     
     def __repr__(self):
