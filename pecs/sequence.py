@@ -452,7 +452,7 @@ class Move(object):
                     target0 += [self.target0[i]]
                     target1 += [self.target1[i]]
         else:
-            posids = [loc2id_map.values()]
+            posids = list(loc2id_map.values())
             target0 = self.target0[0] * len(posids)
             target1 = self.target1[0] * len(posids)  
         log_note = pc.join_notes(self.log_note, log_note)
