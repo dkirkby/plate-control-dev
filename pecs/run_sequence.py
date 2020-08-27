@@ -376,7 +376,7 @@ if pecs_on:
 last_pos_settings = None
 real_moves = pecs_on and not args.no_movement
 cycle_time = args.cycle_time if real_moves else 4.0
-last_move_time = pause_between_moves(None, cycle_time)
+last_move_time = 'no moves done yet'
 try:
     for m in range(len(seq)):
         move = seq[m]
@@ -395,7 +395,10 @@ try:
         errs = None
         calc_errors = True
         for submove_num in range(1 + n_corr):
-            last_move_time = pause_between_moves(last_move_time, cycle_time)
+            if last_move_time == 'no moves done yet':
+                last_move_time = pause_between_moves(None, cycle_time)
+            else:
+                last_move_time = pause_between_moves(last_move_time, cycle_time)
             if last_move_time == KeyboardInterrupt:
                 raise StopIteration
             extra_log_note = f'move {move_num}'
