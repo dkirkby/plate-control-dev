@@ -97,7 +97,7 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: list(pecs.get_enabled_posids('sub'), include_posinfo=False)
+    get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
     _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
     all_posinfo = all_posinfo.reset_index()
     temp = all_posinfo[['DEVICE_LOC','DEVICE_ID']].to_dict(orient='list')
