@@ -105,7 +105,8 @@ class Sequence(object):
         sequence = Sequence.read(path)
         '''
         path = os.path.abspath(path)
-        table = Table.read(path)
+        kwargs = {'fill_values': None} if os.path.splitext(path)[1] == '.ecsv' else {}
+        table = Table.read(path, **kwargs)
         table = Sequence._validate_table(table)
         basename = os.path.basename(path)
         fallback_short_name = os.path.splitext(basename)[0]
@@ -391,7 +392,7 @@ class Move(object):
         '''Returns boolean whether the move has valid command definitions for
         the argued collection of device locations.
         '''
-        if self.device_loc == 'any':
+        if 'any' in self.device_loc:
             return True
         missing = set(device_locs) - set(self.device_loc)
         if any(missing):
