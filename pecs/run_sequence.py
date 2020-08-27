@@ -86,6 +86,9 @@ def quit_query(question):
         sys.exit(0)
 
 quit_query('Does the sequence look correct?')
+logger.info(f'Number of correction submoves: {args.num_corr}')
+logger.info(f'Number of fvc images per measurement: {args.num_meas}')
+logger.info(f'Minimum move cycle time: {args.cycle_time} sec')
 
 def assert2(test, message):
     '''Like an assert, but cleaner handling of logging.'''
