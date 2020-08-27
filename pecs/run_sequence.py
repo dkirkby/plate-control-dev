@@ -411,7 +411,7 @@ try:
         calc_errors = True
         for submove_num in range(1 + n_corr):
             if last_move_time == 'no moves done yet':
-                last_move_time = pause_between_moves(None, cycle_time)
+                last_move_time = time.time()
             else:
                 last_move_time = pause_between_moves(last_move_time, cycle_time)
             if last_move_time == KeyboardInterrupt:
