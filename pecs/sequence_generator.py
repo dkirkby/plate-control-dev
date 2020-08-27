@@ -78,6 +78,23 @@ seqs.append(seq)
 make_sparse_csv.append(seq)
 
 
+# GENERIC XY TESTS
+# ----------------
+import xy_targets_generator
+n_targs = 24
+for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
+    seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""}',
+                            long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}')
+    targs = xy_targets_generator.filled_annulus(n_points=n_targs,
+                                                r_min=0.0,
+                                                r_max=3.3 if limited else 6.0,
+                                                random=False)
+    for targ in targs:
+        move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
+        seq.append(move)
+    seqs.append(seq)
+
+
 # BASIC HOMING SEQUENCES
 # ----------------------
 
