@@ -459,12 +459,13 @@ try:
                 last_pos_settings = new_settings
             if real_moves:
                 results = move_measure_func(**kwargs)
+                
+                # To be implemented: Some method of storing the submeas strings to
+                # the online DB. Can replace the verbose printout below. For now,
+                # I just want to be sure that the sub-measurements are logged *somewhere*.
                 if args.num_meas > 1:
                     submeas = pecs.summarize_submeasurements(results)
-                    
-                    # to be implemented: Some method of storing the submeas strings to
-                    # the online DB will replace the little loop below.
-                    logger.info(f'sub-measurements: {submeas}')
+                    logger.info(f'sub-measurements: {submeas}') 
     
                 prev_posids = posids
                 posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
