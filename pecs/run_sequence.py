@@ -25,6 +25,10 @@ max_fvc_iter = 10
 parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
 max_corr = 5
 parser.add_argument('-nc', '--num_corr', type=int, default=0, help=f'int, number of correction moves, for those rows where allowed in sequence definition (default is 0, max is {max_corr})')
+default_n_best = 5
+default_n_worst = 5
+parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=f'int, number of best performers to display in log messages for each measurement (default is {default_n_best})')
+parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
@@ -295,17 +299,22 @@ def calc_poslocXY_errors(requests, results):
         err[posid] = [err_x, err_y]
     return err        
 
-def summarize_errors(errs, move_num, submove_num):
+def summarize_errors(errs, move_num, submove_num, n_best=3, n_worst=3):
     '''Produces a string summarizing errors for a set of positioners.
     
     INPUT:   errs ... same format as output by calc_poslocXY_errors, a dict with
                       keys = posids and values = [err_locX, err_locY]
+             move_num ... int, which move of the sequence this is
+             submove_num ... int, which submove of the move this is
+             n_best ... int, number of "best" performers to display
+             n_worst ... int, number of "worst" performers to display
+             
     OUTPUT:  string
     '''
     posids = sorted(errs.keys())
     vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
     vec_errs_um = [err*1000 for err in vec_errs]
-    err_str = f'move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors (um): '
+    err_str = f'move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors (um):\n '
     first = True
     for name, func in {'max': max, 'min': min, 'mean': np.mean,
                        'median': np.median, 'std': np.std,
@@ -313,12 +322,20 @@ def summarize_errors(errs, move_num, submove_num):
                        }.items():
         if not first:
             err_str += ', '
-        err_str += f'{name}={func(vec_errs_um):.1f}'
+        err_str += f'{name}: {func(vec_errs_um):5.1f}'
         first = False
-    for desc, func in {'best': min, 'worst': max}.items():
-        err = func(vec_errs_um)
-        pos = posids[vec_errs_um.index(err)]
-        err_str += f'\n{desc} performer: {pos}, err={err:.1f} um'
+    sorted_err_idxs = np.argsort(vec_errs_um)
+    for desc, count in {'best': args.num_best, 'worst': args.num_worst}.items():
+        n = len(vec_errs_um)
+        if n == 0:
+            break
+        count_mod = min(count, int(n/2)) if n > 1 else 1
+        err_str += f'\n {desc:<5} {count_mod}:'
+        this_sort = list(sorted_err_idxs) if desc == 'best' else list(reversed(sorted_err_idxs))
+        these_idxs = [this_sort[i] for i in range(count_mod)]
+        for i in these_idxs:
+            err_str += f' {posids[i]}: {vec_errs_um[i]:5.1f},'
+        err_str = err_str[:-1]  # remove dangling comma
     return err_str
 
 def pause_between_moves(last_move_time, cycle_time):
@@ -326,18 +343,15 @@ def pause_between_moves(last_move_time, cycle_time):
     CTRL-C exit the sequence during this period.
     
     INPUT:  last_move_time ... seconds since epoch, defining when the previous
-                               move was done
+                               move was done. last_move_time=None will wait the
+                               full cycle_time
             cycle_time ... seconds to wait after last_move_time
     
     OUTPUT: Returns the time now, if the pause was succesfully completed.
             Returns KeyboardInterrupt if user did CTRL-C.
-            
-    When calling this function for the first time, you can argue last_move_time=None.
-    In this case, the function will immediately return a value suitable for use
-    as "last_move_time" for the *next* time you call the function.
     '''
     if last_move_time == None:
-        return time.time()
+        last_move_time = time.time()
     sec_since_last_move = time.time() - last_move_time
     need_to_wait = cycle_time - sec_since_last_move
     if need_to_wait > 0:
@@ -443,8 +457,6 @@ try:
                 if pecs_on:
                     apply_pos_settings(all_settings)
                 last_pos_settings = new_settings
-            else:
-                logger.info('Positioner settings: (no change)')
             if real_moves:
                 results = move_measure_func(**kwargs)
                 if args.num_meas > 1:
