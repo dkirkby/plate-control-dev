@@ -75,6 +75,7 @@ is_bool = lambda x: isinstance(x, (bool, np.bool, np.bool_))
 move_idx_key = 'move_idx'
 possible_device_locs = set(pc.generic_pos_neighbor_locs)
 get_datestr = lambda: datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
+sequence_note_prefix = 'sequence: '
 
 class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
@@ -455,7 +456,7 @@ class Move(object):
             posids = list(loc2id_map.values())
             target0 = self.target0[0]
             target1 = self.target1[0] 
-        log_note = pc.join_notes(self.log_note, log_note)
+        log_note = pc.join_notes(sequence_note_prefix + self.log_note, log_note)
         request_data = {'DEVICE_ID': posids,
                         'COMMAND': self.command,
                         'X1': target0,
