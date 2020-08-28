@@ -94,6 +94,8 @@ class PosTransforms(petaltransforms.PetalTransforms):
     
     alt_keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X', 'OFFSET_Y']
     alt = {key:pc.nominals[key]['value'] for key in alt_keys}
+    stateless_range_limits = [[-179.999999999, 180.0], [-20.0, 200.0]]
+    exact_range_limits = [[-179.999999999, 180.0], [0.0, 180.0]]
 
     def __init__(self, this_posmodel=None, petal_alignment=None, stateless=False):
         if petal_alignment is None:
@@ -133,15 +135,19 @@ class PosTransforms(petaltransforms.PetalTransforms):
                             backlash clearance zones near the hardstops
             'exact':        means theta range of [-179.999999999,180] and phi
                             range of [0,180]
+        For debugging purposes, once can alternatively argue specific numeric
+        values of the form [[minT, maxT], [minP,maxP]]
         """
-        if self.stateless:
-            return [[-179.999999999, 180.0], [-20.0, 200.0]]
-        elif range_limits == 'exact':
-            return [[-179.999999999, 180.0], [0.0, 180.0]]
-        elif range_limits == 'full':
+        if range_limits == 'full':
             return [self.posmodel.full_range_posintT, self.posmodel.full_range_posintP]
         elif range_limits == 'targetable':
             return [self.posmodel.targetable_range_posintT, self.posmodel.targetable_range_posintP]
+        elif range_limits == 'exact':
+            return self.exact_range_limits
+        elif self.stateless:
+            return self.stateless_range_limits
+        elif isinstance(range_limits, list):
+            return range_limits
         else:
             print(f'bad range_limits argument: {range_limits}')
             return None
