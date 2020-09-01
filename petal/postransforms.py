@@ -138,10 +138,10 @@ class PosTransforms(petaltransforms.PetalTransforms):
         For debugging purposes, once can alternatively argue specific numeric
         values of the form [[minT, maxT], [minP,maxP]]
         """
-        if self.stateless:
-            return self.stateless_range_limits
         if isinstance(range_limits, (list, tuple)):
             return range_limits
+        if self.stateless:
+            return self.stateless_range_limits
         if range_limits == 'full':
             return [self.posmodel.full_range_posintT, self.posmodel.full_range_posintP]
         if range_limits == 'targetable':
