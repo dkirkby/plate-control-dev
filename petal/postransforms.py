@@ -138,19 +138,18 @@ class PosTransforms(petaltransforms.PetalTransforms):
         For debugging purposes, once can alternatively argue specific numeric
         values of the form [[minT, maxT], [minP,maxP]]
         """
+        if self.stateless:
+            return self.stateless_range_limits
+        if isinstance(range_limits, (list, tuple)):
+            return range_limits
         if range_limits == 'full':
             return [self.posmodel.full_range_posintT, self.posmodel.full_range_posintP]
-        elif range_limits == 'targetable':
+        if range_limits == 'targetable':
             return [self.posmodel.targetable_range_posintT, self.posmodel.targetable_range_posintP]
-        elif range_limits == 'exact':
+        if range_limits == 'exact':
             return self.exact_range_limits
-        elif self.stateless:
-            return self.stateless_range_limits
-        elif isinstance(range_limits, list):
-            return range_limits
-        else:
-            print(f'bad range_limits argument: {range_limits}')
-            return None
+        print(f'bad range_limits argument: {range_limits}')
+        return None
         
     def construct(self, coord_in, coord_out):
         '''Utility to construct a transform function using strings describing
