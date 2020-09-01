@@ -521,7 +521,7 @@ class PECS:
         '''
         # meapos may contain not only matched but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        merged = matched_df.merge(request, on='DEVICE_ID').set_index('DEVICE_ID')
+        merged = matched_df.merge(request, on='DEVICE_ID')
         
         # columns get renamed
         merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
