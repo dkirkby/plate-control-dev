@@ -29,6 +29,8 @@ default_n_best = 5
 default_n_worst = 5
 parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=f'int, number of best performers to display in log messages for each measurement (default is {default_n_best})')
 parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
+park_options = [None, 'poslocTP', 'posintTP']
+parser.add_argument('-pp', '--prepark', type=str, default=park_options[0], help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {park_options[0]}')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
@@ -36,6 +38,7 @@ if args.anticollision == 'None':
 assert args.anticollision in {'adjust', 'freeze', None}, f'bad argument {args.anticollision} for anticollision parameter'
 assert 1 <= args.num_meas <= max_fvc_iter, f'out of range argument {args.num_meas} for num_meas parameter'
 assert 0 <= args.num_corr <= max_corr, f'out of range argument {args.num_corr} for num_corr parameter'
+assert args.prepark in park_options, f'invalid park option, must be one of {park_options}'
 
 # read sequence file
 import sequence
@@ -367,7 +370,19 @@ def pause_between_moves(last_move_time, cycle_time):
         except KeyboardInterrupt:
             return KeyboardInterrupt
     return time.time()
-    
+
+def get_parkable_neighbors(posids):
+    '''Return set of neighbors of posids which can be "parked".
+    '''
+    parkable_neighbors = set()
+    for posid in posids:
+        neighbors = ptlcall('get_positioner_neighbors', posid)
+        for neighbor in neighbors:
+            is_enabled = ptlcall('get_posfid_val', neighbor, 'CTRL_ENABLED')
+            if is_enabled:
+                parkable_neighbors.add(neighbor)
+    return parkable_neighbors
+
 # setup prior to running sequence
 if pecs_on:
     # cache the pos settings
@@ -395,7 +410,33 @@ last_pos_settings = None
 real_moves = pecs_on and not args.no_movement
 cycle_time = args.cycle_time if real_moves else 4.0
 last_move_time = 'no moves done yet'
+def do_pause():
+    '''Convenience wrapper for pause_between_moves(), utilizing a global to
+    track the timing.'''
+    global last_move_time
+    if last_move_time == 'no moves done yet':
+        last_move_time = time.time()
+    else:
+        last_move_time = pause_between_moves(last_move_time, cycle_time)
+    if last_move_time == KeyboardInterrupt:
+        raise StopIteration
 try:
+    if args.prepark:
+        posids = get_posids()
+        if pecs_on:
+            neighbors = get_parkable_neighbors(posids)
+        else:
+            neighbors = set()
+        extras = set(neighbors) - set(posids)
+        neighbor_text = '' if not extras else f' specified for this test, as well as {len(extras)} of their unspecificed neighbors: {sorted(extras)}'
+        logger.info(f'Performing initial parking move (coords={args.prepark}) on {len(posids)} positioners' + neighbor_text)
+        all_to_park = sorted(set(posids) | set(neighbors))
+        extra_note = pc.join_notes(sequence.sequence_note_prefix, seq.normalized_short_name)
+        last_move_time = time.time()
+        if real_moves:
+            pecs.park_and_measure(posids=all_to_park, mode='normal', coords=args.prepark, log_note=extra_note,
+                                  match_radius=None, check_unmatched=False, test_tp=False)
+        do_pause()
     for m in range(len(seq)):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
@@ -413,12 +454,7 @@ try:
         errs = None
         calc_errors = True
         for submove_num in range(1 + n_corr):
-            if last_move_time == 'no moves done yet':
-                last_move_time = time.time()
-            else:
-                last_move_time = pause_between_moves(last_move_time, cycle_time)
-            if last_move_time == KeyboardInterrupt:
-                raise StopIteration
+            do_pause()
             extra_log_note = f'move {move_num}'
             if n_corr > 0:
                 extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
