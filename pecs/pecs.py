@@ -356,7 +356,39 @@ class PECS:
         assert debounce in {True, False}
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
+        return self._rehome_or_park_and_measure(ids=posids, axis=axis, debounce=debounce,
+                                                log_note=log_note, match_radius=match_radius, 
+                                                check_unmatched=check_unmatched,
+                                                test_tp=test_tp, anticollision=anticollision)
+    
+    def park_and_measure(self, posids, mode='normal', coords='poslocTP', log_note='',
+                         match_radius=None, check_unmatched=False, test_tp=False):
+        '''Wrapper for sending park_positioners command and then measuring result.
+        Returns whatever fvc_measure returns.
+        '''
+        assert mode in {'normal', 'center'}
+        assert coords in {'posintTP', 'poslocTP'}
+        self.print(f'Parking positioners, mode={mode}, coords={coords},' +
+                   f', exposure={self.exp.id}, iteration={self.iteration}')
+        return self._rehome_or_park_and_measure(move='park', ids=posids, mode=mode,
+                                                coords=coords, log_note=log_note,
+                                                match_radius=match_radius, 
+                                                check_unmatched=check_unmatched,
+                                                test_tp=test_tp)
+        
+    def _rehome_or_park_and_measure(self, move='rehome', **kwargs):
+        '''Common operations for both "rehome_and_measure" and "park_and_measure".
+        '''
+        funcs = {'rehome': self.ptlm.rehome_pos,
+                 'park': self.ptlm.park_positioners}
+        move_args = {'rehome': {'ids', 'axis', 'anticollision', 'debounce', 'log_note'},
+                     'park': {'ids', 'mode', 'coords', 'log_note'}}
+        meas_args = {'match_radius', 'check_unmatched', 'test_tp'}
+        missing_args = (move_args[move] | meas_args) - set(kwargs)
+        assert move in funcs, f'unrecognized move type {move}'
+        assert not(any(missing_args)), f'missing args {missing_args}'
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
+        posids = kwargs['ids']
         enabled = self.get_enabled_posids(posids)
         posids_by_petal = {}
         for posid in enabled:
@@ -371,11 +403,14 @@ class PECS:
             # multiple petals. That said, this is probably such a rarely called function
             # that it's not critical to achieve that parallelism right now.
             role = self._pcid2role(pcid)
-            self.ptlm.rehome_pos(ids=these_posids, axis=axis, anticollision=anticollision,
-                                 debounce=debounce, log_note=log_note, participating_petals=role)
-        # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here 
-        result = self.fvc_measure(exppos=None, matched_only=True, match_radius=match_radius, 
-                                  check_unmatched=check_unmatched, test_tp=test_tp)
+            move_kwargs = {kwargs[key] for key in move_args[move] if key != 'ids'}
+            move_kwargs.update({'ids': these_posids, 'participating_petals': role})
+            funcs[move](**move_kwargs)
+        
+        # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
+        meas_kwargs = {kwargs[key] for key in meas_args}
+        meas_kwargs.update({'exppos': None, 'matched_only': True})
+        result = self.fvc_measure(**meas_kwargs)
         self.ptlm.clear_exposure_info()
         return result
 
