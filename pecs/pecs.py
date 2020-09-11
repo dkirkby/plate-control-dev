@@ -368,7 +368,7 @@ class PECS:
         '''
         assert mode in {'normal', 'center'}
         assert coords in {'posintTP', 'poslocTP'}
-        self.print(f'Parking positioners, mode={mode}, coords={coords},' +
+        self.print(f'Parking positioners, mode={mode}, coords={coords}' +
                    f', exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(move='park', ids=posids, mode=mode,
                                                 coords=coords, log_note=log_note,
