@@ -112,7 +112,7 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
+    _get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
     get_all_enabled_posids = lambda: list(pecs.get_enabled_posids('all', include_posinfo=False))
     _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
     all_posinfo = all_posinfo.reset_index()
@@ -120,21 +120,34 @@ try:
     all_loc2id = {temp['DEVICE_LOC'][i]: temp['DEVICE_ID'][i] for i in range(len(all_posinfo))}
 except:
     # still a useful case, for testing some portion of the script offline
-    logger.info('PECS initialization failed')
+    logger.warning('PECS initialization failed')
     pecs_on = False
-    get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
-    temp = sorted(get_posids())
+    _get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
+    temp = sorted(_get_posids())
     all_loc2id = {i: temp[i] for i in range(len(temp))}
 all_id2loc = {val: key for key, val in all_loc2id.items()}
-initial_selected_posids = get_posids()
-if not any(initial_selected_posids):
-    logger.warning('No positioners were found matching selection(s) for this test.' +
-                   ' Suggested things to check: CTRL_ENABLED flags, posfid power,' +
-                   ' canbus status, petal ops_state. Now quitting.')
+
+class NoPosidsError(Exception):
+    pass
+
+def get_posids():
+    '''Wrapper function to get list of currently enabled + selected posids, including
+    raising an exception if that list is empty.'''
+    posids = _get_posids()
+    if not any(posids):
+        raise NoPosidsError
+    return posids
+
+# check that there are at least some valid posids selected
+try:
+    initial_selected_posids = get_posids()
+    logger.info(f'selected posids: {get_posids()}')
+except NoPosidsError:
+    logger.error('No positioners were found matching selection(s) for this test.' +
+                 ' Suggested things to check: CTRL_ENABLED flags, posfid power,' +
+                 ' canbus status, petal ops_state. Now quitting.')
     sys.exit(0)
     
-logger.info(f'selected posids: {get_posids()}')
-
 _loc2id_cache = {}  # reduces overhead for function below
 _id2loc_cache = {}  # reduces overhead for function below
 def get_map(key='loc', posids=[]):
@@ -442,6 +455,7 @@ def do_pause():
     else:
         last_move_time = pause_between_moves(last_move_time, cycle_time)
     if last_move_time == KeyboardInterrupt:
+        logger.info('Keyboard interrupt detected.')
         raise StopIteration
         
 def park(park_option, is_prepark=True):
@@ -565,6 +579,8 @@ try:
         park(park_option=args.postpark, is_prepark=False)
 except StopIteration:
     logger.info('Safely aborting the sequence.')
+except NoPosidsError:
+    logger.error('All positioners have become disabled. Aborting the sequence.')
 logger.info(f'Sequence "{seq.short_name}" complete!')
 
 # cleanup after running sequence
