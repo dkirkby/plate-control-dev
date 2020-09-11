@@ -498,7 +498,8 @@ class PECS:
             except:
                 assert False, f'error, could not iterate arg posids={posids}'
         ret = self.ptlm.get_positioners(enabled_only=True, posids=selected_posids)
-        posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
+        posinfo = pd.concat(list(ret.values()))
+        posinfo = posinfo.set_index('DEVICE_ID')
         posids = sorted(posinfo.index)
         if include_posinfo:
             return posids, posinfo
