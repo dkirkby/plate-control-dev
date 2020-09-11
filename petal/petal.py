@@ -943,11 +943,7 @@ class Petal(object):
             if old_state == self.PETAL_OPS_STATES[self._last_state][key][0]:
                 # Don't change state if it's where we want it
                 todo.remove(key)
-            elif key == 'GFA_FAN': #GFA has different structure
-                req = self.PETAL_OPS_STATES[self._last_state][key][0]['inlet'][0], self.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
-                old = old_state['inlet'][0], old_state['outlet'][0]
-                if req == old:
-                    todo.remove(key)
+            # Ignore GFAFAN
             else:
                 # Change state because it needs to be changed
                 ret = self.comm.pbset(key, value[0])
