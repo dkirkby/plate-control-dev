@@ -403,7 +403,7 @@ class PECS:
             # multiple petals. That said, this is probably such a rarely called function
             # that it's not critical to achieve that parallelism right now.
             role = self._pcid2role(pcid)
-            move_kwargs = {kwargs[key] for key in move_args[move] if key != 'ids'}
+            move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
             move_kwargs.update({'ids': these_posids, 'participating_petals': role})
             funcs[move](**move_kwargs)
         
