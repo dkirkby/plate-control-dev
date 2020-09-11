@@ -30,7 +30,9 @@ default_n_worst = 5
 parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=f'int, number of best performers to display in log messages for each measurement (default is {default_n_best})')
 parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
 park_options = [None, 'poslocTP', 'posintTP']
-parser.add_argument('-pp', '--prepark', type=str, default=park_options[0], help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {park_options[0]}')
+default_park = park_options[2]
+parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, if argued, then an final parking move will be performed after running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {default_park}')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
@@ -39,6 +41,7 @@ assert args.anticollision in {'adjust', 'freeze', None}, f'bad argument {args.an
 assert 1 <= args.num_meas <= max_fvc_iter, f'out of range argument {args.num_meas} for num_meas parameter'
 assert 0 <= args.num_corr <= max_corr, f'out of range argument {args.num_corr} for num_corr parameter'
 assert args.prepark in park_options, f'invalid park option, must be one of {park_options}'
+assert args.postpark in park_options, f'invalid park option, must be one of {park_options}'
 
 # read sequence file
 import sequence
@@ -404,12 +407,11 @@ if pecs_on:
     else:
         logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
                     f'new phi limits: {new_phi_limits}')
-
-# do the sequence
 last_pos_settings = None
 real_moves = pecs_on and not args.no_movement
 cycle_time = args.cycle_time if real_moves else 4.0
 last_move_time = 'no moves done yet'
+
 def do_pause():
     '''Convenience wrapper for pause_between_moves(), utilizing a global to
     track the timing.'''
@@ -420,23 +422,33 @@ def do_pause():
         last_move_time = pause_between_moves(last_move_time, cycle_time)
     if last_move_time == KeyboardInterrupt:
         raise StopIteration
+        
+def park(park_option, is_prepark=True):
+    '''Perform (or skip if appropriate) parking based on argued park_option.'''
+    global last_move_time
+    assert park_option in park_options
+    if not park_option:
+        return
+    posids = get_posids()
+    if pecs_on:
+        neighbors = get_parkable_neighbors(posids)
+    else:
+        neighbors = set()
+    extras = set(neighbors) - set(posids)
+    neighbor_text = '' if not extras else f' specified for this test, as well as {len(extras)} of their unspecificed neighbors: {sorted(extras)}'
+    logger.info(f'Performing {"initial" if is_prepark else "final"} parking move (coords={park_option}) on {len(posids)} positioners' + neighbor_text)
+    all_to_park = sorted(set(posids) | set(neighbors))
+    extra_note = pc.join_notes(sequence.sequence_note_prefix, seq.normalized_short_name)
+    if is_prepark:
+        last_move_time = time.time()
+    if real_moves:
+        pecs.park_and_measure(posids=all_to_park, mode='normal', coords=park_option, log_note=extra_note,
+                              match_radius=None, check_unmatched=False, test_tp=False)
+        
+# do the sequence
 try:
     if args.prepark:
-        posids = get_posids()
-        if pecs_on:
-            neighbors = get_parkable_neighbors(posids)
-        else:
-            neighbors = set()
-        extras = set(neighbors) - set(posids)
-        neighbor_text = '' if not extras else f' specified for this test, as well as {len(extras)} of their unspecificed neighbors: {sorted(extras)}'
-        logger.info(f'Performing initial parking move (coords={args.prepark}) on {len(posids)} positioners' + neighbor_text)
-        all_to_park = sorted(set(posids) | set(neighbors))
-        extra_note = pc.join_notes(sequence.sequence_note_prefix, seq.normalized_short_name)
-        last_move_time = time.time()
-        if real_moves:
-            pecs.park_and_measure(posids=all_to_park, mode='normal', coords=args.prepark, log_note=extra_note,
-                                  match_radius=None, check_unmatched=False, test_tp=False)
-        do_pause()
+        park(park_option=args.prepark, is_prepark=True)
     for m in range(len(seq)):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
@@ -521,6 +533,9 @@ try:
                     errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
                 err_str = summarize_errors(errs, move_num, submove_num)
                 logger.info(err_str)
+    if args.postpark:
+        do_pause()
+        park(park_option=args.postpark, is_prepark=False)
 except StopIteration:
     logger.info('Safely aborting the sequence.')
 logger.info(f'Sequence "{seq.short_name}" complete!')
