@@ -330,7 +330,7 @@ def summarize_errors(errs, move_num, submove_num, n_best=3, n_worst=3):
     posids = sorted(errs.keys())
     vec_errs = [math.hypot(errs[posid][0], errs[posid][1]) for posid in posids]
     vec_errs_um = [err*1000 for err in vec_errs]
-    err_str = f'move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors (um):\n '
+    err_str = f'Results for move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors given in um:\n '
     first = True
     for name, func in {'max': max, 'min': min, 'mean': np.mean,
                        'median': np.median, 'std': np.std,
@@ -372,7 +372,7 @@ def pause_between_moves(last_move_time, cycle_time):
     need_to_wait = cycle_time - sec_since_last_move
     if need_to_wait > 0:
         logger.info(f'Pausing {need_to_wait:.1f} sec for positioner cool down. ' +
-                    'It is safe to CTRL-C abort the test during this wait period.')
+                    'It is safe to CTRL-C abort the test during this wait period.\n')
         try:
             dt = 0.2  # sec
             for i in range(int(np.ceil(need_to_wait/dt))):
@@ -450,7 +450,7 @@ def park(park_option, is_prepark=True):
         neighbors = set()
     extras = set(neighbors) - set(posids)
     neighbor_text = '' if not extras else f' specified for this test, as well as {len(extras)} of their unspecificed neighbors: {sorted(extras)}'
-    logger.info(f'Performing {"initial" if is_prepark else "final"} parking move (coords={park_option}) on {len(posids)} positioners' + neighbor_text)
+    logger.info(f'Doing {"initial" if is_prepark else "final"} parking move (coords={park_option}) on {len(posids)} positioners' + neighbor_text)
     all_to_park = sorted(set(posids) | set(neighbors))
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
@@ -458,8 +458,12 @@ def park(park_option, is_prepark=True):
     if real_moves:
         pecs.park_and_measure(posids=all_to_park, mode='normal', coords=park_option, log_note=extra_note,
                               match_radius=None, check_unmatched=False, test_tp=False)
+    if any(seq) and is_prepark:
+        do_pause()
+    logger.info('Parking complete\n')
         
 # do the sequence
+logger.info('Beginning the move sequence\n')
 try:
     if args.prepark:
         park(park_option=args.prepark, is_prepark=True)
@@ -468,19 +472,18 @@ try:
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
         device_loc_unordered = set(get_map(key='loc', posids=posids))
         move_num = m + 1
-        move_num_text = f'move {move_num} of {len(seq)}'
+        move_num_text = f'target {move_num} of {len(seq)}'
         if not move.is_defined_for_locations(device_loc_unordered):
-            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.')
+            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
-        logger.info(f'Now doing {move_num_text} on {len(posids)} positioner(s).')
+        logger.info(f'Preparing {move_num_text} on {len(posids)} positioner(s).')
         descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
-        logger.info(f'Move settings are {descriptive_dict}')
+        logger.info(f'Move settings are {descriptive_dict}\n')
         correctable = move.command in sequence.general_commands and move.allow_corr
         n_corr = args.num_corr if correctable else 0
         errs = None
         calc_errors = True
         for submove_num in range(1 + n_corr):
-            do_pause()
             extra_log_note = f'move {move_num}'
             if n_corr > 0:
                 extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
@@ -513,7 +516,7 @@ try:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
             else:
-                logger.warning(f'Skipping move {move_num} submove {submove_num} due to unexpected command {move.command}')
+                logger.warning(f'Skipping move {move_num} submove {submove_num} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
@@ -522,6 +525,7 @@ try:
                 if pecs_on:
                     apply_pos_settings(all_settings)
                 last_pos_settings = new_settings
+            logger.info(f'Doing move {move_num}, submove {submove_num}')
             if real_moves:
                 results = move_measure_func(**kwargs)
                 
@@ -546,9 +550,11 @@ try:
                     dummy_err_y = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     errs = {posids[i]: [dummy_err_x[i], dummy_err_y[i]] for i in range(len(posids))}
                 err_str = summarize_errors(errs, move_num, submove_num)
-                logger.info(err_str)
+                logger.info(err_str + '\n')
+            more_moves_to_do = submove_num < n_corr or move_num < len(seq) or args.postpark
+            if more_moves_to_do:
+                do_pause()
     if args.postpark:
-        do_pause()
         park(park_option=args.postpark, is_prepark=False)
 except StopIteration:
     logger.info('Safely aborting the sequence.')
