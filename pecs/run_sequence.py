@@ -86,11 +86,11 @@ logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {args.infile}')
 logger.info(f'Contents:\n\n{seq}')
 
+import sys
 def quit_query(question):
     response = input(f'\n{question} (y/n) >> ')
     if 'n' in response.lower():
         logger.info('User rejected the sequence prior to running. Now quitting.')
-        import sys
         sys.exit(0)
 
 quit_query('Does the sequence look correct?')
@@ -126,6 +126,13 @@ except:
     temp = sorted(get_posids())
     all_loc2id = {i: temp[i] for i in range(len(temp))}
 all_id2loc = {val: key for key, val in all_loc2id.items()}
+initial_selected_posids = get_posids()
+if not any(initial_selected_posids):
+    logger.warning('No positioners were found matching selection(s) for this test.' +
+                   ' Suggested things to check: CTRL_ENABLED flags, posfid power,' +
+                   ' canbus status, petal ops_state. Now quitting.')
+    sys.exit(0)
+    
 logger.info(f'selected posids: {get_posids()}')
 
 _loc2id_cache = {}  # reduces overhead for function below
