@@ -515,7 +515,12 @@ try:
                 if submove_num == 0:
                     submove = move
                 else:
-                    posids = get_posids()   # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                    operable = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+                    posids = [p for p in operable if p in errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
+                    no_err_val = set(operable) - set(posids)
+                    if any(no_err_val):
+                        logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
+                                    f' missing error results. Excluded posids: {no_err_val}')
                     device_loc_map = get_map(key='ids', posids=posids)
                     # note below how order is preserved for target0, target1, and device_loc
                     # lists, on the assumption that get_posids() returns a list
