@@ -408,7 +408,7 @@ class PECS:
             funcs[move](**move_kwargs)
         
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
-        meas_kwargs = {kwargs[key] for key in meas_args}
+        meas_kwargs = {key:kwargs[key] for key in meas_args}
         meas_kwargs.update({'exppos': None, 'matched_only': True})
         result = self.fvc_measure(**meas_kwargs)
         self.ptlm.clear_exposure_info()
