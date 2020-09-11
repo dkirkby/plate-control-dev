@@ -111,6 +111,7 @@ try:
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
+    get_all_enabled_posids = lambda: list(pecs.get_enabled_posids('all'), include_posinfo=False)
     _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
     all_posinfo = all_posinfo.reset_index()
     temp = all_posinfo[['DEVICE_LOC','DEVICE_ID']].to_dict(orient='list')
@@ -382,12 +383,11 @@ def get_parkable_neighbors(posids):
     '''Return set of neighbors of posids which can be "parked".
     '''
     parkable_neighbors = set()
+    all_enabled = get_all_enabled_posids()
     for posid in posids:
         neighbors = ptlcall('get_positioner_neighbors', posid)
-        for neighbor in neighbors:
-            is_enabled = ptlcall('get_posfid_val', neighbor, 'CTRL_ENABLED')
-            if is_enabled:
-                parkable_neighbors.add(neighbor)
+        enabled_neighbors = set(neighbors) & set(all_enabled)
+        parkable_neighbors |= enabled_neighbors
     return parkable_neighbors
 
 # setup prior to running sequence
