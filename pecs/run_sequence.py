@@ -29,7 +29,7 @@ default_n_best = 5
 default_n_worst = 5
 parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=f'int, number of best performers to display in log messages for each measurement (default is {default_n_best})')
 parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
-park_options = ['posintTP', 'poslocTP', None, False]
+park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
 parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, if argued, then an final parking move will be performed after running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
@@ -42,6 +42,8 @@ assert 1 <= args.num_meas <= max_fvc_iter, f'out of range argument {args.num_mea
 assert 0 <= args.num_corr <= max_corr, f'out of range argument {args.num_corr} for num_corr parameter'
 assert args.prepark in park_options, f'invalid park option, must be one of {park_options}'
 assert args.postpark in park_options, f'invalid park option, must be one of {park_options}'
+args.prepark = None if args.prepark in ['None', 'False'] else args.prepark
+args.postpark = None if args.postpark in ['None', 'False'] else args.postpark
 
 # read sequence file
 import sequence
