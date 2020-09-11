@@ -443,7 +443,8 @@ if pecs_on:
                     f'new phi limits: {new_phi_limits}')
 last_pos_settings = None
 real_moves = pecs_on and not args.no_movement
-cycle_time = args.cycle_time if real_moves else 4.0
+cooldown_margin = 1.0  # seconds
+cycle_time = args.cycle_time + cooldown_margin if real_moves else 2.0
 last_move_time = 'no moves done yet'
 
 def do_pause():
