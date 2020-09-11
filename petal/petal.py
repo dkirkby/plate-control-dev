@@ -937,14 +937,25 @@ class Petal(object):
             if hasattr(self, 'ops_state_sv'):
                 self.ops_state_sv.write('READY')
             return 'OBSERVING' # bypass everything below if in petal sim mode - sim should always be observing
+        todo = list(self.PETAL_OPS_STATES[self._last_state].keys())
         for key, value in self.PETAL_OPS_STATES[self._last_state].items():
-            ret = self.comm.pbset(key, value[0])
-            if 'FAILED' in ret:
-                #fail message, should only happen if petalcontroller changes - code will raise error later on
-                self.printfunc('_set_hardware_state: WARNING: key %s returned %s from pbset.' % (key,ret))
+            old_state = self.comm.pbget(key)
+            if old_state == self.PETAL_OPS_STATES[self._last_state][key][0]:
+                # Don't change state if it's where we want it
+                todo.remove(key)
+            elif key == 'GFA_FAN': #GFA has different structure
+                req = self.PETAL_OPS_STATES[self._last_state][key][0]['inlet'][0], self.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
+                old = old_state['inlet'][0], old_state['outlet'][0]
+                if req == old:
+                    todo.remove(key)
+            else:
+                # Change state because it needs to be changed
+                ret = self.comm.pbset(key, value[0])
+                if 'FAILED' in ret:
+                    #fail message, should only happen if petalcontroller changes - code will raise error later on
+                    self.printfunc('_set_hardware_state: WARNING: key %s returned %s from pbset.' % (key,ret))
         # now check if all state changes are complete
         # wait for timeout, if still inconsistent raise exception
-        todo = list(self.PETAL_OPS_STATES[self._last_state].keys())
         failed = {}
         start = time.time()
         while len(todo) != 0:
