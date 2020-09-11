@@ -183,6 +183,10 @@ def ptlcall(funcname, posid, *args, **kwargs):
         kwargs = extra_kwargs
     function = getattr(pecs.ptlm, funcname)
     result = function(posid, *args, **kwargs)
+    if isinstance(result, dict) and len(result) == 1 and list(result.keys())[0] == role:
+        # 2020-09-10 [JHS] I don't know how to predict why / when this happens, but some
+        # calls through petalman return a single element dict that needs to be decomposed.
+        result = list(result.values())[0]
     return result
 
 def trans(posid, method, *args, **kwargs):
