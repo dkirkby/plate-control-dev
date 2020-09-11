@@ -452,7 +452,7 @@ def park(park_option, is_prepark=True):
     neighbor_text = '' if not extras else f' specified for this test, as well as {len(extras)} of their unspecificed neighbors: {sorted(extras)}'
     logger.info(f'Performing {"initial" if is_prepark else "final"} parking move (coords={park_option}) on {len(posids)} positioners' + neighbor_text)
     all_to_park = sorted(set(posids) | set(neighbors))
-    extra_note = pc.join_notes(sequence.sequence_note_prefix, seq.normalized_short_name)
+    extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
     if real_moves:
