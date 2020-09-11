@@ -31,8 +31,8 @@ parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=
 parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
 park_options = [None, 'poslocTP', 'posintTP']
 default_park = park_options[2]
-parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {default_park}')
-parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, if argued, then an final parking move will be performed after running the sequence. Parking will be done for all selected positioners and any of their neighbors (if enabled). Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, if argued, then an final parking move will be performed after running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
 
 args = parser.parse_args()
 if args.anticollision == 'None':
@@ -388,6 +388,14 @@ def get_parkable_neighbors(posids):
         neighbors = ptlcall('get_positioner_neighbors', posid)
         enabled_neighbors = set(neighbors) & set(all_enabled)
         parkable_neighbors |= enabled_neighbors
+    
+    # 2020-09-10 [JHS] Unfortunately, PECS seems not quite set up to move neighbors
+    # unless they were also in the selected set of commanded positioners at the
+    # beginning. So for now I am simply removing such neighbors --- rendering this
+    # function right now a functionally useless placeholder.
+    all_known_as_commandable_to_pecs = set(pecs.posids)
+    parkable_neighbors &= all_known_as_commandable_to_pecs
+    
     return parkable_neighbors
 
 # setup prior to running sequence
