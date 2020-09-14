@@ -86,8 +86,8 @@ class Petal(object):
                                                  'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                                  'PS2_EN':('off', 1.0)}),
                         'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                               'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
-                                               'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                               'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
+                                               'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
                                                'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
                                                'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
                                                #GFA CCD OFF
@@ -97,8 +97,8 @@ class Petal(object):
                                                'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
                                                'PS2_EN': ('off', 1.0)}),
                         'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                                   'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
-                                                   'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                                   'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
+                                                   'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
                                                    'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
                                                    'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
                                                    #GFA CCD ON
