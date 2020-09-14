@@ -5,7 +5,7 @@ import numpy as np
 import math
 from datetime import datetime, timedelta
 import pytz
-import collections
+from collections import OrderedDict
 import csv
 
 """Constants, environment variables, and convenience methods used in the
@@ -127,7 +127,7 @@ schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full 
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 
 # Nominal and tolerance calibration values
-nominals = collections.OrderedDict()
+nominals = OrderedDict()
 nominals['LENGTH_R1']        = {'value':   3.0, 'tol':    1.0}
 nominals['LENGTH_R2']        = {'value':   3.0, 'tol':    1.0}
 nominals['OFFSET_T']         = {'value':   0.0, 'tol':  200.0}
@@ -150,6 +150,53 @@ _ctrd_phi_theta_change_tol_mm = 0.1 # allowable max positioning error induced by
 _nom_max_r = nominals['LENGTH_R1']['value'] + nominals['LENGTH_R2']['value']
 phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
+
+# Hardware (operations) States
+PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                                 'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                                 'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
+                                                 'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
+                                                 'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                                 #GFA CCD OFF
+                                                 #GFA CCD Voltages EN OFF
+                                                 #TEC Control EN OFF - handeled by camera.py
+                                                 #PetalBox Power ON - controlled by physical raritan switch
+                                                 'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                                 'PS2_EN':('off', 1.0)}),
+                    'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                             'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
+                                             'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                             'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
+                                             'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                             #GFA CCD OFF
+                                             #GFA CCD Voltages EN OFF
+                                             #TEC Control EN OFF - handeled by camera.py
+                                             #PetalBox Power ON - controlled by physical raritan switch
+                                             'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                             'PS2_EN':('off', 1.0)}),
+                    'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                           'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
+                                           'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
+                                           'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
+                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                           #GFA CCD OFF
+                                           #GFA CCD Voltages EN OFF
+                                           #TEC Control EN ON - controlled by camera.py
+                                           #PetalBox Power ON - controlled by physical raritan switch
+                                           'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
+                                           'PS2_EN': ('off', 1.0)}),
+                    'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                               'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
+                                               'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
+                                               'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
+                                               'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                               #GFA CCD ON
+                                               #GFA CCD Voltages EN ON
+                                               #TEC Control EN ON - controlled by camera.py
+                                               #PetalBox Power ON - controlled by physical raritan switch
+                                               'PS1_EN':('on', 1.0), #Positioner Power EN ON
+                                               'PS2_EN':('on', 1.0)})}
+
 
 # Conservatively accessible angle ranges (intended to be valid for any basically
 # functional postioner, and for which a seed calibration is at least roughly known).
