@@ -498,7 +498,7 @@ try:
         if not move.is_defined_for_locations(device_loc_unordered):
             logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
-        logger.info(f'Preparing {move_num_text} on {len(posids)} positioner(s).')
+        logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
         descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
         logger.info(f'Move settings are {descriptive_dict}\n')
         correctable = move.command in sequence.general_commands and move.allow_corr
