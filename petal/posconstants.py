@@ -132,6 +132,52 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+# Hardware (operations) States
+PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                                 'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                                 'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
+                                                 'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
+                                                 'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                                 #GFA CCD OFF
+                                                 #GFA CCD Voltages EN OFF
+                                                 #TEC Control EN OFF - handeled by camera.py
+                                                 #PetalBox Power ON - controlled by physical raritan switch
+                                                 'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                                 'PS2_EN':('off', 1.0)}),
+                    'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                             'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
+                                             'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                             'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
+                                             'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                             #GFA CCD OFF
+                                             #GFA CCD Voltages EN OFF
+                                             #TEC Control EN OFF - handeled by camera.py
+                                             #PetalBox Power ON - controlled by physical raritan switch
+                                             'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                             'PS2_EN':('off', 1.0)}),
+                    'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                           'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                           'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                           'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
+                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                           #GFA CCD OFF
+                                           #GFA CCD Voltages EN OFF
+                                           #TEC Control EN ON - controlled by camera.py
+                                           #PetalBox Power ON - controlled by physical raritan switch
+                                           'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
+                                           'PS2_EN': ('off', 1.0)}),
+                    'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                               'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                               'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                               'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
+                                               'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                               #GFA CCD ON
+                                               #GFA CCD Voltages EN ON
+                                               #TEC Control EN ON - controlled by camera.py
+                                               #PetalBox Power ON - controlled by physical raritan switch
+                                               'PS1_EN':('on', 1.0), #Positioner Power EN ON
+                                               'PS2_EN':('on', 1.0)})}
+
 # keepout envelope expansion parameter keys
 keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_PHI_ANGULAR',
