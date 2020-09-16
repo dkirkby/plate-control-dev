@@ -323,7 +323,7 @@ def decipher_posflags(flags, sep=';', verbose=True):
             if flags_imported:
                 status_list = []
                 for key, val in POSITIONER_FLAGS_MASK:
-                    if flag & val != 0:
+                    if (flag & val) != 0:
                         if verbose:
                             status_list.append(POSITIONER_FLAGS_VERBOSE[key])
                         else:
