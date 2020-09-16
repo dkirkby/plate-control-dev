@@ -1046,6 +1046,14 @@ class Petal(object):
         accepted = state.store(key, value, register_if_altered=True)
         return accepted
     
+    def get_posids_with_commit_pending(self):
+        '''Returns set of all posids for which there is a commit to DB pending.
+        '''
+        states = self.altered_states | self.altered_calib_states
+        unit_ids = {state.unit_id for state in states}
+        posids = unit_ids & self.posids
+        return posids
+    
     def _add_to_altered_states(self, state):
         '''Wrapper function so that another module (posstate) can add itself
         to petal's cached set.'''
