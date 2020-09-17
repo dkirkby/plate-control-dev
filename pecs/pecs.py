@@ -163,7 +163,7 @@ class PECS:
                     posids0 = sorted(posinfo.index)
                 else:
                     posids0 = sorted(posinfo['DEVICE_ID'])
-                self.print(f'Found {len(posids0)} posids')
+                self.print(f'Found {len(posids0)} enabled posids matching specified device locations')
             else:
                 self.print('Defaulting to all enabled positioners')
         else:
