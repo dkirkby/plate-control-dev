@@ -109,7 +109,7 @@ def assert2(test, message):
 try:
     from pecs import PECS
     kwargs = {'interactive': True}
-    specified_locs = seq.device_locs
+    specified_locs = seq.get_device_locs()
     if any(specified_locs):
         kwargs['device_locs'] = specified_locs
     pecs = PECS(**kwargs)
@@ -124,7 +124,7 @@ try:
     all_loc2id = {temp['DEVICE_LOC'][i]: temp['DEVICE_ID'][i] for i in range(len(all_posinfo))}
 except:
     # still a useful case, for testing some portion of the script offline
-    logger.warning('PECS initialization failed')
+    logger.warning('PECS initialization failed (hint: double-check whether you need to join instance in this terminal')
     pecs_on = False
     _get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
     temp = sorted(_get_posids())
