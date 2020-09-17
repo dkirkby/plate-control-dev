@@ -160,6 +160,16 @@ class Sequence(object):
         table.meta = {k:v for k,v in vars(self).items() if k in meta}
         return table
     
+    def device_locs(self):
+        '''Returns set of all device location integers specified in the sequence.
+        '''
+        locs = set()
+        for move in self:
+            locs |= set(move.device_loc)
+        if 'any' in locs:
+            locs.remove('any')
+        return locs
+    
     def __str__(self):
         s = self._meta_str()
         s += '\n'

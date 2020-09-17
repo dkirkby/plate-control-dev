@@ -39,7 +39,7 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS'):
+                 test_name='PECS', device_locs=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -93,7 +93,7 @@ class PECS:
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
         if interactive or (self.pcids is None):
-            self.interactive_ptl_setup()  # choose which petal to operate
+            self.interactive_ptl_setup(device_locs)  # choose which petal to operate
         elif interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         #Setup exposure ID last incase aborted doing the above
@@ -140,7 +140,7 @@ class PECS:
             return self._parse_yn(
                 input(f'Invalid input: {yn_str}, must be y/n:'))
 
-    def ptl_setup(self, pcids, posids=None, illumination_check=False):
+    def ptl_setup(self, pcids, posids=None, illumination_check=False, device_locs=None):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
                    f'selected petals, PCIDs: {pcids}')
@@ -148,26 +148,38 @@ class PECS:
             for pcid in pcids:  # illumination check
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PC{pcid:02} must be illuminated.')
-        self.ptlm.participating_petals = [self._pcid2role(pcid)
-                                          for pcid in self.pcids]
+        self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
-            self.print(f'Defaulting to all {len(posids0)} enabled positioners')
+            if device_locs:
+                self.print(f'Looking for enabled positioners at {len(device_locs)} specific' +
+                           ' device locations on each petal')
+                drop_idxs = set()
+                for idx, row in posinfo.iterrows():
+                    if row['DEVICE_LOC'] in device_locs:
+                        drop_idxs.add(idx)
+                posinfo = posinfo.drop(drop_idxs, axis=0)
+                posids0 = sorted(posinfo['DEVICE_ID'])
+                self.print(f'Found {len(posids0)} posids')
+            else:
+                self.print('Defaulting to all enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
             posids0 = sorted(set(posids) & set(posinfo.index))  # double check
-            self.print(f'Validated {len(posids0)} of {len(posids)} '
-                       f'positioners specified')
+            self.print(f'Validated {len(posids0)} of {len(posids)} positioners specified')
         self.posids = posids0
         self.posinfo = posinfo
         self.ptl_roles = self.ptlm.participating_petals
 
-    def interactive_ptl_setup(self):
-        self.print(f'Running interactive setup for PECS')
+    def interactive_ptl_setup(self, device_locs=None):
+        self.print('Running interactive setup for PECS')
         pcids = self._interactively_get_pcid()  # set selected ptlid
-        posids = self._interactively_get_posids()  # set selected posids
-        self.ptl_setup(pcids, posids=posids)
+        if device_locs:
+            posids = None
+        else:
+            posids = self._interactively_get_posids()  # set selected posids
+        self.ptl_setup(pcids, posids=posids, device_locs=device_locs)
 
     def pcid_lookup(self, posid):
         if posid in self.posinfo.index:
@@ -180,8 +192,8 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = input(f'Please enter integer PCIDs seperated by spaces. '
-                      f'Leave blank to select petal specified in cfg: ')
+        pcids = input('Please enter integer PCIDs seperated by spaces. '
+                      'Leave blank to select petal specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
@@ -197,7 +209,7 @@ class PECS:
                           'spaces. Leave blank to select all positioners: ')
         enabled_only, kwarg = True, {}
         if user_text == '':
-            self.print(f'Defaulting to all enabled positioners...')
+            self.print('Defaulting to all enabled positioners...')
             posids = None
         else:
             selection = user_text.split()

@@ -108,7 +108,11 @@ def assert2(test, message):
 # set up PECS (online control system)
 try:
     from pecs import PECS
-    pecs = PECS(interactive=True)
+    kwargs = {'interactive': True}
+    specified_locs = seq.device_locs
+    if any(specified_locs):
+        kwargs['device_locs'] = specified_locs
+    pecs = PECS(**kwargs)
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
