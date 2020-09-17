@@ -156,10 +156,13 @@ class PECS:
                            ' device locations on each petal')
                 drop_idxs = set()
                 for idx, row in posinfo.iterrows():
-                    if row['DEVICE_LOC'] in device_locs:
+                    if row['DEVICE_LOC'] not in device_locs:
                         drop_idxs.add(idx)
                 posinfo = posinfo.drop(drop_idxs, axis=0)
-                posids0 = sorted(posinfo['DEVICE_ID'])
+                if posinfo.index.name == 'DEVICE_ID':
+                    posids0 = sorted(posinfo.index)
+                else:
+                    posids0 = sorted(posinfo['DEVICE_ID'])
                 self.print(f'Found {len(posids0)} posids')
             else:
                 self.print('Defaulting to all enabled positioners')
