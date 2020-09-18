@@ -15,18 +15,14 @@ positioner_param_sequences = {'cmds_unit_test':[90000],
                               'two real petals':[98002,98003],
                               'many real petals':[98002,98003,98004,98005,98006,
                                                   98007,98008,98009,98010,98011],
-                              'PTL03_03001':[3001],
+                              'PTL00_00001':[1],
+                              'PTL00_00002':[2], # has expanded keepouts
                               'PTL01_01001':[1001],
                               'PTL01_01002':[1002], # has expanded keepouts
+                              'PTL03_03001':[3001],
                               }
 
 move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
-                              0:[0],
-                              1:[0,1],
-                              2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                              3:[20,21,22,23,24],
-                              4:[20,21],
-                              5:[21],
                               'many':[i for i in range(100)],
                               '04000':[4000],
                               '04000-04001':[4000,4001],
@@ -44,6 +40,8 @@ move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
                               '01000':[1000],
                               '01000-01001':[i for i in range(1000,1002)],
                               '01000-01999':[i for i in range(1000,2000)],
+                              '00000-00001':[i for i in range(0,2)],
+                              '00000-00999':[i for i in range(0,1000)],
                              }
 
 stress_sequences_petal3_subset7a = {'03001_ntarg001_set000': [3229],

@@ -14,7 +14,7 @@ import sequences
 
 # input parameters
 num_sets_to_make = 1000
-petal_id = 1
+petal_id = 0
 posparams_id = int(f'{petal_id}001')
 posparams = sequences._read_data(data_id=posparams_id)
 posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
@@ -33,7 +33,7 @@ for posid,data in posparams.items():
     if posid in posids or posids == 'all':
         state = posstate.PosState(posid)
         for key in keys_to_copy:
-            state.store(key,data[key])  
+            state.store(key,data[key], register_if_altered=False)  
         model = posmodel.PosModel(state)
         posmodels[posid] = model
 collider.add_positioners(posmodels.values())
@@ -73,7 +73,9 @@ for i in range(num_sets_to_make):
                     attempts_remaining = max(attempts_remaining - 1, 0)
         if not attempts_remaining:
             v = model.state._val
-            print('Warning: no valid target found for posid: ' + posid + ' at location ' + str(v['DEVICE_LOC']) + ' (x,y) = (' + format(v['OFFSET_X'],'.3f') + ',' + format(v['OFFSET_Y'],'.3f') + ')')
+            print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
+                  f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f}). Target set {i} will not' +
+                  ' include an entry for this positioner.')
     all_targets.append(targets_posXY)
 
 # gather device locations and sort rows
