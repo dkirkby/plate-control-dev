@@ -15,16 +15,15 @@ make_sparse_csv = []
 # DEBUGGING / CODE SYNTAX seqs
 # -----------------------------
 
-debug_note = lambda seq: f'move sequence code test, {seq.normalized_short_name}'
 seq = sequence.Sequence(short_name='debug dTdP', long_name='test the code with single tiny move')
-move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq), allow_corr=False,
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note='', allow_corr=False,
                      pos_settings={'ANTIBACKLASH_ON': False})
 seq.append(move)
 seqs.append(seq)
 
 seq = sequence.Sequence(short_name='debug dTdP full current',
                         long_name='test the code with single tiny move and motor current set to 100')
-move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note=debug_note(seq), allow_corr=False,
+move = sequence.Move(command='dTdP', target0=0.01, target1=0.01, log_note='', allow_corr=False,
                      pos_settings={'ANTIBACKLASH_ON': False,
                                    'CURR_SPIN_UP_DOWN': 100,
                                    'CURR_CRUISE': 100,
@@ -36,7 +35,7 @@ x = 1.0
 y = 1.0
 seq = sequence.Sequence(short_name='debug poslocXY with corr',
                         long_name=f'single move to poslocXY = ({x}, {y}) and a followup correction move')
-move = sequence.Move(command='poslocXY', target0=x, target1=y, log_note=debug_note(seq), allow_corr=True)
+move = sequence.Move(command='poslocXY', target0=x, target1=y, log_note='', allow_corr=True)
 seq.append(move)
 seqs.append(seq)
 
@@ -44,7 +43,7 @@ t = 0.0
 p = 150.0
 seq = sequence.Sequence(short_name='debug posintTP with corr',
                         long_name=f'single move to posintTP = ({t}, {p}) and a followup correction move')
-move = sequence.Move(command='posintTP', target0=t, target1=p, log_note=debug_note(seq), allow_corr=True)
+move = sequence.Move(command='posintTP', target0=t, target1=p, log_note='', allow_corr=True)
 seq.append(move)
 seqs.append(seq)
 
@@ -70,7 +69,7 @@ for i in range(n_moves):
                          target0=targets[0],
                          target1=targets[1],
                          device_loc=locs,
-                         log_note=debug_note(seq),
+                         log_note='',
                          allow_corr=True,
                          )
     seq.append(move)
@@ -98,16 +97,15 @@ for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlim
 # BASIC HOMING SEQUENCES
 # ----------------------
 
-simple_note = lambda seq: f'move sequence: {seq.normalized_short_name}'
 seq = sequence.Sequence(short_name='home_and_debounce',
                         long_name='run a single rehome on both axes, followed by debounce moves')
-move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note=simple_note(seq), allow_corr=False)
+move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note='', allow_corr=False)
 seq.append(move)
 seqs.append(seq)
 
 seq = sequence.Sequence(short_name='home_no_debounce', 
                         long_name='run a single rehome on both axes, with no debounce moves')
-move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note=simple_note(seq), allow_corr=False)
+move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note='', allow_corr=False)
 seq.append(move)
 seqs.append(seq)
 
@@ -119,7 +117,7 @@ cmd = 'posintTP'
 settings = {'ALLOW_EXCEED_LIMITS': True}
 name_note = ', travel limits OFF'
 for axis in ['theta', 'phi']:
-    seq = sequence.Sequence(short_name=f'{axis} arc', long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}')
+    seq = sequence.Sequence(short_name=f'arc {axis}', long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}')
     if axis == 'theta':
         thetas = [-170+i*20 for i in range(18)]
         phi = 130
@@ -130,23 +128,21 @@ for axis in ['theta', 'phi']:
         targets = [[theta, phi] for phi in phis]
     for i in range(len(targets)):
         target = targets[i]
-        note = f'{simple_note(seq)}'
-        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
     
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
 for axis in ['theta', 'phi']:
-    seq = sequence.Sequence(short_name=f'{axis} short deltas', long_name=f'rotate {axis} small delta amounts, over a short distance{name_note}')
+    seq = sequence.Sequence(short_name=f'shortdeltas {axis}', long_name=f'rotate {axis} small delta amounts, over a short distance{name_note}')
     if axis == 'theta':
         targets = [[delta, 0] for delta in deltas]
     else:
         targets = [[0, delta] for delta in deltas]
     for i in range(len(targets)):
         target = targets[i]
-        note = f'{simple_note(seq)}'
-        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
 
@@ -162,7 +158,7 @@ clearance_vals = {'theta': [3.0, 4.0, 5.0, 6.0],
 test_step_away = {'theta': 30.0, 'phi': -30.0}
 num_test_steps = {'theta': 3, 'phi': 3}
 for axis in ['theta', 'phi']:
-    seq = sequence.Sequence(short_name=f'{axis} hardstop test',
+    seq = sequence.Sequence(short_name=f'hardstoptest {axis}',
                             long_name=f'seqs varying debounce distances, when coming off {axis} hard limit',
                             details=details)
     init_cmd = 'posintTP'
@@ -175,7 +171,7 @@ for axis in ['theta', 'phi']:
         clearance_val = clearance_vals[axis][i]
         clearance_key = f'PRINCIPLE_HARDSTOP_CLEARANCE_{"T" if axis=="theta" else "P"}'
         settings = {clearance_key: clearance_val}
-        note = f'{seq.short_name}, loop {i+1} of {n_loops}, {clearance_key}={clearance_val}'
+        note = f'loop {i+1} of {n_loops}, {clearance_key}={clearance_val}'
         move = sequence.Move(command='home_and_debounce',
                              target0=(axis=='theta'),
                              target1=(axis=='phi'),
@@ -216,16 +212,15 @@ def wiggle(forward, case=0):
     return deltas
     
 def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_deltas, settings):
-    seq = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
-                            long_name = prefix + ' ' + long_suffix,
+    seq = sequence.Sequence(short_name = f'motortest {prefix} {short_suffix}',
+                            long_name = f'{prefix} motor test, {long_suffix}',
                             details = details)
     i = 0 if prefix.lower()[0] == 't' else 1
     deltas = wiggle(forward_deltas, case=i)
     for j in range(len(deltas)):
         target = [0,0]
         target[i] = deltas[j]
-        note = 'motortest ' + str(seq.short_name)
-        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note=note, pos_settings=settings, allow_corr=False)
+        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note='', pos_settings=settings, allow_corr=False)
         seq.append(move)
     return seq
 
@@ -248,7 +243,7 @@ options = {'FINAL_CREEP_ON': False,
            'ANTIBACKLASH_ON': False,
            'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'] # smallest finite value
            }
-short_suffix = 'cruise only'
+short_suffix = 'cruiseonly'
 long_suffix = 'cruise-only, at otherwise nominal settings'
 forward_deltas = [1, 5, 15, 30]
 seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
@@ -264,7 +259,7 @@ options = {'FINAL_CREEP_ON': False,
            'CURR_SPIN_UP_DOWN': 0,
            'SPINUPDOWN_PERIOD': 1 # smallest finite value
           }
-short_suffix = 'cruise no spinupdown'
+short_suffix = 'cruise nospinupdown'
 long_suffix = 'cruise-only, with spinup/down power disabled'
 forward_deltas = [1, 5, 15, 30]
 seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
@@ -276,7 +271,7 @@ Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in creep mode.'''
 options = {'ONLY_CREEP': True,
            'FINAL_CREEP_ON': False}
-short_suffix = 'creep only'
+short_suffix = 'creeponly'
 long_suffix = 'creep-only, at otherwise nominal settings'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
 seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
@@ -289,7 +284,7 @@ Purpose: Determine whether creep performance can be improved under existing firm
 options = {'ONLY_CREEP': True,
            'CREEP_PERIOD': 1,
            'FINAL_CREEP_ON': False}
-short_suffix = 'fast creep'
+short_suffix = 'fastcreep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
 seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
@@ -299,6 +294,7 @@ seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, 
 # SAVE ALL TO DISK
 # ----------------
 paths = []
+sparse_paths = []
 for seq in seqs:
     path = seq.save()
     paths.append(path)
@@ -310,11 +306,14 @@ for seq in seqs:
             del table[col]
         sparse_path = os.path.splitext(path)[0] + '_sparse.csv'
         table.write(sparse_path, overwrite=True, delimiter=',')
-        paths.append(sparse_path)
+        sparse_paths.append(sparse_path)
+    paths.extend(sparse_paths)
     
 # READ FROM DISK AND PRINT TO STDOUT
 # ----------------------------------
 for path in paths:
+    if 'XYTEST' in path:
+        print(f'Now reading: {path}')  # debug breakpoint
     seq = sequence.Sequence.read(path)
     print(seq,'\n')
     if 'motortest' in seq[0].log_note:

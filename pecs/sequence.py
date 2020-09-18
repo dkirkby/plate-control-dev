@@ -129,8 +129,6 @@ class Sequence(object):
                 for key, val in kwargs.items():
                     if isinstance(val, list) and len(val) == 1:
                         kwargs[key] = val[0]
-            if not kwargs['log_note']:
-                kwargs['log_note'] = seq.normalized_short_name
             move = Move(**kwargs)
             seq.append(move)
         return seq
@@ -161,6 +159,16 @@ class Sequence(object):
         meta = set(vars(self)) - not_meta
         table.meta = {k:v for k,v in vars(self).items() if k in meta}
         return table
+    
+    def get_device_locs(self):
+        '''Returns set of all device location integers specified in the sequence.
+        '''
+        locs = set()
+        for move in self:
+            locs |= set(move.device_loc)
+        if 'any' in locs:
+            locs.remove('any')
+        return locs
     
     def __str__(self):
         s = self._meta_str()
@@ -239,9 +247,9 @@ class Sequence(object):
         self._validate_move(value)
         self.moves.append(value)
         
-    @staticmethod
-    def _validate_move(move):
+    def _validate_move(self, move):
         assert isinstance(move, Move), f'{move} must be an instance of Move class'
+        move.register_sequence_name_getter(lambda: self.normalized_short_name)
     
     def _validate_table(table):
         '''Validates an astropy table representing a sequence. Returns a new
@@ -339,13 +347,37 @@ class Move(object):
         allowed_posloc = possible_device_locs | {'any'}
         assert all([x in allowed_posloc for x in self.device_loc]), 'all elements of device_loc must be valid device locations'
         self.command = command
-        self.log_note = str(log_note)
+        self._log_note = str(log_note)
         self._pos_settings = self._validate_pos_settings(pos_settings)
         self.allow_corr = bool(allow_corr)
+        self._sequence_name_getter = None
     
     # properties of Move with single values vs multiple values
     single_keys = {'command', 'log_note', 'allow_corr'}
     multi_keys = {'target0', 'target1', 'device_loc'}
+    
+    def register_sequence_name_getter(self, function):
+        '''Register function that can get name of the sequence that contains this move.'''
+        self._sequence_name_getter = function
+    
+    @property
+    def log_note(self):
+        '''Log note string, including sequence name if available.'''
+        existing_parts = [part.strip() for part in self._log_note.split(';')]
+        new_parts = []
+        has_name_yet = False
+        for part in existing_parts:
+            is_name = sequence_note_prefix in part
+            not_a_name = sequence_note_prefix not in part
+            use_old_name = is_name and not has_name_yet and not self._sequence_name_getter
+            if not_a_name or use_old_name:
+                new_parts.append(part)
+            if use_old_name:
+                has_name_yet = True
+        if not has_name_yet and self._sequence_name_getter:
+            seq_name = str(sequence_note_prefix) + str(self._sequence_name_getter())
+            new_parts = [seq_name] + new_parts
+        return pc.join_notes(*new_parts)
     
     @staticmethod
     def _validate_pos_settings(settings):
@@ -455,8 +487,8 @@ class Move(object):
         else:
             posids = list(loc2id_map.values())
             target0 = self.target0[0]
-            target1 = self.target1[0] 
-        log_note = pc.join_notes(sequence_note_prefix + self.log_note, log_note)
+            target1 = self.target1[0]
+        log_note = pc.join_notes(self.log_note, log_note)
         request_data = {'DEVICE_ID': posids,
                         'COMMAND': self.command,
                         'X1': target0,

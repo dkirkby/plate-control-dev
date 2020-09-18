@@ -39,7 +39,7 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS'):
+                 test_name='PECS', device_locs=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -93,7 +93,7 @@ class PECS:
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
         if interactive or (self.pcids is None):
-            self.interactive_ptl_setup()  # choose which petal to operate
+            self.interactive_ptl_setup(device_locs)  # choose which petal to operate
         elif interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         #Setup exposure ID last incase aborted doing the above
@@ -140,7 +140,7 @@ class PECS:
             return self._parse_yn(
                 input(f'Invalid input: {yn_str}, must be y/n:'))
 
-    def ptl_setup(self, pcids, posids=None, illumination_check=False):
+    def ptl_setup(self, pcids, posids=None, illumination_check=False, device_locs=None):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
                    f'selected petals, PCIDs: {pcids}')
@@ -148,26 +148,41 @@ class PECS:
             for pcid in pcids:  # illumination check
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PC{pcid:02} must be illuminated.')
-        self.ptlm.participating_petals = [self._pcid2role(pcid)
-                                          for pcid in self.pcids]
+        self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
-            self.print(f'Defaulting to all {len(posids0)} enabled positioners')
+            if device_locs:
+                self.print(f'Looking for enabled positioners at {len(device_locs)} specific' +
+                           ' device locations on each petal')
+                drop_idxs = set()
+                for idx, row in posinfo.iterrows():
+                    if row['DEVICE_LOC'] not in device_locs:
+                        drop_idxs.add(idx)
+                posinfo = posinfo.drop(drop_idxs, axis=0)
+                if posinfo.index.name == 'DEVICE_ID':
+                    posids0 = sorted(posinfo.index)
+                else:
+                    posids0 = sorted(posinfo['DEVICE_ID'])
+                self.print(f'Found {len(posids0)} enabled posids matching specified device locations')
+            else:
+                self.print('Defaulting to all enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
             posids0 = sorted(set(posids) & set(posinfo.index))  # double check
-            self.print(f'Validated {len(posids0)} of {len(posids)} '
-                       f'positioners specified')
+            self.print(f'Validated {len(posids0)} of {len(posids)} positioners specified')
         self.posids = posids0
         self.posinfo = posinfo
         self.ptl_roles = self.ptlm.participating_petals
 
-    def interactive_ptl_setup(self):
-        self.print(f'Running interactive setup for PECS')
+    def interactive_ptl_setup(self, device_locs=None):
+        self.print('Running interactive setup for PECS')
         pcids = self._interactively_get_pcid()  # set selected ptlid
-        posids = self._interactively_get_posids()  # set selected posids
-        self.ptl_setup(pcids, posids=posids)
+        if device_locs:
+            posids = None
+        else:
+            posids = self._interactively_get_posids()  # set selected posids
+        self.ptl_setup(pcids, posids=posids, device_locs=device_locs)
 
     def pcid_lookup(self, posid):
         if posid in self.posinfo.index:
@@ -180,8 +195,8 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = input(f'Please enter integer PCIDs seperated by spaces. '
-                      f'Leave blank to select petal specified in cfg: ')
+        pcids = input('Please enter integer PCIDs seperated by spaces. '
+                      'Leave blank to select petal specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
@@ -197,7 +212,7 @@ class PECS:
                           'spaces. Leave blank to select all positioners: ')
         enabled_only, kwarg = True, {}
         if user_text == '':
-            self.print(f'Defaulting to all enabled positioners...')
+            self.print('Defaulting to all enabled positioners...')
             posids = None
         else:
             selection = user_text.split()
@@ -251,6 +266,8 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
+        # Change below when proper petalman implementation exists
+        centers = pd.concat(list(self.ptlm.get_centers(return_coord='QS').values())).reset_index(drop=True)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
@@ -261,7 +278,7 @@ class PECS:
                               expected_positions=exppos, seqid=seqid,
                               exptime=self.exptime, match_radius=match_radius,
                               matched_only=matched_only,
-                              all_fiducials=self.all_fiducials))
+                              all_fiducials=self.all_fiducials,centers=centers))
                           .rename(columns={'id': 'DEVICE_ID'})
                           .set_index('DEVICE_ID').sort_index())
             if np.any(['P' in device_id for device_id in this_meapos.index]):
@@ -354,7 +371,39 @@ class PECS:
         assert debounce in {True, False}
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
+        return self._rehome_or_park_and_measure(ids=posids, axis=axis, debounce=debounce,
+                                                log_note=log_note, match_radius=match_radius, 
+                                                check_unmatched=check_unmatched,
+                                                test_tp=test_tp, anticollision=anticollision)
+    
+    def park_and_measure(self, posids, mode='normal', coords='poslocTP', log_note='',
+                         match_radius=None, check_unmatched=False, test_tp=False):
+        '''Wrapper for sending park_positioners command and then measuring result.
+        Returns whatever fvc_measure returns.
+        '''
+        assert mode in {'normal', 'center'}
+        assert coords in {'posintTP', 'poslocTP'}
+        self.print(f'Parking positioners, mode={mode}, coords={coords}' +
+                   f', exposure={self.exp.id}, iteration={self.iteration}')
+        return self._rehome_or_park_and_measure(move='park', ids=posids, mode=mode,
+                                                coords=coords, log_note=log_note,
+                                                match_radius=match_radius, 
+                                                check_unmatched=check_unmatched,
+                                                test_tp=test_tp)
+        
+    def _rehome_or_park_and_measure(self, move='rehome', **kwargs):
+        '''Common operations for both "rehome_and_measure" and "park_and_measure".
+        '''
+        funcs = {'rehome': self.ptlm.rehome_pos,
+                 'park': self.ptlm.park_positioners}
+        move_args = {'rehome': {'ids', 'axis', 'anticollision', 'debounce', 'log_note'},
+                     'park': {'ids', 'mode', 'coords', 'log_note'}}
+        meas_args = {'match_radius', 'check_unmatched', 'test_tp'}
+        missing_args = (move_args[move] | meas_args) - set(kwargs)
+        assert move in funcs, f'unrecognized move type {move}'
+        assert not(any(missing_args)), f'missing args {missing_args}'
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
+        posids = kwargs['ids']
         enabled = self.get_enabled_posids(posids)
         posids_by_petal = {}
         for posid in enabled:
@@ -369,11 +418,14 @@ class PECS:
             # multiple petals. That said, this is probably such a rarely called function
             # that it's not critical to achieve that parallelism right now.
             role = self._pcid2role(pcid)
-            self.ptlm.rehome_pos(ids=these_posids, axis=axis, anticollision=anticollision,
-                                 debounce=debounce, log_note=log_note, participating_petals=role)
-        # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here 
-        result = self.fvc_measure(exppos=None, matched_only=True, match_radius=match_radius, 
-                                  check_unmatched=check_unmatched, test_tp=test_tp)
+            move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
+            move_kwargs.update({'ids': these_posids, 'participating_petals': role})
+            funcs[move](**move_kwargs)
+        
+        # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
+        meas_kwargs = {key:kwargs[key] for key in meas_args}
+        meas_kwargs.update({'exppos': None, 'matched_only': True})
+        result = self.fvc_measure(**meas_kwargs)
         self.ptlm.clear_exposure_info()
         return result
 
@@ -461,7 +513,8 @@ class PECS:
             except:
                 assert False, f'error, could not iterate arg posids={posids}'
         ret = self.ptlm.get_positioners(enabled_only=True, posids=selected_posids)
-        posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
+        posinfo = pd.concat(list(ret.values()))
+        posinfo = posinfo.set_index('DEVICE_ID')
         posids = sorted(posinfo.index)
         if include_posinfo:
             return posids, posinfo
@@ -522,6 +575,8 @@ class PECS:
         # meapos may contain not only matched but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
         merged = matched_df.merge(request, on='DEVICE_ID')
+        if not(merged.index.name == 'DEVICE_ID'):
+            merged = merged.set_index('DEVICE_ID')
         
         # columns get renamed
         merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
