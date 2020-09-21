@@ -433,7 +433,8 @@ def get_parkable_neighbors(posids):
 # setup prior to running sequence
 if pecs_on:
     # cache the pos settings
-    cache_path = cache_current_pos_settings(get_posids())
+    cache_posids = get_posids()
+    cache_path = cache_current_pos_settings(cache_posids)
     logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
     
     # set phi limit angle for the test
@@ -609,7 +610,7 @@ if pecs_on:
     # restore the original pos settings
     orig_settings = retrieve_cached_pos_settings(cache_path)
     logger.info(f'Retrieved original positioner settings from {cache_path}')
-    new_cache_path = cache_current_pos_settings(posids)
+    new_cache_path = cache_current_pos_settings(cache_posids)
     new_settings = retrieve_cached_pos_settings(new_cache_path)
     if orig_settings == new_settings:
         logger.info('No net change of positioner settings detected between start and finish' +
