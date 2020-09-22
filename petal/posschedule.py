@@ -440,7 +440,8 @@ class PosSchedule(object):
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
                         adjusted = stage.adjust_path(posid, freezing)
                         for p in adjusted:
-                            self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
+                            if stage.sweeps[p].is_frozen:
+                                self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                             if name != self.RRE_stage_order[-1]: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
