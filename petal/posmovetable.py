@@ -313,6 +313,7 @@ class PosMoveTable(object):
             for i in [pc.T,pc.P]:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                 err_dist[i] = ideal_total[i] - actual_total[i]
+                err_dist[i] = pc.sign(err_dist[i]) * min(abs(err_dist[i]), pc.max_auto_creep_distance)
                 move = self.posmodel.true_move(axisid=i,
                                                distance=err_dist[i],
                                                allow_cruise=False,
