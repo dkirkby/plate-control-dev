@@ -252,7 +252,7 @@ class PosScheduleStage(object):
                             if not self.move_tables[p].is_motionless: # does that table have any contents inside to be frozen?
                                 freeze_is_possible = True
                         if freeze_is_possible: 
-                            recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
+                            adjusted, recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
                             adjusted.update(recursed_newly_frozen) 
                             frozen.update(recursed_newly_frozen)
                         else:

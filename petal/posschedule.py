@@ -326,7 +326,6 @@ class PosSchedule(object):
         frozen = set()
         for stage in self.stages.values():
             frozen |= stage.get_frozen_posids()
-        frozen &= set(self.move_tables.keys()) # to double-check that we're not miscounting "empties" for example
         return frozen
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
@@ -387,10 +386,8 @@ class PosSchedule(object):
             adjustment_performed = False
             for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
-                    newly_frozen = stage.adjust_path(posid, freezing='forced_recursive')
+                    adjusted, frozen = stage.adjust_path(posid, freezing='forced_recursive')
                     adjustment_performed = True
-                    for p in newly_frozen:
-                        self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                     if self.verbose:
                         self.printfunc("remaining stage.colliding " + str(stage.colliding))
             if self.stats.is_enabled() and adjustment_performed:
