@@ -318,7 +318,17 @@ class PosSchedule(object):
         function, in the same order they were added.
         """
         return self._expert_added_tables_sequence
-    
+
+    def get_frozen_posids(self):
+        '''Returns set of any posids whose move tables are marked as frozen.
+        Intended to be called *after* doing schedule_moves().
+        '''
+        frozen = set()
+        for stage in self.stages.values():
+            frozen |= stage.get_frozen_posids()
+        frozen &= set(self.move_tables.keys()) # to double-check that we're not miscounting "empties" for example
+        return frozen
+
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
         stage. Any move requests are ignored.
@@ -434,15 +444,14 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
+            not_the_last_stage = name != self.RRE_stage_order[-1]
             while stage.colliding and attempts_sequence:
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        adjusted = stage.adjust_path(posid, freezing)
-                        for p in adjusted:
-                            if stage.sweeps[p].is_frozen:
-                                self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
-                            if name != self.RRE_stage_order[-1]: # i.e. some next stage exists
+                        adjusted, frozen = stage.adjust_path(posid, freezing)
+                        for p in frozen:
+                            if not_the_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
                                 adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]

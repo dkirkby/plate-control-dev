@@ -645,6 +645,11 @@ class Petal(object):
             response = self.comm.send_tables(hw_tables)
         failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries)
         if n_retries == 0 or not failed_posids:
+            frozen = self.schedule.get_frozen_posids()
+            for posid in frozen:
+                self.pos_flags[posid] |= self.frozen_anticol_bit # Mark as frozen by anticollision
+            if any(frozen):
+                self.printfunc(f'frozen: {frozen}')
             times = {tbl['total_time'] for tbl in hw_tables}
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc('send_move_tables: Done')

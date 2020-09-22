@@ -341,7 +341,7 @@ class PosSchedStats(object):
         If the argument footers=True, then a number of rows will be returned
         instead, which match up to the normal table. These special rows will
         give max, min, mean, rms, and median for each data column, collated by
-        anticollision  method (e.g. 'adjust' vs 'freeze'). That's no new
+        anticollision method (e.g. 'adjust' vs 'freeze'). That's no new
         information --- just a convenience when for example evaluating sims of
         hundreds of targets in a row.
         """
