@@ -476,7 +476,7 @@ class PosScheduleStage(object):
                 start = t.init_posintTP[0]
                 limits = posmodels[p].targetable_range_posintT
                 direction = 1 if p == posid else -1 # neighbor repels from primary
-                if 'cw' in method:
+                if 'ccw' not in method:
                     direction *= -1
                 if direction > 0:
                     furthest_existing_excursion = max(tables_data[p]['net_dT'] + [0]) # zero element prevents accidentally adding margin (if all net_dT < 0) that temporally might not exist when you hoped it would
