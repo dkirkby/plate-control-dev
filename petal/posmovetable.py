@@ -38,6 +38,8 @@ class PosMoveTable(object):
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
         self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
         self._orig_command = ''
+        self._warning_flag = 'WARNING'
+        self._error_flag = 'ERROR'
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -181,6 +183,22 @@ class PosMoveTable(object):
     def append_log_note(self, note):
         '''Appends a note to the current log_note.'''
         self._log_note = pc.join_notes(self._log_note, note)
+        
+    @property
+    def error_str(self):
+        '''Returns a string that is either empty or contains human-readable
+        error messages, suitable for printout at a console or in a log.'''
+        msg = ''
+        i = 0
+        for row in self.rows + self._rows_extra:
+            auto_cmd = row.data['auto_cmd']
+            is_err = self._warning_flag in auto_cmd or self._error_flag in auto_cmd
+            if is_err:
+                msg += f'\nRow {i}: {auto_cmd}'
+            i += 1
+        if msg:
+            msg = f'{self.posid} move table contains errors/warnings:' + msg
+        return msg
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -313,14 +331,20 @@ class PosMoveTable(object):
             for i in [pc.T,pc.P]:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                 err_dist[i] = ideal_total[i] - actual_total[i]
-                err_dist[i] = pc.sign(err_dist[i]) * min(abs(err_dist[i]), pc.max_auto_creep_distance)
+                if abs(err_dist[i]) > pc.max_auto_creep_distance:
+                    auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
+                                       f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
+                                        'which indicates likely upstream problem in the move schedule!'
+                    err_dist[i] = pc.sign(err_dist[i]) * pc.max_auto_creep_distance
+                else:
+                    auto_cmd_warning = ''
                 move = self.posmodel.true_move(axisid=i,
                                                distance=err_dist[i],
                                                allow_cruise=False,
                                                limits=extra_row_limits,
                                                init_posintTP=latest_TP)
                 new_moves[i].append(move)
-                new_moves[i][-1]['auto_cmd'] = '(auto final creep)'
+                new_moves[i][-1]['auto_cmd'] = f'(auto final creep{auto_cmd_warning})'
                 latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
         for i in range(len(new_moves[0])):

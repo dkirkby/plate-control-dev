@@ -1641,6 +1641,10 @@ class Petal(object):
         for m in self.schedule.move_tables.values():
             hw_tbl = m.for_hardware()
             hw_tables.append(hw_tbl)
+            err = m.error_str
+            if err:
+                self.printfunc(err)
+                m.display(self.printfunc)
         return hw_tables
 
     def _postmove_cleanup(self):
