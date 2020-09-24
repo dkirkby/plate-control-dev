@@ -315,7 +315,4 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.states[posid].store(key, value, register_if_altered=False)
         ptl.states[posid].write()
     loop += 1
-    
-# quick temporary test
-p = 'M02226'
-ptl.set_posfid_val(p, 'PRINCIPLE_HARDSTOP_CLEARANCE_T', 10)
+
