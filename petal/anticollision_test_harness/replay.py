@@ -19,7 +19,7 @@ parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the 
 parser.add_argument('-mf', '--final_move', type=int, default=None, help='end the simulation at this move index, defaults to final move in data')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
-parser.add_argument('-f2', '--second_order_focus', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
+parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
 parser.add_argument('-v', '--verbose', action='store_true', help='turn on additional verbosity at console, may be helpful for debugging')
 
 uargs = parser.parse_args()
@@ -143,7 +143,7 @@ def set_params(move_idx, ptl=None, include_posintTP=False):
              include_posintTP ... set POS_T, POS_P using values from CSV data file
     '''
     posids = ptl.posids if ptl else all_posids
-    keys = set(param_keys)
+    keys = set(param_keys) | {'DEVICE_LOC'}
     if include_posintTP:
         keys |= {'POS_T', 'POS_P'}
     for posid in posids:
@@ -152,7 +152,6 @@ def set_params(move_idx, ptl=None, include_posintTP=False):
         else:
             state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         row = get_row(move_idx, posid)
-
         for key in keys:
             state.store(key, row[key], register_if_altered=False)
         state.write()
@@ -196,12 +195,14 @@ if uargs.animate:
             focus_posid = ptl.devices[focus_loc]
         except:
             focus_posid = uargs.focus
+            focus_loc = ptl.posmodels[focus_posid].deviceloc
         assert focus_posid in all_posids, f'cannot focus video on missing posid {focus_posid}'
-        neighbors = pc.generic_pos_neighbor_locs[focus_posid]
-        if uargs.second_order_focus:  # include neighbors of neighbors
-            for n in neighbors.copy():
-                neighbors |= pc.generic_pos_neighbor_locs[n]
-        all_foci = set(focus_posid) | neighbors
+        neighbor_locs = pc.generic_pos_neighbor_locs[focus_loc]
+        if uargs.focus_expand:  # include neighbors of neighbors
+            for n in neighbor_locs.copy():
+                neighbor_locs |= pc.generic_pos_neighbor_locs[n]
+        neighbor_posids = {ptl.devices[loc] for loc in neighbor_locs if loc in ptl.devices}
+        all_foci = set([focus_posid]) | neighbor_posids
         ptl.collider.posids_to_animate = all_foci
         ptl.collider.fixed_items_to_animate = set()
     ptl.start_gathering_frames()
