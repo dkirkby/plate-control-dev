@@ -514,7 +514,7 @@ try:
         logger.info(f'Move settings are {descriptive_dict}\n')
         correctable = move.command in sequence.general_commands and move.allow_corr
         n_corr = uargs.num_corr if correctable else 0
-        errs = None
+        targ_errs = None
         calc_errors = True
         for submove_num in range(1 + n_corr):
             extra_log_note = f'move {move_num}'
@@ -527,7 +527,7 @@ try:
                     submove = move
                 else:
                     operable = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-                    posids = [p for p in operable if p in errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
+                    posids = [p for p in operable if p in targ_errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
                     no_err_val = set(operable) - set(posids)
                     if any(no_err_val):
                         logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
@@ -536,8 +536,8 @@ try:
                     # note below how order is preserved for target0, target1, and device_loc
                     # lists, on the assumption that get_posids() returns a list
                     submove = sequence.Move(command='poslocdXdY',
-                                            target0=[-errs[posid][0] for posid in posids],
-                                            target1=[-errs[posid][1] for posid in posids],
+                                            target0=[-targ_errs[posid][0] for posid in posids],
+                                            target1=[-targ_errs[posid][1] for posid in posids],
                                             device_loc=[device_loc_map[posid] for posid in posids],
                                             log_note=move.log_note,
                                             pos_settings=move.pos_settings,
