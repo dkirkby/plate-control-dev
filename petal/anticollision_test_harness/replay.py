@@ -144,16 +144,23 @@ def set_params(move_idx, ptl=None, include_posintTP=False):
     '''
     posids = ptl.posids if ptl else all_posids
     keys = set(param_keys) | {'DEVICE_LOC'}
-    if include_posintTP:
-        keys |= {'POS_T', 'POS_P'}
     for posid in posids:
         if ptl:
             state = ptl.states[posid]
         else:
             state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         row = get_row(move_idx, posid)
-        for key in keys:
-            state.store(key, row[key], register_if_altered=False)
+        row_dict = {key: row[key] for key in keys}
+        if include_posintTP and move_idx > 0:
+            position_row = get_row(move_idx - 1, posid)
+            row_dict['POS_T'] = position_row['POS_T']
+            row_dict['POS_P'] = position_row['POS_P']
+        else:
+            # common pre-parking value in many sequences
+            row_dict['POS_T'] = 0 
+            row_dict['POS_P'] = 150
+        for key, value in row_dict.items():
+            state.store(key, value, register_if_altered=False)
         state.write()
         
 def make_request(move_cmd_str):
@@ -167,7 +174,7 @@ def make_request(move_cmd_str):
     return request
 
 # initialize petal
-set_params(0, ptl=None, include_posintTP=True)
+set_params(move_idxs_to_run[0], ptl=None, include_posintTP=True)
 ptl = petal.Petal(petal_id        = petal_id,
                   petal_loc       = 3,
                   posids          = all_posids,
@@ -223,6 +230,7 @@ for m in move_idxs_to_run:
             requests[posid] = make_request(row['MOVE_CMD'])
     ptl.request_targets(requests)
     ptl.schedule_moves()
+    ptl.schedule.move_tables['M06357'].display()
     failed_posids = ptl.send_and_execute_moves()
     if uargs.verbose:
         tab = '   '
