@@ -37,6 +37,7 @@ petal/anticollision_test_harness/harness.py -text
 petal/anticollision_test_harness/harness_constants.py -text
 petal/anticollision_test_harness/multiharness.py -text
 petal/anticollision_test_harness/read_nominal_pos_locations.py -text
+petal/anticollision_test_harness/replay.py -text
 petal/anticollision_test_harness/select_anticol_test_group.py -text
 petal/anticollision_test_harness/sequences.py -text
 petal/anticollision_test_harness/stress_test_selector.py -text
