@@ -179,7 +179,7 @@ ptl = petal.Petal(petal_id        = petal_id,
                   collider_file   = None,
                   sched_stats_on  = True,
                   anticollision   = uargs.anticollision,
-                  verbose         = uargs.verbose,
+                  verbose         = False,  # typically distinct from uargs.verbose
                   phi_limit_on    = uargs.enable_phi_limit,
                   )
 
