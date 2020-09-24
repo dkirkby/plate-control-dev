@@ -224,18 +224,21 @@ for m in move_idxs_to_run:
     ptl.request_targets(requests)
     ptl.schedule_send_and_execute_moves()    
     if uargs.verbose:
+        tab = '   '
+        print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
         coords = {'posintTP': ['POS_T', 'POS_P'], 'ptlXY': ['PTL_X', 'PTL_Y']}
-        tab = '  '
         for posid in set(requests):
-            s = f'{posid:<7s} ... {"SIMULATED":<20}{tab}{"FROM_FILE":<20}'
             expected = ptl.posmodels[posid].expected_current_position
+            posid_str = f'{posid:7}'
             for ptl_coord, data_coord in coords.items():
                 exp = expected[ptl_coord]
                 dat = list(get_row(m, posid)[data_coord])
+                err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
                 exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
-                dat_str = f'({dat[0]:8.3f}, {dat:8.3f})'
-                s += f'\n{ptl_coord:>12s}{exp_str:<20}{tab}{dat_str:<20}'
-            print(s)   
+                dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
+                print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
+                if posid_str:
+                    posid_str = ' ' * len(posid_str)
 if ptl.schedule_stats.is_enabled():
     ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
     print(f'Stats saved to {ptl.sched_stats_path}')
