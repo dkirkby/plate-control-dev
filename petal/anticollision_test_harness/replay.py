@@ -222,7 +222,8 @@ for m in move_idxs_to_run:
             posid = row['POS_ID']
             requests[posid] = make_request(row['MOVE_CMD'])
     ptl.request_targets(requests)
-    ptl.schedule_send_and_execute_moves()    
+    ptl.schedule_moves()
+    failed_posids = ptl.send_and_execute_moves()
     if uargs.verbose:
         tab = '   '
         print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
