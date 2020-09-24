@@ -32,9 +32,7 @@ import sys
 sys.path.append(os.path.abspath('../../petal/'))
 import petal
 import posconstants as pc
-import harness_constants as hc
 import posstate
-import random
 from astropy.table import Table, vstack
 import numpy as np
 
