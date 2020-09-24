@@ -230,7 +230,6 @@ for m in move_idxs_to_run:
             requests[posid] = make_request(row['MOVE_CMD'])
     ptl.request_targets(requests)
     ptl.schedule_moves()
-    ptl.schedule.move_tables['M06357'].display()
     failed_posids = ptl.send_and_execute_moves()
     if uargs.verbose:
         tab = '   '
