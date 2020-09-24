@@ -66,12 +66,13 @@ class PosMoveTable(object):
         return str(self.as_dict())
         
     def display(self, printfunc=print, show_posid=True):
+        import numpy as np
         def fmt(x):
             if x == None:
                 x = str(x)
-            if type(x) == str:
+            if isinstance(x, (str, np.str)):
                 return format(x,'>11s')
-            elif type(x) == int or type(x) == float:
+            elif isinstance(x, (int, float, np.integer, np.floating)):
                 return format(x,'>11g')
         tab = '  '
         output = f'{tab}move table for: {self.posid}\n' if show_posid else ''
