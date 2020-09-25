@@ -8,7 +8,7 @@ import pytz
 from collections import OrderedDict
 import csv
 try:
-    from DOSlib.flags import POSITIONER_FLAGS_BITS, POSITIONER_FLAGS_MASK, POSITIONER_FLAGS_VERBOSE
+    from DOSlib.flags import POSITIONER_FLAGS_BITS, POSITIONER_FLAGS_MASKS, POSITIONER_FLAGS_VERBOSE
     flags_imported = True
 except:
     POSITIONER_FLAGS_BITS = {}
@@ -325,7 +325,7 @@ def decipher_posflags(flags, sep=';', verbose=True):
     def decipher_flag(flag, sep, verbose):
             if flags_imported:
                 status_list = []
-                for key, val in POSITIONER_FLAGS_MASK:
+                for key, val in POSITIONER_FLAGS_MASKS.items():
                     if (flag & val) != 0:
                         if verbose:
                             status_list.append(POSITIONER_FLAGS_VERBOSE[key])
