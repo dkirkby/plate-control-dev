@@ -532,3 +532,12 @@ def ordinal_str(number):
     if last_digit == '3':
         return numstr + 'rd'
     return numstr + 'th'
+
+def is_integer(x):
+    return isinstance(x, (int, np.integer))
+
+def is_float(x):
+    return isinstance(x, (float, np.floating))
+
+def is_string(x):
+    return isinstance(x, (str, np.str))
