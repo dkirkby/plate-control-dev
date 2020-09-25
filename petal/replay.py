@@ -28,8 +28,6 @@ if uargs.anticollision == 'None':
 assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 
 import glob
-import sys
-sys.path.append(os.path.abspath('../../petal/'))
 import petal
 import posconstants as pc
 import posstate
