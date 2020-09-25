@@ -4,8 +4,16 @@ import numpy as np
 import math
 from datetime import datetime, timedelta
 import pytz
-import collections
+from collections import OrderedDict
 import csv
+try:
+    from DOSlib.flags import POSITIONER_FLAGS_BITS, POSITIONER_FLAGS_MASKS, POSITIONER_FLAGS_VERBOSE
+    flags_imported = True
+except:
+    POSITIONER_FLAGS_BITS = {}
+    POSITIONER_FLAGS_MASK = {}
+    POSITIONER_FLAGS_VERSOSE = {}
+    flags_imported = False
 
 """Constants and convenience methods used in the control of Fiber Postioners
 """
@@ -120,7 +128,7 @@ schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full 
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 
 # Nominal and tolerance calibration values
-nominals = collections.OrderedDict()
+nominals = OrderedDict()
 nominals['LENGTH_R1']        = {'value':   3.0, 'tol':    1.0}
 nominals['LENGTH_R2']        = {'value':   3.0, 'tol':    1.0}
 nominals['OFFSET_T']         = {'value':   0.0, 'tol':  200.0}
@@ -194,38 +202,27 @@ def is_calib_key(key):
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 
-def decipher_posflags(flags):
+def decipher_posflags(flags, sep=';', verbose=True):
     '''translates posflag to readable reasons, bits taken from petal.py
     simple problem of locating the leftmost set bit, always 0b100 on the
     right input flags. presence of non-positioner bits from FVC/PM is OK
     input flags must be an array-like or list-like object'''
-    pos_bit_dict = {0:  'Matched',
-                    2:  'Normal positioner',
-                    16: 'Control disabled',
-                    17: 'Fibre nonintact',
-                    18: 'CAN communication error',
-                    19: 'Overlapping targets',
-                    20: 'Frozen by anticollision',
-                    21: 'Unreachable by positioner',
-                    22: 'Out of petal boundaries',
-                    23: 'Multiple requests',
-                    24: 'Device nonfunctional',
-                    25: 'Move table rejected',
-                    26: 'Exceeded patrol limits'}
 
-    def decipher_flag(flag):
-        bit = np.floor(np.log2(flag)).astype(int)
-        if bit in pos_bit_dict:
-            return pos_bit_dict[bit]
-        elif bit < 26:  # not a positioner bit, but probably valid from FVC/PM
-            flag_cleared = flag & ~(1 << bit)  # namely, flag - (1<<bit)
-            return decipher_flag(flag_cleared)
-        else:
-            return (f'Invalid input flag {flags} with leftmost '
-                    f'set bit at {bit} further than 26')
-
+    def decipher_flag(flag, sep, verbose):
+            if flags_imported:
+                status_list = []
+                for key, val in POSITIONER_FLAGS_MASKS.items():
+                    if (flag & val) != 0:
+                        if verbose:
+                            status_list.append(POSITIONER_FLAGS_VERBOSE[key])
+                        else:
+                            status_list.append(key)
+                return sep.join(status_list)
+            else:
+                return 'Flags not imported'
     flags = np.array(flags).reshape(-1,).astype(int)  # 1d to enable indexing
-    return [decipher_flag(flag) for flag in flags]
+
+    return [decipher_flag(flag, sep, verbose) for flag in flags]
 
 
 class collision_case(object):
