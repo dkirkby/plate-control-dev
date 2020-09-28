@@ -266,8 +266,7 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        # Change below when proper petalman implementation exists
-        centers = pd.concat(list(self.ptlm.get_centers(return_coord='QS').values())).reset_index(drop=True)
+        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
