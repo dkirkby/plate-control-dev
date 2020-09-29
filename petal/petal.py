@@ -55,7 +55,8 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
-        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius of acceptable positioner move requests
+        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -67,7 +68,7 @@ class Petal(object):
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True):
+                 phi_limit_on=True, sync_mode='hard'):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -113,6 +114,9 @@ class Petal(object):
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
+        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        assert sync_mode.lower() in ['hard','soft'], f'Invalid sync mode: {sync_mode}'
+        self.sync_mode = sync_mode
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0} 
@@ -264,9 +268,6 @@ class Petal(object):
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
         self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
-        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
-        # positioners
-        self.sync_mode = 'soft'
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
 
