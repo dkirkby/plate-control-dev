@@ -294,7 +294,7 @@ class PosAnimator(object):
     def grab_frame(self, frame_number):
         """Saves current figure to an image file. Returns next frame number."""
         path = os.path.join(self.frame_dir, self.framefile_prefix + str(frame_number).zfill(self.n_framefile_digits) + self.framefile_extension)
-        plt.savefig(path)
+        plt.savefig(path, bbox_inches='tight')
         return frame_number + 1, path
 
     @staticmethod
