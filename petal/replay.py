@@ -17,8 +17,8 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
                          'that contains the files.')
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
-parser.add_argument('-ms', '--start_move', type=int, default=-sys.maxsize, help='start the simulation at this POS_MOVE_INDEX, default is the first one in data')
-parser.add_argument('-mf', '--final_move', type=int, default=sys.maxsize, help='end the simulation at this POS_MOVE_INDEX, default is the final move in data')
+parser.add_argument('-ms', '--start_move', type=str, default='0.0', help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
+parser.add_argument('-mf', '--final_move', type=str, default='0.0', help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
@@ -68,9 +68,9 @@ required.update(param_keys)
 mask_fills = {}
 for key, func in required.items():
     if func == float:
-        mask_fills[key] = float('inf')
+        mask_fills[key] = 0.0
     elif func == int:
-        mask_fills[key] = sys.maxsize
+        mask_fills[key] = 0
     elif func == boolean:
         mask_fills[key] = False
     elif func == str:
@@ -101,7 +101,7 @@ for path in infiles:
         new[key] = vec
     input_tables.append(Table(new))
 t = vstack(input_tables)
-t.sort(keys=['POS_ID', 'POS_MOVE_INDEX']) # this order is important!
+t.sort(keys=['POS_ID', 'DATE'])
 
 # confirm only one petal
 petal_ids = set(t['PETAL_ID'])
@@ -129,27 +129,54 @@ for posid in moving:
 all_posids = moving | nonmoving_neighbors
 
 # identify / define which rows should be run in simulation
-first_move_found = t['POS_MOVE_INDEX'][has_cmd][0]
-last_move_found = t['POS_MOVE_INDEX'][has_cmd][-1]
+t['MOVE_ID'] = [f'{t["EXPOSURE_ID"][i]}.{t["EXPOSURE_ITER"][i]}' for i in range(len(t))]
+has_cmd_idxs = np.where(t['HAS_MOVE_CMD'])[0].tolist()
+first_move_found = t[has_cmd_idxs[0]]['MOVE_ID']
+last_move_found = t[has_cmd_idxs[-1]]['MOVE_ID']
+for user_arg in [uargs.start_move, uargs.final_move]:
+    try:
+        split = user_arg.split('.')
+        assert len(split) == 2
+        int(split[0])
+        int(split[1])
+    except:
+        assert False, f'invalid move id argument {user_arg}'
 start_move = max(uargs.start_move, first_move_found)
 final_move = min(uargs.final_move, last_move_found)
 assert start_move <= final_move, f'final move index {final_move} must be >= than start {start_move}'
-t['SHOULD_RUN'] = np.logical_and(t['POS_MOVE_INDEX'] >= start_move,
-                                 t['POS_MOVE_INDEX'] <= final_move,
+t['SHOULD_RUN'] = np.logical_and(t['MOVE_ID'] >= start_move,
+                                 t['MOVE_ID'] <= final_move,
                                  t['HAS_MOVE_CMD'])
 
+# 2020-09-29 [JHS] TO-DO
+# # apply any tp_update rows
+# t['HAS_TP_UPDATE'] = ['tp_update' in s for s in t['LOG_NOTE']]
+# for posid in all_posids:
+#     updates = np.logical_and(t['HAS_TP_UPDATE'], t['POS_ID']==posid)
+#     update_idxs = np.where(updates)[0].tolist()
+#     if any(update_idxs):
+#         print(update_idxs)
 
 # helper functions
-def get_row(move_idx, posid):
-    '''Get matching row in table for a given move index and posid.'''
-    row_match = np.logical_and(t['POS_ID'] == posid, t['MOVE_IDX'] == move_idx)
-    rows = t[row_match]
-    assert len(rows) == 1, f'unexpected match of {len(row)} > 1 rows'
-    return rows[0]
-
-def set_params(move_idx, ptl=None, include_posintTP=False):
+def get_row(posid, move_id=None, date=None, prior=False):
+    '''Get matching row in table for a given posid and either move_id or date.
+    Argue prior=True to get the last row just before the match.
+    '''
+    assert (move_id and not date) or (date and not move_id), 'must only argue either move_id or date'
+    match_field = 'MOVE_ID' if move_id else 'DATE'
+    match_value = move_id if move_id else date
+    if prior:
+        matches = t[match_field] < match_value
+    else:
+        matches = t[match_field] == match_value
+    matches = np.logical_and(t['POS_ID'] == posid, matches)
+    match_idxs = np.where(matches)[0].tolist()
+    row = t[match_idxs[-1]]
+    return row
+        
+def set_params(move_id, ptl=None, include_posintTP=False):
     '''Set state parameters for all positioners at a given move index.
-    INPUTS:  move_idx ... in the general astropy table "t"
+    INPUTS:  move_id ... in the general astropy table "t"
              ptl ... Petal instance
              include_posintTP ... set POS_T, POS_P using values from CSV data file
     '''
@@ -160,10 +187,10 @@ def set_params(move_idx, ptl=None, include_posintTP=False):
             state = ptl.states[posid]
         else:
             state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
-        row = get_row(move_idx, posid)
+        row = get_row(posid, move_id=move_id)
         row_dict = {key: row[key] for key in keys}
-        if include_posintTP and move_idx > 0:
-            position_row = get_row(move_idx - 1, posid)
+        if include_posintTP:
+            position_row = get_row(posid, move_id=move_id, prior=True)
             row_dict['POS_T'] = position_row['POS_T']
             row_dict['POS_P'] = position_row['POS_P']
         else:
@@ -185,7 +212,9 @@ def make_request(move_cmd_str):
     return request
 
 # initialize petal
-set_params(move_idxs_to_run[0], ptl=None, include_posintTP=True)
+move_idxs = np.where(t['SHOULD_RUN'])[0]
+first_move_id = t['MOVE_ID'][move_idxs[0]]
+set_params(first_move_id, ptl=None, include_posintTP=True)
 ptl = petal.Petal(petal_id        = petal_id,
                   petal_loc       = 3,
                   posids          = all_posids,
@@ -225,62 +254,43 @@ if uargs.animate:
         ptl.collider.fixed_items_to_animate = set()
     ptl.start_gathering_frames()
 
-# apply any tp_update rows
-t['HAS_TP_UPDATE'] = ['tp_update' in s for s in t['LOG_NOTE']]
-for posid in all_posids:
-    updates = np.logical_and(t['HAS_TP_UPDATE'], t['POS_ID']==posid)
-    update_idxs = np.where(updates)[0].tolist()
-    if any(update_idxs):
-        print(update_idxs)
-        
-
-    
-    
-
 # run the sequence
-first_move = True
-expids = sorted(set(t['EXPOSURE_ID']))
-for expid in expids:
-    expiters = sorted(set(t['EXPOSURE_ITER']))
-    for expiter in expiters:
-        run_now = np.logical_and(t['SHOULD_RUN'],
-                                 t['EXPOSURE_ID'] == expid,
-                                 t['EXPOSURE_ITER'] == expiter)
-        run_now_idxs = np.where(run_now)[0].tolist()
-        if not any(run_now_idxs):
-            continue
-        force_tp = first_move or uargs.tp_update
-        first_move = False
-        rows = t[run_now]
-        set_params(m, ptl=ptl, include_posintTP=force_tp)
-        move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_IDX', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
-        print('\n\n', move_id_str, '\n')
-        if ptl.schedule_stats.is_enabled():
-            ptl.schedule_stats.add_note(move_id_str)
-        requests = {}
-        for row in rows:
-            if row['HAS_MOVE_CMD']:
-                posid = row['POS_ID']
-                requests[posid] = make_request(row['MOVE_CMD'])
-        ptl.request_targets(requests)
-        ptl.schedule_moves()
-        failed_posids = ptl.send_and_execute_moves()
-        if uargs.verbose:
-            tab = '   '
-            print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
-            coords = {'posintTP': ['POS_T', 'POS_P'], 'ptlXY': ['PTL_X', 'PTL_Y']}
-            for posid in set(requests):
-                expected = ptl.posmodels[posid].expected_current_position
-                posid_str = f'{posid:7}'
-                for ptl_coord, data_coord in coords.items():
-                    exp = expected[ptl_coord]
-                    dat = list(get_row(m, posid)[data_coord])
-                    err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
-                    exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
-                    dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
-                    print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
-                    if posid_str:
-                        posid_str = ' ' * len(posid_str)
+for move_id in t['MOVE_ID']:
+    run_now = np.logical_and(t['SHOULD_RUN'], move_id == t['EXPOSURE_ID'])
+    run_now_idxs = np.where(run_now)[0].tolist()
+    if not any(run_now_idxs):
+        continue
+    force_tp = move_id == first_move_id or uargs.tp_update
+    rows = t[run_now]
+    set_params(move_id, ptl=ptl, include_posintTP=force_tp)
+    move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_ID', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
+    print('\n\n', move_id_str, '\n')
+    if ptl.schedule_stats.is_enabled():
+        ptl.schedule_stats.add_note(move_id_str)
+    requests = {}
+    for row in rows:
+        if row['HAS_MOVE_CMD']:
+            posid = row['POS_ID']
+            requests[posid] = make_request(row['MOVE_CMD'])
+    ptl.request_targets(requests)
+    ptl.schedule_moves()
+    failed_posids = ptl.send_and_execute_moves()
+    if uargs.verbose:
+        tab = '   '
+        print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
+        coords = {'posintTP': ['POS_T', 'POS_P'], 'ptlXY': ['PTL_X', 'PTL_Y']}
+        for posid in set(requests):
+            expected = ptl.posmodels[posid].expected_current_position
+            posid_str = f'{posid:7}'
+            for ptl_coord, data_coord in coords.items():
+                exp = expected[ptl_coord]
+                dat = list(get_row(move_id, posid)[data_coord])
+                err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
+                exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
+                dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
+                print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
+                if posid_str:
+                    posid_str = ' ' * len(posid_str)
 if ptl.schedule_stats.is_enabled():
     ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
     print(f'Stats saved to {ptl.sched_stats_path}')
