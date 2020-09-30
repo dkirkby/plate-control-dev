@@ -189,6 +189,10 @@ class PosAnimator(object):
         """Sets up the animation, using the data that has been already entered via the
         add_or_change_item method. Returns boolean stating success or not.
         """
+        if self.live_animate:
+            plt.ion()
+        else:
+            plt.ioff()
         self.anim_fig = plt.figure(self.fignum, figsize=(20,15))
         self.anim_ax = plt.axes()
         temp = np.array([])
@@ -237,7 +241,6 @@ class PosAnimator(object):
         if not successful:
             print('Animator not initialized. Usually due to no frames available to animate.')
             return
-        plt.ion()
         frame_number = 1
         stdout_message_period = 50 # number of frames per update message
         image_paths = {}
@@ -280,7 +283,9 @@ class PosAnimator(object):
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
             output_file = os.path.join(self.save_dir, timestamp + 'schedule_anim' + suffix + '.mp4')
             ffmpeg_cmd = self.ffmpeg_path + ' -y -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.codec + ' ' + output_file
-            os.system(ffmpeg_cmd)
+            err = os.system(ffmpeg_cmd)
+            if err:
+                output_file = 'FAILED - check ffmpeg installation'
         if self.delete_imgs:
             for path in image_paths.values():
                 os.remove(path)
