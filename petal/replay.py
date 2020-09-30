@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''Script to replay in simulation, a sequence of moves done on hardware.
+'''Script to replay in simulation, a sequence of moves done on hardware. Note:
+Get data from online DB using desimeter/get_posmoves tool, including options
+--with-calib and --tp-updates.
 '''
 
 import os
@@ -21,17 +23,19 @@ parser.add_argument('-anim', '--animate', action='store_true', help='plot an ani
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
 parser.add_argument('-v', '--verbose', action='store_true', help='turn on additional verbosity at console, may be helpful for debugging')
+parser.add_argument('-t', '--tp_update', action='store_true', help='for each move, force POS_T and POS_P to adopt values from data file (rather than using the simulated values from the previous move), thus any tp_updates done by the online system will be incorporated in sim')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
 assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 
+import sys
 import glob
 import petal
 import posconstants as pc
 import posstate
-from astropy.table import Table, vstack
+from astropy.table import Table, vstack, MaskedColumn
 import numpy as np
 
 # paths
@@ -62,6 +66,16 @@ param_keys = {'LENGTH_R1': float, 'LENGTH_R2': float, 'OFFSET_X': float, 'OFFSET
               'CLASSIFIED_AS_RETRACTED': boolean, 'CTRL_ENABLED': boolean,
              }
 required.update(param_keys)
+mask_fills = {}
+for key, func in required.items():
+    if func == float:
+        mask_fills[key] = float('inf')
+    elif func == int:
+        mask_fills[key] = sys.maxsize
+    elif func == boolean:
+        mask_fills[key] = False
+    elif func == str:
+        mask_fills[key] = ''
 
 # read in the move data
 input_tables = []
@@ -75,7 +89,17 @@ for path in infiles:
         continue
     new = {}
     for key, typefunc in required.items():
-        new[key] = [typefunc(x) for x in table[key]]
+        if isinstance(table[key], MaskedColumn):
+            vec = []
+            for i in range(len(table)):
+                if table[key].mask[i]:
+                    x = mask_fills[key]
+                else:
+                    x = typefunc(table[key][i])
+                vec.append(x)
+        else:
+            vec = [typefunc(x) for x in table[key]]
+        new[key] = vec
     input_tables.append(Table(new))
 t = vstack(input_tables)
 t.sort(keys=['EXPOSURE_ID', 'EXPOSURE_ITER', 'POS_ID'])
@@ -214,7 +238,7 @@ if uargs.animate:
 
 # run the sequence
 for m in move_idxs_to_run:
-    force_tp = m == move_idxs_to_run[0]
+    force_tp = m == move_idxs_to_run[0] or uargs.tp_update
     rows = t[t['MOVE_IDX'] == m]
     set_params(m, ptl=ptl, include_posintTP=force_tp)
     move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_IDX', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
