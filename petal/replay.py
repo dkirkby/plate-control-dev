@@ -5,7 +5,9 @@ Get data from online DB using desimeter/get_posmoves tool, including options
 --with-calib and --tp-updates.
 '''
 
-import os, sys
+import os
+get_move_id = lambda expid, expiter: f'{expid:05}.{expiter:03}'
+null_move_id = get_move_id(0,0)
 
 # command line argument parsing
 import argparse
@@ -17,13 +19,14 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
                          'that contains the files.')
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
-parser.add_argument('-ms', '--start_move', type=str, default='0.0', help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
-parser.add_argument('-mf', '--final_move', type=str, default='0.0', help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
+parser.add_argument('-ms', '--start_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
+parser.add_argument('-mf', '--final_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
 parser.add_argument('-v', '--verbose', action='store_true', help='turn on additional verbosity at console, may be helpful for debugging')
 parser.add_argument('-t', '--tp_update', action='store_true', help='for each move, force POS_T and POS_P to adopt values from data file (rather than using the simulated values from the previous move), thus any tp_updates done by the online system will be incorporated in sim')
+parser.add_argument('-d', '--display-posids', type=str, default='', help='one or more posids (comma-separated) for which you want extra information printed')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -128,25 +131,33 @@ for posid in moving:
             nonmoving_neighbors.add(neighbor_posid)
 all_posids = moving | nonmoving_neighbors
 
+# organize the display posids
+display_posids = set(uargs.display_posids.split(','))
+display_posids -= {''}
+invalid_display_posids = display_posids - all_posids
+assert not any(invalid_display_posids), f'requested display posid(s) were not found in data: {invalid_display_posids}'
+
 # identify / define which rows should be run in simulation
-t['MOVE_ID'] = [f'{t["EXPOSURE_ID"][i]}.{t["EXPOSURE_ITER"][i]}' for i in range(len(t))]
+t['MOVE_ID'] = [get_move_id(t["EXPOSURE_ID"][i], t["EXPOSURE_ITER"][i]) for i in range(len(t))]
 has_cmd_idxs = np.where(t['HAS_MOVE_CMD'])[0].tolist()
 first_move_found = t[has_cmd_idxs[0]]['MOVE_ID']
 last_move_found = t[has_cmd_idxs[-1]]['MOVE_ID']
-for user_arg in [uargs.start_move, uargs.final_move]:
+def check_move_id(val):
     try:
-        split = user_arg.split('.')
+        split = val.split('.')
         assert len(split) == 2
-        int(split[0])
-        int(split[1])
+        move_id = get_move_id(int(split[0]), int(split[1]))
+        return move_id
     except:
-        assert False, f'invalid move id argument {user_arg}'
-start_move = max(uargs.start_move, first_move_found)
-final_move = min(uargs.final_move, last_move_found)
+        assert False, f'invalid move id argument {val}'
+start_move = check_move_id(uargs.start_move)
+final_move = check_move_id(uargs.final_move)
+start_move = max(start_move, first_move_found)
+final_move = min(final_move, last_move_found)
 assert start_move <= final_move, f'final move index {final_move} must be >= than start {start_move}'
-t['SHOULD_RUN'] = np.logical_and(t['MOVE_ID'] >= start_move,
-                                 t['MOVE_ID'] <= final_move,
-                                 t['HAS_MOVE_CMD'])
+should_run = np.logical_and(t['MOVE_ID'] >= start_move, t['MOVE_ID'] <= final_move)
+should_run = np.logical_and(should_run, t['HAS_MOVE_CMD'])
+t['SHOULD_RUN'] = should_run
 
 # 2020-09-29 [JHS] TO-DO
 # # apply any tp_update rows
@@ -183,6 +194,8 @@ def set_params(move_id, ptl=None, include_posintTP=False):
     posids = ptl.posids if ptl else all_posids
     keys = set(param_keys) | {'DEVICE_LOC'}
     for posid in posids:
+        if posid == 'M06303':
+            print('pause')
         if ptl:
             state = ptl.states[posid]
         else:
@@ -190,7 +203,7 @@ def set_params(move_id, ptl=None, include_posintTP=False):
         row = get_row(posid, move_id=move_id)
         row_dict = {key: row[key] for key in keys}
         if include_posintTP:
-            position_row = get_row(posid, move_id=move_id, prior=True)
+            position_row = get_row(posid, date=row['DATE'], prior=True)
             row_dict['POS_T'] = position_row['POS_T']
             row_dict['POS_P'] = position_row['POS_P']
         else:
@@ -255,8 +268,9 @@ if uargs.animate:
     ptl.start_gathering_frames()
 
 # run the sequence
-for move_id in t['MOVE_ID']:
-    run_now = np.logical_and(t['SHOULD_RUN'], move_id == t['EXPOSURE_ID'])
+move_ids = sorted(set(t['MOVE_ID']) - {null_move_id})
+for move_id in move_ids:
+    run_now = np.logical_and(t['SHOULD_RUN'], move_id == t['MOVE_ID'])
     run_now_idxs = np.where(run_now)[0].tolist()
     if not any(run_now_idxs):
         continue
@@ -274,6 +288,16 @@ for move_id in t['MOVE_ID']:
             requests[posid] = make_request(row['MOVE_CMD'])
     ptl.request_targets(requests)
     ptl.schedule_moves()
+    for posid in display_posids:
+        print(f'\n---- {posid} @ MOVE_ID {move_id} ----')
+        row = get_row(posid, move_id=move_id)
+        for key in ['MOVE_CMD', 'MOVE_VAL1', 'MOVE_VAL2', 'LOG_NOTE']:
+            print(f' {key}: {row[key]}')
+        if posid in ptl.schedule.move_tables:
+            ptl.schedule.move_tables[posid].for_hardware() # dummy call, to ensure inclusion of final creep rows in next display line
+            ptl.schedule.move_tables[posid].display()
+            ptl.schedule.move_tables[posid].display_hw()  
+        print('\n')
     failed_posids = ptl.send_and_execute_moves()
     if uargs.verbose:
         tab = '   '
@@ -284,7 +308,7 @@ for move_id in t['MOVE_ID']:
             posid_str = f'{posid:7}'
             for ptl_coord, data_coord in coords.items():
                 exp = expected[ptl_coord]
-                dat = list(get_row(move_id, posid)[data_coord])
+                dat = list(get_row(posid, move_id=move_id)[data_coord])
                 err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
                 exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
                 dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
