@@ -5,7 +5,7 @@ Get data from online DB using desimeter/get_posmoves tool, including options
 --with-calib and --tp-updates.
 '''
 
-import os
+import os, sys
 
 # command line argument parsing
 import argparse
@@ -17,8 +17,8 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
                          'that contains the files.')
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
-parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the simulation at this move index, default is 0')
-parser.add_argument('-mf', '--final_move', type=int, default=None, help='end the simulation at this move index, defaults to final move in data')
+parser.add_argument('-ms', '--start_move', type=int, default=-sys.maxsize, help='start the simulation at this POS_MOVE_INDEX, default is the first one in data')
+parser.add_argument('-mf', '--final_move', type=int, default=sys.maxsize, help='end the simulation at this POS_MOVE_INDEX, default is the final move in data')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
@@ -30,7 +30,6 @@ if uargs.anticollision == 'None':
     uargs.anticollision = None
 assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 
-import sys
 import glob
 import petal
 import posconstants as pc
@@ -102,7 +101,7 @@ for path in infiles:
         new[key] = vec
     input_tables.append(Table(new))
 t = vstack(input_tables)
-t.sort(keys=['EXPOSURE_ID', 'EXPOSURE_ITER', 'POS_ID'])
+t.sort(keys=['POS_ID', 'POS_MOVE_INDEX']) # this order is important!
 
 # confirm only one petal
 petal_ids = set(t['PETAL_ID'])
@@ -129,26 +128,16 @@ for posid in moving:
             nonmoving_neighbors.add(neighbor_posid)
 all_posids = moving | nonmoving_neighbors
 
-# identify / define move indexes
-move_idxs = [0]
-for i in range(1, len(t)):
-    this = move_idxs[-1]
-    plus_one = this + 1
-    if t['EXPOSURE_ID'][i] != t['EXPOSURE_ID'][i-1]:
-        move_idxs.append(plus_one)
-    elif t['EXPOSURE_ITER'][i] != t['EXPOSURE_ITER'][i-1]:
-        move_idxs.append(plus_one)
-    else:
-        move_idxs.append(this)
-t['MOVE_IDX'] = move_idxs
-start_move = uargs.start_move
-final_move = uargs.final_move
-if final_move == None:
-    final_move = max(move_idxs)
-assert min(move_idxs) <= start_move <= max(move_idxs), f'cannot start at move index {start_move}'
-assert min(move_idxs) <= final_move <= max(move_idxs), f'cannot finish at move index {final_move}'
+# identify / define which rows should be run in simulation
+first_move_found = t['POS_MOVE_INDEX'][has_cmd][0]
+last_move_found = t['POS_MOVE_INDEX'][has_cmd][-1]
+start_move = max(uargs.start_move, first_move_found)
+final_move = min(uargs.final_move, last_move_found)
 assert start_move <= final_move, f'final move index {final_move} must be >= than start {start_move}'
-move_idxs_to_run = sorted(set([i for i in move_idxs if start_move <= i <= final_move]))
+t['SHOULD_RUN'] = np.logical_and(t['POS_MOVE_INDEX'] >= start_move,
+                                 t['POS_MOVE_INDEX'] <= final_move,
+                                 t['HAS_MOVE_CMD'])
+
 
 # helper functions
 def get_row(move_idx, posid):
@@ -236,39 +225,62 @@ if uargs.animate:
         ptl.collider.fixed_items_to_animate = set()
     ptl.start_gathering_frames()
 
+# apply any tp_update rows
+t['HAS_TP_UPDATE'] = ['tp_update' in s for s in t['LOG_NOTE']]
+for posid in all_posids:
+    updates = np.logical_and(t['HAS_TP_UPDATE'], t['POS_ID']==posid)
+    update_idxs = np.where(updates)[0].tolist()
+    if any(update_idxs):
+        print(update_idxs)
+        
+
+    
+    
+
 # run the sequence
-for m in move_idxs_to_run:
-    force_tp = m == move_idxs_to_run[0] or uargs.tp_update
-    rows = t[t['MOVE_IDX'] == m]
-    set_params(m, ptl=ptl, include_posintTP=force_tp)
-    move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_IDX', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
-    print('\n\n', move_id_str, '\n')
-    if ptl.schedule_stats.is_enabled():
-        ptl.schedule_stats.add_note(move_id_str)
-    requests = {}
-    for row in rows:
-        if row['HAS_MOVE_CMD']:
-            posid = row['POS_ID']
-            requests[posid] = make_request(row['MOVE_CMD'])
-    ptl.request_targets(requests)
-    ptl.schedule_moves()
-    failed_posids = ptl.send_and_execute_moves()
-    if uargs.verbose:
-        tab = '   '
-        print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
-        coords = {'posintTP': ['POS_T', 'POS_P'], 'ptlXY': ['PTL_X', 'PTL_Y']}
-        for posid in set(requests):
-            expected = ptl.posmodels[posid].expected_current_position
-            posid_str = f'{posid:7}'
-            for ptl_coord, data_coord in coords.items():
-                exp = expected[ptl_coord]
-                dat = list(get_row(m, posid)[data_coord])
-                err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
-                exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
-                dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
-                print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
-                if posid_str:
-                    posid_str = ' ' * len(posid_str)
+first_move = True
+expids = sorted(set(t['EXPOSURE_ID']))
+for expid in expids:
+    expiters = sorted(set(t['EXPOSURE_ITER']))
+    for expiter in expiters:
+        run_now = np.logical_and(t['SHOULD_RUN'],
+                                 t['EXPOSURE_ID'] == expid,
+                                 t['EXPOSURE_ITER'] == expiter)
+        run_now_idxs = np.where(run_now)[0].tolist()
+        if not any(run_now_idxs):
+            continue
+        force_tp = first_move or uargs.tp_update
+        first_move = False
+        rows = t[run_now]
+        set_params(m, ptl=ptl, include_posintTP=force_tp)
+        move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_IDX', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
+        print('\n\n', move_id_str, '\n')
+        if ptl.schedule_stats.is_enabled():
+            ptl.schedule_stats.add_note(move_id_str)
+        requests = {}
+        for row in rows:
+            if row['HAS_MOVE_CMD']:
+                posid = row['POS_ID']
+                requests[posid] = make_request(row['MOVE_CMD'])
+        ptl.request_targets(requests)
+        ptl.schedule_moves()
+        failed_posids = ptl.send_and_execute_moves()
+        if uargs.verbose:
+            tab = '   '
+            print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
+            coords = {'posintTP': ['POS_T', 'POS_P'], 'ptlXY': ['PTL_X', 'PTL_Y']}
+            for posid in set(requests):
+                expected = ptl.posmodels[posid].expected_current_position
+                posid_str = f'{posid:7}'
+                for ptl_coord, data_coord in coords.items():
+                    exp = expected[ptl_coord]
+                    dat = list(get_row(m, posid)[data_coord])
+                    err = np.hypot(exp[0]-dat[0], exp[1]-dat[1])
+                    exp_str = f'({exp[0]:8.3f}, {exp[1]:8.3f})'
+                    dat_str = f'({dat[0]:8.3f}, {dat[1]:8.3f})'
+                    print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
+                    if posid_str:
+                        posid_str = ' ' * len(posid_str)
 if ptl.schedule_stats.is_enabled():
     ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
     print(f'Stats saved to {ptl.sched_stats_path}')
