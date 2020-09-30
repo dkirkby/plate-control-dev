@@ -159,15 +159,6 @@ should_run = np.logical_and(t['MOVE_ID'] >= start_move, t['MOVE_ID'] <= final_mo
 should_run = np.logical_and(should_run, t['HAS_MOVE_CMD'])
 t['SHOULD_RUN'] = should_run
 
-# 2020-09-29 [JHS] TO-DO
-# # apply any tp_update rows
-# t['HAS_TP_UPDATE'] = ['tp_update' in s for s in t['LOG_NOTE']]
-# for posid in all_posids:
-#     updates = np.logical_and(t['HAS_TP_UPDATE'], t['POS_ID']==posid)
-#     update_idxs = np.where(updates)[0].tolist()
-#     if any(update_idxs):
-#         print(update_idxs)
-
 # helper functions
 def get_row(posid, move_id=None, date=None, prior=False):
     '''Get matching row in table for a given posid and either move_id or date.
