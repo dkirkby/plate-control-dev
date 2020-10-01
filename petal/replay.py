@@ -8,6 +8,7 @@ Get data from online DB using desimeter/get_posmoves tool, including options
 import os
 get_move_id = lambda expid, expiter: f'{expid:05}.{expiter:03}'
 null_move_id = get_move_id(0,0)
+null_move_id_large = get_move_id(99999,999)
 
 # command line argument parsing
 import argparse
@@ -20,7 +21,7 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-ms', '--start_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
-parser.add_argument('-mf', '--final_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
+parser.add_argument('-mf', '--final_move', type=str, default=null_move_id_large, help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
@@ -52,6 +53,7 @@ for s in uargs.infiles:
         else:
             infiles.append(this)
 infiles = [os.path.realpath(p) for p in infiles]
+assert any(infiles), 'check path args, no valid input files detected'
 
 # data types / definitions
 nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
@@ -162,7 +164,8 @@ t['SHOULD_RUN'] = should_run
 # helper functions
 def get_row(posid, move_id=None, date=None, prior=False):
     '''Get matching row in table for a given posid and either move_id or date.
-    Argue prior=True to get the last row just before the match.
+    Argue prior=True to get the last row just before the match. If no prior rows
+    exist, then it will return the matched one.
     '''
     assert (move_id and not date) or (date and not move_id), 'must only argue either move_id or date'
     match_field = 'MOVE_ID' if move_id else 'DATE'
@@ -173,14 +176,18 @@ def get_row(posid, move_id=None, date=None, prior=False):
         matches = t[match_field] == match_value
     matches = np.logical_and(t['POS_ID'] == posid, matches)
     match_idxs = np.where(matches)[0].tolist()
+    if prior and not any(matches):
+        return get_row(posid, move_id=move_id, date=date, prior=False)
     row = t[match_idxs[-1]]
     return row
         
-def set_params(move_id, ptl=None, include_posintTP=False):
+def set_params(move_id, ptl=None, tp_update_mode=None):
     '''Set state parameters for all positioners at a given move index.
     INPUTS:  move_id ... in the general astropy table "t"
              ptl ... Petal instance
-             include_posintTP ... set POS_T, POS_P using values from CSV data file
+             tp_update_mode ... None --> no update
+                                'data' --> set POS_T, POS_P using values from CSV data file
+                                'parked' --> use a typical "parked" value for POS_T, POS_P
     '''
     posids = ptl.posids if ptl else all_posids
     keys = set(param_keys) | {'DEVICE_LOC'}
@@ -191,12 +198,11 @@ def set_params(move_id, ptl=None, include_posintTP=False):
             state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         row = get_row(posid, move_id=move_id)
         row_dict = {key: row[key] for key in keys}
-        if include_posintTP:
+        if tp_update_mode == 'data':
             position_row = get_row(posid, date=row['DATE'], prior=True)
             row_dict['POS_T'] = position_row['POS_T']
             row_dict['POS_P'] = position_row['POS_P']
-        else:
-            # common pre-parking value in many sequences
+        elif tp_update_mode == 'parked':
             row_dict['POS_T'] = 0 
             row_dict['POS_P'] = 150
         for key, value in row_dict.items():
@@ -216,7 +222,7 @@ def make_request(move_cmd_str):
 # initialize petal
 move_idxs = np.where(t['SHOULD_RUN'])[0]
 first_move_id = t['MOVE_ID'][move_idxs[0]]
-set_params(first_move_id, ptl=None, include_posintTP=True)
+set_params(first_move_id, ptl=None, tp_update_mode='parked')
 ptl = petal.Petal(petal_id        = petal_id,
                   petal_loc       = 3,
                   posids          = all_posids,
@@ -263,11 +269,13 @@ for move_id in move_ids:
     run_now_idxs = np.where(run_now)[0].tolist()
     if not any(run_now_idxs):
         continue
-    force_tp = move_id == first_move_id or uargs.tp_update
     rows = t[run_now]
-    set_params(move_id, ptl=ptl, include_posintTP=force_tp)
     move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_ID', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])
     print('\n\n', move_id_str, '\n')
+    tp_update_mode = None
+    if move_id == first_move_id or uargs.tp_update:
+        tp_update_mode = 'data'
+    set_params(move_id, ptl=ptl, tp_update_mode=tp_update_mode)
     if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.add_note(move_id_str)
     requests = {}
