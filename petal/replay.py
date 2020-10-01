@@ -185,8 +185,6 @@ def set_params(move_id, ptl=None, include_posintTP=False):
     posids = ptl.posids if ptl else all_posids
     keys = set(param_keys) | {'DEVICE_LOC'}
     for posid in posids:
-        if posid == 'M06303':
-            print('pause')
         if ptl:
             state = ptl.states[posid]
         else:
