@@ -71,7 +71,6 @@ class PosMoveTable(object):
     def display(self, printfunc=print, show_posid=True):
         '''Pretty-prints the table.
         '''
-        import numpy as np
         def fmt(x):
             if x == None:
                 x = str(x)
