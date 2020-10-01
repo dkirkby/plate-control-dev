@@ -15,7 +15,8 @@ import sequences
 # input parameters
 num_sets_to_make = 1000
 petal_id = 0
-posparams_id = int(f'{petal_id}001')
+params_id = 1
+params_id_str = hc.make_params_prefix(petal_id)
 posparams = sequences._read_data(data_id=posparams_id)
 posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
 

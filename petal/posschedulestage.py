@@ -185,8 +185,10 @@ class PosScheduleStage(object):
         In other words, a neighbor's neighbor will not be affected by this function.
         """
         stats_enabled = self.stats.is_enabled()
+        adjusted = set()
+        frozen = set()
         if self.sweeps[posid].collision_case == pc.case.I:
-            return set()
+            return adjusted, frozen
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
             methods = ['freeze'] if freezing != 'off' else []
         elif freezing in {'forced','forced_recursive'}:
@@ -195,8 +197,6 @@ class PosScheduleStage(object):
             methods = pc.nonfreeze_adjustment_methods
         else:
             methods = pc.all_adjustment_methods
-        adjusted = set()
-        frozen = set()
         for method in methods:        
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
