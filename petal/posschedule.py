@@ -241,10 +241,13 @@ class PosSchedule(object):
                 self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')  
             else:
                 adjusted = set()
+                frozen = set()
                 for posid in colliding_sweeps:
-                    these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
+                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
                     adjusted.update(these_adjusted)
-                self.printfunc('Adjusted posids: ' + str(adjusted))
+                    frozen.update(frozen)
+                self.printfunc(f'Adjusted posids: {adjusted}')
+                self.printfunc(f'Frozen posids: {frozen}')
                 c, a, p = self._check_final_stage(msg_prefix='Final', msg_suffix=' (should always be zero)')
                 colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
         self._schedule_moves_check_final_sweeps_continuity()
