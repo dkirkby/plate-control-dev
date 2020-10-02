@@ -13,11 +13,16 @@ import harness_constants as hc
 import sequences
 
 # input parameters
-num_sets_to_make = 1000
-petal_id = 0
-params_id = 1
-params_id_str = hc.make_params_prefix(petal_id)
-posparams = sequences._read_data(data_id=posparams_id)
+petal_id = int(input('Enter petal id (max 2 digits): '))
+assert 0 <= petal_id < 100
+params_id = int(input('Enter params id (max 5 digits): '))
+assert 0 <= params_id < 100000
+set_number = int(input('Enter set number (max 2 digits): '))
+assert 0 <= set_number < 100
+num_req_to_make = int(input('Enter number of requests to make (max 5 digits): '))
+assert 0 <= num_req_to_make < 100000
+params_prefix = hc.make_params_prefix(petal_id)
+posparams = sequences._read_data(data_id=params_id, prefix=params_prefix)
 posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
 
 # initialize a poscollider instance (for fair target checking)
@@ -41,7 +46,7 @@ collider.add_positioners(posmodels.values())
 
 # generate random targets
 all_targets = []
-for i in range(num_sets_to_make):
+for i in range(num_req_to_make):
     targets_obsTP = {}
     targets_posXY = {}
     for posid,model in posmodels.items():
@@ -91,14 +96,24 @@ for targets in all_targets:
     all_targets_by_loc.append(targets_by_loc)
 
 # save set files
-start_number = input('Enter starting file number (or nothing, to start at \'000\'). The petal id number will be prefixed. start = ')
-start_number = 0 if not start_number else int(start_number)
-next_filenumber = petal_id * 1000 + start_number # more id number hackery
+i = 0
+prefix = hc.make_request_prefix(petal_id, set_number)
+overwrite = False
+existing = os.listdir(hc.req_dir)
 for target in all_targets_by_loc:
-    save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
-    with open(save_path,'w',newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['DEVICE_LOC','command','u','v'])
-        for loc,uv in target.items():
-            writer.writerow([loc,'poslocXY',uv[0],uv[1]])
-    next_filenumber += 1
+    save_path = hc.filepath(hc.req_dir, prefix, i)
+    name = os.path.basename(save_path)
+    if name in existing:
+        if not overwrite:
+            yesno = input(f'Some files (e.g. {name}) already exist. Overwrite them? (y/n): ')
+            overwrite = yesno.lower() in {'true', 'y', 't', 'yes', '1'}
+        ok_to_write = overwrite
+    else:
+        ok_to_write = True
+    if ok_to_write:
+        with open(save_path,'w',newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['DEVICE_LOC','command','u','v'])
+            for loc,uv in target.items():
+                writer.writerow([loc,'poslocXY',uv[0],uv[1]])
+    i += 1
