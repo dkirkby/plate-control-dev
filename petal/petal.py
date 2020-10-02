@@ -2,7 +2,13 @@ from posmodel import PosModel
 import posschedule
 import posmovetable
 import posstate
-import poscollider
+try:
+    import poscollider
+except:
+    import sys
+    print('Error while importing poscollider. Make sure you have compiled the cython file ' +
+          'poscollider.pyx. Use setup.py in the petal directory, see usage comments in there.')
+    sys.exit(1)
 import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
