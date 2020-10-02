@@ -91,6 +91,20 @@ class PosScheduleStage(object):
         for posids in supply_map.values():
             group = []
             group_time = 0
+            
+            # 2020-10-02 [JHS] This sorting step was required to resolve a complex, and non-deterministic bug
+            # in move scheduling. That bug was first encountered during exposure_id 3047, exposure_iter 46,
+            # on petal 1, 2020-10-01. I never managed to track down how adding a sort here resolves the issue.
+            # But in principle, since there is no random number generation going on anywhere in the code, our
+            # best assumption was that *some* unordered for-loop operation was causing wrong behavior on some
+            # runs. The line below is the only place I found where adding a sorting step had any tangible impact
+            # on the move tables that get generated. And after I added it, the error never arose again, in 85
+            # consecutive runs of replay.py upon the 3047.46 move data. Then I turned off the sorted() call as
+            # a test, and counted errors on 10% of runs (9 of 85 attempts). Also, I noted that without this sort,
+            # the total move table times were non-deterministic, varying with each run. (That alone is a good
+            # enough reason to include it.)
+            posids = sorted(posids)
+            
             for posid in posids:
                 group.append(posid)
                 group_time += times[posid]
@@ -303,7 +317,7 @@ class PosScheduleStage(object):
             table_A = move_tables[posid]
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
-                    table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
+                    table_B = move_tables.get(neighbor, self._get_or_generate_table(neighbor))
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, table_A.init_poslocTP, table_A.for_collider(), neighbor, table_B.init_poslocTP, table_B.for_collider())
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
