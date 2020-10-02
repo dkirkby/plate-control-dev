@@ -78,7 +78,7 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.clock()
+            timer_start = time.perf_counter()
             self.stats.add_request()
         self._all_received_requested_posids.add(posid)
         def print_denied(string):
@@ -174,7 +174,7 @@ class PosSchedule(object):
                        }
         self._requests[posid] = new_request
         if stats_enabled:
-            self.stats.add_requesting_time(time.clock() - timer_start)
+            self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
         return True
 
@@ -287,7 +287,7 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.clock()
+            timer_start = time.perf_counter()
         if self._deny_request_because_disabled(move_table.posmodel):
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
@@ -295,7 +295,7 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
-            self.stats.add_expert_table_time(time.clock() - timer_start)
+            self.stats.add_expert_table_time(time.perf_counter() - timer_start)
             
     def expert_mode_is_on(self):
         """Returns boolean stating whether scheduling is in expert mode. This is
@@ -587,7 +587,7 @@ class PosSchedule(object):
     def _schedule_moves_initialize_logging(self, anticollision):
         """Initial logging tasks for the schedule_moves() function."""
         if self.stats.is_enabled():
-            self.__timer_start = time.clock()
+            self.__timer_start = time.perf_counter()
             self.stats.set_scheduling_method(str(anticollision))
             self.__original_request_posids = set(self._requests.keys())
             self.__max_net_time = 0
@@ -673,7 +673,7 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            self.stats.add_scheduling_time(time.clock() - self.__timer_start)
+            self.stats.add_scheduling_time(time.perf_counter() - self.__timer_start)
             freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
             if freeze_collisions:
                 self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')

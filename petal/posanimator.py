@@ -263,7 +263,7 @@ class PosAnimator(object):
                 image_paths[frame_number] = path
         frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
         for frame in range(len(frame_times)):
-            frame_start_time = time.clock()
+            frame_start_time = time.perf_counter()
             self.anim_frame_update(frame)
             plt.title('time: ' + format(frame*self.timestep,'5.2f') + ' / ' + format(self.finish_time,'5.2f') + ' sec')
             if self.save_movie:
@@ -273,7 +273,7 @@ class PosAnimator(object):
                     print(' ... animation frame ' + str(frame) + ' of approx ' + str(len(frame_times)) + ' saved')
             if self.live_animate:
                 plt.pause(0.001) # just to force a refresh of the plot window (hacky, yep. that's matplotlib for ya.)
-                time.sleep(max(0,self.timestep-(time.clock()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
+                time.sleep(max(0,self.timestep-(time.perf_counter()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
         if self.save_movie:
             for i in range(round(self.start_end_still_time/self.timestep)):
                 frame_number,path = self.grab_frame(frame_number)
