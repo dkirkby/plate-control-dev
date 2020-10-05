@@ -516,6 +516,7 @@ try:
         n_corr = uargs.num_corr if correctable else 0
         targ_errs = None
         calc_errors = True
+        initial_request = None
         for submove_num in range(1 + n_corr):
             extra_log_note = f'move {move_num}'
             if n_corr > 0:
@@ -539,7 +540,7 @@ try:
                                             target0=[-targ_errs[posid][0] for posid in posids],
                                             target1=[-targ_errs[posid][1] for posid in posids],
                                             device_loc=[device_loc_map[posid] for posid in posids],
-                                            log_note=move.log_note,
+                                            log_note=initial_request['log_note'],
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
                 request = submove.make_request(loc2id_map=get_map('loc'),log_note=extra_log_note)

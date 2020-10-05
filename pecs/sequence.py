@@ -71,6 +71,7 @@ is_float = lambda x: isinstance(x, (float, np.floating))
 is_int = lambda x: isinstance(x, (int, np.integer))
 is_number = lambda x: is_float(x) or is_int(x)
 is_bool = lambda x: isinstance(x, (bool, np.bool, np.bool_))
+is_string = lambda x: isinstance(x, (str, np.str))
 
 move_idx_key = 'move_idx'
 possible_device_locs = set(pc.generic_pos_neighbor_locs)
@@ -305,7 +306,7 @@ class Move(object):
         target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
         target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
         device_loc   ... optional sequence of which positioner device locations should be commanded
-        log_note     ... optional string to store alongside log data for this move
+        log_note     ... optional string (uniformly applied) or sequence of strings (per device) to store alongside log data in this move
         pos_settings ... optional dict of positioner settings to apply during the move
         allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
         
@@ -333,12 +334,18 @@ class Move(object):
             self.target0 = [target0]
             self.target1 = [target1]
             self.device_loc = [device_loc]
+            self._log_note = [log_note] if is_string(log_note) else list(log_note)[0]
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
             assert len(target0) == len(target1) == len(device_loc), 'args target0, target1, and device_loc are not of equal length'
             self.target0 = list(target0)
             self.target1 = list(target1)
             self.device_loc = list(device_loc)
+            if is_string(log_note):
+                self._log_note = [log_note] * len(self.device_loc)
+            else:
+                assert len(log_note) == len(self.device_loc)
+                self._log_note = list(log_note)
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
         if command in homing_commands:
@@ -347,14 +354,14 @@ class Move(object):
         allowed_posloc = possible_device_locs | {'any'}
         assert all([x in allowed_posloc for x in self.device_loc]), 'all elements of device_loc must be valid device locations'
         self.command = command
-        self._log_note = str(log_note)
+        
         self._pos_settings = self._validate_pos_settings(pos_settings)
         self.allow_corr = bool(allow_corr)
         self._sequence_name_getter = None
     
     # properties of Move with single values vs multiple values
     single_keys = {'command', 'log_note', 'allow_corr'}
-    multi_keys = {'target0', 'target1', 'device_loc'}
+    multi_keys = {'target0', 'target1', 'device_loc', 'log_note'}
     
     def register_sequence_name_getter(self, function):
         '''Register function that can get name of the sequence that contains this move.'''
@@ -362,22 +369,26 @@ class Move(object):
     
     @property
     def log_note(self):
-        '''Log note string, including sequence name if available.'''
-        existing_parts = [part.strip() for part in self._log_note.split(';')]
-        new_parts = []
-        has_name_yet = False
-        for part in existing_parts:
-            is_name = sequence_note_prefix in part
-            not_a_name = sequence_note_prefix not in part
-            use_old_name = is_name and not has_name_yet and not self._sequence_name_getter
-            if not_a_name or use_old_name:
-                new_parts.append(part)
-            if use_old_name:
-                has_name_yet = True
-        if not has_name_yet and self._sequence_name_getter:
-            seq_name = str(sequence_note_prefix) + str(self._sequence_name_getter())
-            new_parts = [seq_name] + new_parts
-        return pc.join_notes(*new_parts)
+        '''Log note strings, including sequence name if available.'''
+        notes = []
+        for note in self._log_note:
+            existing_parts = [part.strip() for part in note.split(';')]
+            new_parts = []
+            has_name_yet = False
+            for part in existing_parts:
+                is_name = sequence_note_prefix in part
+                not_a_name = sequence_note_prefix not in part
+                use_old_name = is_name and not has_name_yet and not self._sequence_name_getter
+                if not_a_name or use_old_name:
+                    new_parts.append(part)
+                if use_old_name:
+                    has_name_yet = True
+            if not has_name_yet and self._sequence_name_getter:
+                seq_name = str(sequence_note_prefix) + str(self._sequence_name_getter())
+                new_parts = [seq_name] + new_parts
+            note = pc.join_notes(*new_parts)
+            notes.append(note)
+        return notes
     
     @staticmethod
     def _validate_pos_settings(settings):
@@ -476,7 +487,8 @@ class Move(object):
         OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
         '''
         assert self.command not in homing_commands, 'Cannot make a request for homing. Try make_homing_kwargs() instead.'
-        posids, target0, target1 = [], [], []
+        posids, target0, target1, final_log_note = [], [], [], []
+        possible_notes = [pc.join_notes(note, log_note) for note in self.log_note]
         if self.has_multiple_targets:
             for i in range(len(self)):
                 device_loc = self.device_loc[i]
@@ -484,16 +496,17 @@ class Move(object):
                     posids += [loc2id_map[device_loc]]
                     target0 += [self.target0[i]]
                     target1 += [self.target1[i]]
+                    final_log_note += [possible_notes[i]]
         else:
             posids = list(loc2id_map.values())
             target0 = self.target0[0]
             target1 = self.target1[0]
-        log_note = pc.join_notes(self.log_note, log_note)
+            final_log_note = possible_notes[0]
         request_data = {'DEVICE_ID': posids,
                         'COMMAND': self.command,
                         'X1': target0,
                         'X2': target1,
-                        'LOG_NOTE': log_note,
+                        'LOG_NOTE': final_log_note,
                         }
         request = pandas.DataFrame(request_data)
         return request
@@ -510,7 +523,11 @@ class Move(object):
         assert self.command in homing_commands, 'Cannot make homing kwargs for non-homing. Try make_request() instead.'
         should_debounce = self.command == 'home_and_debounce'
         axis = 'theta_only' if not self.target1[0] else 'phi_only' if not self.target0[0] else 'both'
-        log_note = pc.join_notes(self.log_note, log_note)
+        possible_notes = [pc.join_notes(note, log_note) for note in self.log_note]
+        if self.has_multiple_targets:
+            log_note = possible_notes
+        else:
+            log_note = possible_notes[0]
         kwargs = {'posids': posids,
                   'axis': axis,
                   'debounce': should_debounce,
