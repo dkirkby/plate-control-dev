@@ -37,8 +37,10 @@ def filenumber(filename, prefix):
     num_str = os.path.splitext(base)[0].split(prefix)[1]
     return int(num_str)
 
-def filename(prefix, integer=None):
-    suffix = f'_{integer:05}' if integer != None else ''
+def filename(prefix, suffix=None):
+    if isinstance(suffix, int):
+        suffix = f'{suffix:05}'
+    suffix = f'_{suffix}' if suffix != None else ''
     return f'{prefix}{suffix}.csv'
 
 def filepath(directory, prefix, integer=None):
