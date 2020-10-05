@@ -88,7 +88,7 @@ class PosSchedule(object):
         trans = posmodel.trans
         if self.already_requested(posid):
             print_denied('Cannot request more than one target per positioner in a given schedule.')
-            self.petal.pos_flags[posid] |= self.petal.multi_request_bit
+            self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return False
         if self._deny_request_because_disabled(posmodel):
             print_denied('Positioner is disabled.')
@@ -146,7 +146,7 @@ class PosSchedule(object):
             print_denied('Bad uv_type: ' + str(uv_type))
             return False
         if unreachable:
-            self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
+            self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
             print_denied(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
@@ -504,7 +504,7 @@ class PosSchedule(object):
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
-            self.petal.pos_flags[posmodel.posid] |= self.petal.ctrl_disabled_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('NOTCTLENABLED', self.petal.missing_flag)
             return True
         return False
     
@@ -547,7 +547,7 @@ class PosSchedule(object):
         if fixed_case:
             interfering_neighbors.add(pc.case.names[fixed_case])
         if interfering_neighbors:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.overlap_targ_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('OVERLAP', self.petal.missing_flag)
         return interfering_neighbors
 
     def _deny_request_because_out_of_bounds(self, posmodel, target_poslocTP):
@@ -556,7 +556,7 @@ class PosSchedule(object):
         """
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_poslocTP)
         if out_of_bounds:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.restricted_targ_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.get('BOUNDARYVIOLATION', self.petal.missing_flag)
             return True
         return False
 
@@ -567,7 +567,7 @@ class PosSchedule(object):
         '''
         if self.petal.limit_angle:
             if target_poslocTP[1] < self.petal.limit_angle:
-                self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
+                self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
                 return True
         return False
     
