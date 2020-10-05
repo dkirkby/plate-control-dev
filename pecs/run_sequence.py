@@ -544,6 +544,8 @@ try:
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
                 request = submove.make_request(loc2id_map=get_map('loc'),log_note=extra_log_note)
+                if submove.command not in sequence.abs_commands:
+                    calc_errors = False
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
