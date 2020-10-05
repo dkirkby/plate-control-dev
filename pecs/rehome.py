@@ -40,8 +40,8 @@ class Rehome(PECS):
         except Exception as e:
             print(f'Exception: {e}, from petalman: {ret}')
             import pdb; pdb.set_trace()
-        ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
-        mask = ret['FLAG'] != 4
+        ret['STATUS'] = pc.decipher_posflags(ret['FLAGS'])
+        mask = ret['FLAGS'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:
             self.printfunc(f'Rehoming (3 tries) complete for all positioners.')

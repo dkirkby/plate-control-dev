@@ -35,7 +35,7 @@ except ImportError:
         raise RuntimeError(*args, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
-    from DOSlib.flags import POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK, ENABLED_RESET_MASK
+    from DOSlib.flags import POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK, ENABLED_RESET_MASK, NON_PETAL_MASK
     FLAGS_AVAILABLE = True
 except ImportError:
     FLAGS_AVAILABLE = False
@@ -188,12 +188,14 @@ class Petal(object):
             self.flags = POSITIONER_FLAGS_MASKS
             self.reset_mask = REQUEST_RESET_MASK
             self.enabled_mask = ENABLED_RESET_MASK
+            self.non_petal_mask = NON_PETAL_MASK
             self.missing_flag = 0
         else:
             self.printfunc('WARNING: DOSlib.flags not imported! Flags will not be set!')
             self.flags = {}
             self.reset_mask = 0
             self.enabled_mask = 0
+            self.non_petal_mask = 0
             self.missing_flag = 0
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
