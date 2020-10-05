@@ -140,6 +140,23 @@ class PosSchedStats(object):
         if method in this_dict:
             return this_dict[method].copy()
         return {}
+    
+    @property
+    def total_unresolved(self):
+        '''Returns count of how many collisions were recorded as unresolved after
+        final collision check. For the latest schedule_id.
+        '''
+        return self.numbers[final_checks_str][-1]
+    
+    @property
+    def total_resolved(self):
+        '''Returns count of how many collisions were recorded as resolved.
+        '''
+        this_dict = self.collisions[self.latest]['resolved']
+        count = 0
+        for collision_pairs in this_dict.values():
+            count += len(collision_pairs)
+        return count
         
     def add_request(self):
         """Increment requests count."""
