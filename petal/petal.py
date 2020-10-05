@@ -1664,16 +1664,8 @@ class Petal(object):
         the hardware.
         """
         if self.schedule_stats.is_enabled():
-            avoidances = {posid:[] for posid in self.posids}
-            for method in pc.all_adjustment_methods:
-                pairs = self.schedule_stats.get_collisions_resolved_by(method)
-                resolved = [set(pair.split('-')) for pair in pairs]
-                for pair in resolved:
-                    for item in pair:
-                        if item in self.posids:
-                            other = pair - {item}
-                            avoidances[item] += [f'{method}/{other.pop()}']
-            for posid, avoidance in avoidances.items():
+            for posid in self.posids:
+                avoidance = self.schedule_stats.get_avoidances(posid)
                 if avoidance:
                     self.set_posfid_val(posid, 'LOG_NOTE', f'collision avoidance: {avoidance}')
         for m in self.schedule.move_tables.values():

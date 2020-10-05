@@ -243,7 +243,7 @@ class PosScheduleStage(object):
                     else:
                         collision_resolved = True
                     if collision_resolved:
-                        self.stats.add_collisions_resolved(method, {old_collision_id})
+                        self.stats.add_collisions_resolved(posid, method, {old_collision_id})
 
                 # store results
                 old_colliding = self.colliding # note how sequence here emphasizes that this must occur before store_collision_finding_results(), which affects self.colliding. in a perfect world, I would re-factor functionally to remove the state-dependence [JHS]                
