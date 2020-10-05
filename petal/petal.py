@@ -1668,13 +1668,14 @@ class Petal(object):
             for method in pc.all_adjustment_methods:
                 pairs = self.schedule_stats.get_collisions_resolved_by(method)
                 resolved = [set(pair.split('-')) for pair in pairs]
-                for item in resolved:
-                    if item in self.posids:
-                        other = resolved - item
-                        avoidances[item] += [f'{method}/{other.pop()}']
-            for posid, avoidance in avoidances:
+                for pair in resolved:
+                    for item in pair:
+                        if item in self.posids:
+                            other = pair - {item}
+                            avoidances[item] += [f'{method}/{other.pop()}']
+            for posid, avoidance in avoidances.items():
                 if avoidance:
-                    self.set_posfid_val(item, 'LOG_NOTE', str(avoidance))
+                    self.set_posfid_val(posid, 'LOG_NOTE', f'collision avoidance: {avoidance}')
         for m in self.schedule.move_tables.values():
             if m.posmodel.posid in self._posids_where_tables_were_just_sent:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
