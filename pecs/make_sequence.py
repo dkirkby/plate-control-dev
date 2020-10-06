@@ -23,6 +23,7 @@ parser.add_argument('-lim', '--enable_phi_limit', action='store_true', help='opt
 parser.add_argument('-p', '--profile', action='store_true', help='optional, turns on timing profiler for move scheduling')
 parser.add_argument('-i', '--infile', type=str, default=None, help='optional, path to offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
 parser.add_argument('-o', '--outdir', type=str, default='.', help='optional, path to directory where to save output file, defaults to current dir')
+parser.add_argument('-m', '--comment', type=str, default='', help='optional, comment string (must enclose in "") that will be included in output file metadata')
 uargs = parser.parse_args()
 
 import os
