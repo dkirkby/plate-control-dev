@@ -166,7 +166,10 @@ class PosSchedStats(object):
         '''Returns count of how many collisions were recorded as unresolved after
         final collision check. For the latest schedule_id.
         '''
-        return self.numbers[final_checks_str][-1]
+        value = self.numbers[final_checks_str][-1]
+        if value == None:
+            return 0
+        return value
     
     @property
     def total_resolved(self):
