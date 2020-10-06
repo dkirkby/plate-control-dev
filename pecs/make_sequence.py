@@ -249,7 +249,7 @@ for m in range(uargs.num_moves):
     set_posTP(sel['final_posTP'])
     move = sequence.Move(command='poslocXY',
                          target0=[sel['targets'][posid][0] for posid in movers],
-                         target1=[sel['targets'][posid][0] for posid in movers],
+                         target1=[sel['targets'][posid][1] for posid in movers],
                          device_loc=[ptl.posmodels[posid].deviceloc for posid in movers],
                          log_note='',
                          pos_settings={},
@@ -262,4 +262,6 @@ seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value int
 if not os.path.isdir(save_dir):
     os.path.os.makedirs(save_dir)
 path = seq.save(save_dir)
-print(f'Sequence generation complete!\nFile: {path}')
+print(f'Sequence generation complete!')
+print(f'\n{seq}\n')
+print(f'Saved to file: {path}\n')
