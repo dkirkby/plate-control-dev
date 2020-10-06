@@ -137,7 +137,7 @@ all_posids = moving | nonmoving_neighbors
 display_posids = set(uargs.display_posids.split(','))
 display_posids -= {''}
 invalid_display_posids = display_posids - all_posids
-assert not any(invalid_display_posids), f'requested display posid(s) were not found in data: {invalid_display_posids}'
+assert len(invalid_display_posids) == 0, f'requested display posid(s) were not found in data: {invalid_display_posids}'
 
 # identify / define which rows should be run in simulation
 t['MOVE_ID'] = [get_move_id(t["EXPOSURE_ID"][i], t["EXPOSURE_ITER"][i]) for i in range(len(t))]
@@ -267,7 +267,7 @@ move_ids = sorted(set(t['MOVE_ID']) - {null_move_id})
 for move_id in move_ids:
     run_now = np.logical_and(t['SHOULD_RUN'], move_id == t['MOVE_ID'])
     run_now_idxs = np.where(run_now)[0].tolist()
-    if not any(run_now_idxs):
+    if len(run_now_idxs) == 0:
         continue
     rows = t[run_now]
     move_id_str = pc.join_notes(*[f'{key}: {rows[key][0]}' for key in ['MOVE_ID', 'DATE', 'EXPOSURE_ID', 'EXPOSURE_ITER']])

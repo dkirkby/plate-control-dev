@@ -32,27 +32,36 @@ assert uargs.num_stress_select > 0
 
 # proceed with bulk of imports
 from astropy.table import Table
-import sys
-path_to_petal = '../petal'
-sys.path.append(os.path.abspath(path_to_petal))
-import posconstants as pc
-import petal
 import sequence
 import random
 import numpy as np
 
-# read positioner parameter data
+# desi imports
+try:
+    import petal
+except:
+    import sys
+    path_to_petal = '../petal'
+    sys.path.append(os.path.abspath(path_to_petal))
+import posconstants as pc
+
+# required data fields
 required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
             'OFFSET_P', 'OFFSET_X', 'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
             'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_PHI_ANGULAR',
             'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_THETA_ANGULAR',
             'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
+
+# read calib data from online system (optional)
+# [TO-DO]
+
+# read positioner parameter data
 booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
 nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
 boolean = lambda x: x not in nulls
 input_table = Table.read(uargs.infile)
 missing = required - set(input_table.columns)
-assert not any(missing), f'input positioner parameters file is missing columns {missing}'
+assert len(missing) == 0, f'input positioner parameters file is missing columns {missing}'
 for col in booleans:
     input_table[col] = [boolean(x) for x in input_table[col].tolist()]
 
@@ -79,7 +88,7 @@ params = Table(params_dict)
 possible_locs = set(pc.generic_pos_neighbor_locs)
 device_locs = params['DEVICE_LOC']
 invalid_locs = set(params['DEVICE_LOC']) - possible_locs
-assert not any(invalid_locs), f'invalid device locations in input file: {invalid_locs}'
+assert len(invalid_locs) == 0, f'invalid device locations in input file: {invalid_locs}'
 assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {petal_id}'
 
 # select which positioners get move commands
@@ -88,7 +97,7 @@ if uargs.posids == 'all':
 else:
     movers = set(uargs.posids.split(','))
     missing = movers - all_posids
-    assert not any(missing), f'argued posids {missing} were not found in parameters file'
+    assert len(missing) == 0, f'argued posids {missing} were not found in parameters file'
 disabled = set(params['POS_ID'][params['CTRL_ENABLED'] == False])
 movers -= disabled
 movers = sorted(movers)  # code lower down assumes consistent order of these
