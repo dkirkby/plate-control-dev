@@ -56,7 +56,7 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
 
 if uargs.infile == None:
     # try to grab data from online db
-    import psycopg2
+    import psycopg2, getpass
     db_configs = [{'host': 'db.replicator.dev-cattle.stable.spin.nersc.org', 'port': 60042, 'password_required': False},
                   {'host': 'beyonce.lbl.gov', 'port': 5432,  'password_required': True}]
     max_rows = 10000
@@ -64,7 +64,7 @@ if uargs.infile == None:
     for config in db_configs:
         pw = ''
         if config['password_required']:
-            pw = input(f'Enter read-access password for database at {config["host"]}: ')
+            pw = getpass.getpass(f'Enter read-access password for database at {config["host"]}: ')
         try:
             comm = psycopg2.connect(host=config['host'], port=config['port'], database='desi_dev', user='desi_reader', password=pw)
             print(f'connected to database at {config["host"]}')
