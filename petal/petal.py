@@ -283,12 +283,14 @@ class Petal(object):
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
         '''
+        kwargs = {'printfunc': self.printfunc, 'use_neighbor_loc_dict': True}
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(config=self.anticol_settings, printfunc=self.printfunc)
+            kwargs['config'] = self.anticol_settings
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file, printfunc=self.printfunc)
-            self.anticol_settings = self.collider.config
+            kwargs['configfile'] = collider_file
+        self.collider = poscollider.PosCollider(**kwargs)
+        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
