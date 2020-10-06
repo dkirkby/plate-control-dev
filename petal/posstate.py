@@ -277,6 +277,7 @@ class PosState(object):
             return False
         if key in pc.nominals:  # 2nd check: reject values too far from nominal
             nom, tol = pc.nominals[key]['value'], pc.nominals[key]['tol']
+            val = float(val)  # helps clear out numpy floats (which are slower) when they sneak into system
             if not nom - tol <= val <= nom + tol:  # check for absurd values
                 self.printfunc(
                     f'Unit {self.unit_id}: new value {val} for posstate key '
