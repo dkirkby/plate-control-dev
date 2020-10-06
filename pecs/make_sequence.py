@@ -14,11 +14,11 @@ at a time.
 # command line argument parsing
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file, containing positioner calibration parameters')
+parser.add_argument('-i', '--infile', type=str, default=None, help='path to offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
 parser.add_argument('-o', '--outdir', type=str, required=True, help='path to directory where to save output file')
 parser.add_argument('-n', '--num_moves', type=int, required=True, help='integer number of moves to generate')
 parser.add_argument('-pos', '--posids', type=str, default='all', help='comma-separated POS_IDs, saying which positioners to generate targets for (defaults to "all")')
-parser.add_argument('-ptl', '--petal_id', type=int, default=0, help='specify which petal to use (if PETAL_ID field exists, and has multiple different values)')
+parser.add_argument('-ptl', '--petal_id', type=int, default=0, help='specify which petal to use')
 parser.add_argument('-ai', '--allow_interference', action='store_true', help='boolean, allow targets to interfere with one another')
 parser.add_argument('-s', '--num_stress_select', type=int, default=1, help='integer, for every selected move, code will internally test this many moves and pick the one with the most opportunities for collision.')
 parser.add_argument('-lim', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
@@ -52,26 +52,72 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
             'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_THETA_ANGULAR',
             'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
 
-# read calib data from online system (optional)
-# [TO-DO]
+# gather some specific user inputs which may be adjusted later, depending on the data source
 
-# read positioner parameter data
-booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
-nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
-boolean = lambda x: x not in nulls
-input_table = Table.read(uargs.infile)
-missing = required - set(input_table.columns)
-assert len(missing) == 0, f'input positioner parameters file is missing columns {missing}'
-for col in booleans:
-    input_table[col] = [boolean(x) for x in input_table[col].tolist()]
+if uargs.infile == None:
+    # try to grab data from online db
+    import psycopg2
+    db_configs = [{'host': 'db.replicator.dev-cattle.stable.spin.nersc.org', 'port': 60042, 'password_required': False},
+                  {'host': 'beyonce.lbl.gov', 'port': 5432,  'password_required': True}]
+    max_rows = 10000
+    comm = None
+    for config in db_configs:
+        pw = ''
+        if config['password_required']:
+            pw = input(f'Enter read-access password for database at {config["host"]}: ')
+        try:
+            comm = psycopg2.connect(host=config['host'], port=config['port'], database='desi_dev', user='desi_reader', password=pw)
+            print(f'connected to database at {config["host"]}')
+            break
+        except:
+            print(f'failed to connect to database at {config["host"]}')
+            continue
+    assert comm != None, 'failed to connect to any database!'
+    def dbquery(comm, operation, parameters=None):
+        '''Cribbed from desimeter/dbutil.py'''
+        cx=comm.cursor()
+        cx.execute(operation,parameters)
+        names=[d.name for d in cx.description]
+        res=cx.fetchall()
+        cx.close()
+        results=dict()
+        for i,name in enumerate(names) :
+            results[name]=[r[i] for r in res]
+        return results
+    from_moves = f'from posmovedb.positioner_moves_p{uargs.petal_id}'
+    from_calib = f'from posmovedb.positioner_calibration_p{uargs.petal_id}'
+    cmd = f'select distinct pos_id {from_calib}'
+    data = dbquery(comm, cmd)
+    all_posids = sorted(set(data['pos_id']))
+    params_dict = {key: [] for key in required}
+    moves_keys = {'CTRL_ENABLED'}
+    calib_keys = required - moves_keys
+    query_config = [{'from': from_moves, 'keys': moves_keys},
+                    {'from': from_calib, 'keys': calib_keys}]
+    for posid in all_posids:
+        for config in query_config:
+            keys_str = str({key.lower() for key in config['keys']}).strip('{').strip('}').replace("'",'')
+            cmd = f"select {keys_str} {config['from']} where pos_id in ('{posid}') order by time_recorded desc limit 1"
+            data = dbquery(comm, cmd)
+            for key, value in data.items():
+                params_dict[key.upper()] += value  # note how value comes back as a single element list here
+    input_table = Table(params_dict)
+else:
+    # read positioner parameter data from csv file
+    booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
+    nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
+    boolean = lambda x: x not in nulls
+    input_table = Table.read(uargs.infile)
+    missing = required - set(input_table.columns)
+    assert len(missing) == 0, f'input positioner parameters file is missing columns {missing}'
+    for col in booleans:
+        input_table[col] = [boolean(x) for x in input_table[col].tolist()]
 
-# select petal id
-petal_id = uargs.petal_id
-if 'PETAL_ID' in input_table.columns:
-    all_petal_ids = set(input_table['PETAL_ID'])
-    assert petal_id in uargs.petal_id, f'argued petal_id {petal_id} not found in input file'
-    undesired = input_table['PETAL_ID'] != petal_id
-    input_table.remove_rows(undesired)
+    # trim out unused data from other petals
+    if 'PETAL_ID' in input_table.columns:
+        all_petal_ids = set(input_table['PETAL_ID'])
+        undesired = input_table['PETAL_ID'] != uargs.petal_id
+        input_table.remove_rows(undesired)
     
 # ensure single, unique set of parameters per positioner
 all_posids = set(input_table['POS_ID'])
@@ -89,7 +135,7 @@ possible_locs = set(pc.generic_pos_neighbor_locs)
 device_locs = params['DEVICE_LOC']
 invalid_locs = set(params['DEVICE_LOC']) - possible_locs
 assert len(invalid_locs) == 0, f'invalid device locations in input file: {invalid_locs}'
-assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {petal_id}'
+assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {uargs.petal_id}'
 
 # select which positioners get move commands
 if uargs.posids == 'all':
@@ -117,7 +163,7 @@ params.remove_rows(elim_rows)
 params.sort('POS_ID')
 
 # initialize a simulated petal instance
-ptl = petal.Petal(petal_id        = petal_id,
+ptl = petal.Petal(petal_id        = uargs.petal_id,
                   petal_loc       = 3,
                   posids          = params['POS_ID'].tolist(),
                   fidids          = set(),
@@ -227,7 +273,7 @@ def profile(evaluatable_string):
 
 # generate sequence
 timestamp = pc.compact_timestamp()
-seq = sequence.Sequence(short_name=f'ptl{petal_id:02}_npos_{len(movers):03}_ntarg_{uargs.num_moves:03}_{timestamp}',
+seq = sequence.Sequence(short_name=f'ptl{uargs.petal_id:02}_npos_{len(movers):03}_ntarg_{uargs.num_moves:03}_{timestamp}',
                         long_name='Test move sequence generated by make_sequence.py',
                         details=f'Generated with settings: {uargs}')
 set_posTP({posid: (0, 150) for posid in ptl.posids})  # inital values like typical "parked" position
