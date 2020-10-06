@@ -360,7 +360,7 @@ class Move(object):
         self._sequence_name_getter = None
     
     # properties of Move with single values vs multiple values
-    single_keys = {'command', 'log_note', 'allow_corr'}
+    single_keys = {'command', 'allow_corr'}
     multi_keys = {'target0', 'target1', 'device_loc', 'log_note'}
     
     def register_sequence_name_getter(self, function):
@@ -389,6 +389,13 @@ class Move(object):
             note = pc.join_notes(*new_parts)
             notes.append(note)
         return notes
+    
+    def get_log_notes(self, device_locs):
+        '''Returns list of log note values for the collection device_locs, in
+        the same order as device_locs.'''
+        notes = self.log_note
+        out = [notes[self.device_loc.index(loc)] for loc in device_locs]
+        return out
     
     @staticmethod
     def _validate_pos_settings(settings):

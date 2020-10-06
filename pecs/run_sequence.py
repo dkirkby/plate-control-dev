@@ -536,14 +536,15 @@ try:
                     device_loc_map = get_map(key='ids', posids=posids)
                     # note below how order is preserved for target0, target1, and device_loc
                     # lists, on the assumption that get_posids() returns a list
+                    device_locs = [device_loc_map[posid] for posid in posids]
                     submove = sequence.Move(command='poslocdXdY',
                                             target0=[-targ_errs[posid][0] for posid in posids],
                                             target1=[-targ_errs[posid][1] for posid in posids],
-                                            device_loc=[device_loc_map[posid] for posid in posids],
-                                            log_note=[initial_request['LOG_NOTE'][np.where(initial_request['DEVICE_ID'] == posid)[0][0]] for posid in posids],  # oh how I despise pandas...
+                                            device_loc=device_locs,
+                                            log_note=move.get_log_notes(device_locs),
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
-                request = submove.make_request(loc2id_map=get_map('loc'),log_note=extra_log_note)
+                request = submove.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
                 if submove.command not in sequence.abs_commands:
                     calc_errors = False
                 if submove_num == 0:
