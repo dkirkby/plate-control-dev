@@ -126,7 +126,10 @@ except:
     # still a useful case, for testing some portion of the script offline
     logger.warning('PECS initialization failed (hint: double-check whether you need to join instance in this terminal')
     pecs_on = False
-    _get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
+    device_locs = seq.get_device_locs()
+    if len(device_locs) == 0:
+        device_locs = range(10)
+    _get_posids = lambda: [f'DUMMY{i:05d}' for i in device_locs]
     temp = sorted(_get_posids())
     all_loc2id = {i: temp[i] for i in range(len(temp))}
 all_id2loc = {val: key for key, val in all_loc2id.items()}
@@ -138,7 +141,7 @@ def get_posids():
     '''Wrapper function to get list of currently enabled + selected posids, including
     raising an exception if that list is empty.'''
     posids = _get_posids()
-    if not any(posids):
+    if len(posids) == 0:
         raise NoPosidsError
     return posids
 
@@ -506,7 +509,7 @@ try:
         device_loc_unordered = set(get_map(key='loc', posids=posids))
         move_num = m + 1
         move_num_text = f'target {move_num} of {len(seq)}'
-        if not move.is_defined_for_locations(device_loc_unordered):
+        if not move.is_defined_for_all_locations(device_loc_unordered):
             logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')

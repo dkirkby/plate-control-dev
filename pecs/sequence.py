@@ -327,7 +327,7 @@ class Move(object):
         or set both to home both axes.
     '''
     def __init__(self, command, target0, target1, device_loc='any', log_note='', pos_settings={}, allow_corr=True):
-        if device_loc == 'any':
+        if device_loc == 'any' or is_number(device_loc):
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
                 assert is_number(x), f'target {x} is not a number'
@@ -337,7 +337,7 @@ class Move(object):
             self._log_note = [log_note] if is_string(log_note) else list(log_note)[0]
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
-            assert len(target0) == len(target1) == len(device_loc), 'args target0, target1, and device_loc are not of equal length'
+            assert (len(target0) == len(target1) == len(device_loc)), 'args target0, target1, and device_loc are not of equal length'
             self.target0 = list(target0)
             self.target1 = list(target1)
             self.device_loc = list(device_loc)
@@ -442,7 +442,7 @@ class Move(object):
         '''Boolean whether this move has mulitple targets.'''
         return len(self) > 1
     
-    def is_defined_for_locations(self, device_locs):
+    def is_defined_for_all_locations(self, device_locs):
         '''Returns boolean whether the move has valid command definitions for
         the argued collection of device locations.
         '''
