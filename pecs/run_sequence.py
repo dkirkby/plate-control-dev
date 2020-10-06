@@ -512,8 +512,15 @@ try:
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
         descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
         logger.info(f'Move settings are {descriptive_dict}\n')
-        correctable = move.command in sequence.general_commands and move.allow_corr
-        n_corr = uargs.num_corr if correctable else 0
+        correction_not_defined = move.command not in sequence.general_commands
+        correction_not_allowed = not move.allow_corr
+        not_correctable = correction_not_allowed or correction_not_defined 
+        if uargs.num_corr > 0 and not_correctable:
+            reason = f'not defined for {move.command} moves' if correction_not_defined else ''
+            reason += ', and ' if correction_not_defined and correction_not_allowed else ''
+            reason += 'disabled for this row in the sequence file' if correction_not_allowed else ''
+            logger.info(f'Correction move skipped ({reason})')
+        n_corr = 0 if not_correctable else uargs.num_corr
         targ_errs = None
         calc_errors = True
         initial_request = None
@@ -545,8 +552,6 @@ try:
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
                 request = submove.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
-                if submove.command not in sequence.abs_commands:
-                    calc_errors = False
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
