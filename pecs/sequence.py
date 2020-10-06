@@ -390,12 +390,15 @@ class Move(object):
             notes.append(note)
         return notes
     
-    def get_log_notes(self, device_locs):
+    def get_log_notes(self, device_locs='any'):
         '''Returns list of log note values for the collection device_locs, in
         the same order as device_locs.'''
         notes = self.log_note
-        out = [notes[self.device_loc.index(loc)] for loc in device_locs]
-        return out
+        if device_locs == 'any':
+            device_locs = self.device_loc
+        elif self.device_loc == ['any']:
+            return [notes[0]] * len(device_locs)
+        return [notes[self.device_loc.index(loc)] for loc in device_locs]
     
     @staticmethod
     def _validate_pos_settings(settings):
