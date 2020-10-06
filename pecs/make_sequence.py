@@ -262,4 +262,4 @@ seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value int
 if not os.path.isdir(save_dir):
     os.path.os.makedirs(save_dir)
 path = seq.save(save_dir)
-print(f'Sequence generation complete!\nFile: {path}
+print(f'Sequence generation complete!\nFile: {path}')
