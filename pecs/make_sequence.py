@@ -14,15 +14,15 @@ at a time.
 # command line argument parsing
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('-i', '--infile', type=str, default=None, help='path to offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
-parser.add_argument('-o', '--outdir', type=str, required=True, help='path to directory where to save output file')
-parser.add_argument('-n', '--num_moves', type=int, required=True, help='integer number of moves to generate')
-parser.add_argument('-pos', '--posids', type=str, default='all', help='comma-separated POS_IDs, saying which positioners to generate targets for (defaults to "all")')
-parser.add_argument('-ptl', '--petal_id', type=int, default=0, help='specify which petal to use')
-parser.add_argument('-ai', '--allow_interference', action='store_true', help='boolean, allow targets to interfere with one another')
-parser.add_argument('-s', '--num_stress_select', type=int, default=1, help='integer, for every selected move, code will internally test this many moves and pick the one with the most opportunities for collision.')
-parser.add_argument('-lim', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
-parser.add_argument('-p', '--profile', action='store_true', help='turns on timing profiler for move scheduling')
+parser.add_argument('-n', '--num_moves', type=int, required=True, help='integer, number of moves to generate')
+parser.add_argument('-ptl', '--petal_id', type=int, required=True, help='integer, specify which PETAL_ID # to use')
+parser.add_argument('-pos', '--posids', type=str, default='all', help='optional, comma-separated POS_ID strings, saying which positioners to generate targets for (defaults to "all")')
+parser.add_argument('-s', '--num_stress_select', type=int, default=1, help='optional, integer, for every selected move, code will internally test this many moves and pick the one with the most opportunities for collision.')
+parser.add_argument('-ai', '--allow_interference', action='store_true', help='optional, allows targets to interfere with one another')
+parser.add_argument('-lim', '--enable_phi_limit', action='store_true', help='optional, turns on minimum phi limit for move targets, default is False')
+parser.add_argument('-p', '--profile', action='store_true', help='optional, turns on timing profiler for move scheduling')
+parser.add_argument('-i', '--infile', type=str, default=None, help='optional, path to offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
+parser.add_argument('-o', '--outdir', type=str, default='.', help='optional, path to directory where to save output file, defaults to current dir')
 uargs = parser.parse_args()
 
 import os
@@ -67,7 +67,7 @@ if uargs.infile == None:
             pw = getpass.getpass(f'Enter read-access password for database at {config["host"]}: ')
         try:
             comm = psycopg2.connect(host=config['host'], port=config['port'], database='desi_dev', user='desi_reader', password=pw)
-            print(f'connected to database at {config["host"]}')
+            print(f'success connecting to database at {config["host"]}')
             break
         except:
             print(f'failed to connect to database at {config["host"]}')
@@ -102,6 +102,7 @@ if uargs.infile == None:
             for key, value in data.items():
                 params_dict[key.upper()] += value  # note how value comes back as a single element list here
     input_table = Table(params_dict)
+    print(f'calibration parameters: database retrieval complete!')
 else:
     # read positioner parameter data from csv file
     booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
@@ -118,6 +119,7 @@ else:
         all_petal_ids = set(input_table['PETAL_ID'])
         undesired = input_table['PETAL_ID'] != uargs.petal_id
         input_table.remove_rows(undesired)
+    print(f'calibration parameters: read from file complete!')
     
 # ensure single, unique set of parameters per positioner
 all_posids = set(input_table['POS_ID'])
@@ -163,6 +165,7 @@ params.remove_rows(elim_rows)
 params.sort('POS_ID')
 
 # initialize a simulated petal instance
+print(f'Now initializing petal {uargs.petal_id}, will take a few seconds...')
 ptl = petal.Petal(petal_id        = uargs.petal_id,
                   petal_loc       = 3,
                   posids          = params['POS_ID'].tolist(),
@@ -272,6 +275,7 @@ def profile(evaluatable_string):
     p.print_stats(n_stats_lines)
 
 # generate sequence
+print(f'Now generating the sequence, n_moves = {uargs.num_moves}')
 timestamp = pc.compact_timestamp()
 seq = sequence.Sequence(short_name=f'ptl{uargs.petal_id:02}_npos_{len(movers):03}_ntarg_{uargs.num_moves:03}_{timestamp}',
                         long_name='Test move sequence generated by make_sequence.py',
