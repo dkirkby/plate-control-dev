@@ -21,7 +21,7 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
 parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-ms', '--start_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
-parser.add_argument('-mf', '--final_move', type=str, default=null_move_id_large, help='syntax: <exposure_id>.<exposure_iter>, finsih the simulation at this move (or defaults to last move in data)')
+parser.add_argument('-mf', '--final_move', type=str, default=null_move_id_large, help='syntax: <exposure_id>.<exposure_iter>, finish the simulation at this move (or defaults to last move in data)')
 parser.add_argument('-anim', '--animate', action='store_true', help='plot an animation of simulated moves (can be slow), defaults to False')
 parser.add_argument('-f', '--focus', type=str, default=None, help='focus the animation in on a particular positioner and its neighbors. Identify it either by device location integer or POS_ID')
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
