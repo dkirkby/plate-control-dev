@@ -244,6 +244,16 @@ class Sequence(object):
     def __contains__(self, value):
         return value in self.moves
     
+    def index(self, value):
+        for i in range(len(self)):
+            if self[i] == value:
+                return i
+        raise ValueError(f'{object.__repr__(self)} is not in sequence')
+    
+    def count(self, value):
+        matches = [True for x in self if value == x]
+        return len(matches)
+    
     def append(self, value):
         self._validate_move(value)
         self.moves.append(value)
