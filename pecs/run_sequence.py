@@ -52,10 +52,11 @@ import sequence
 seq = sequence.Sequence.read(uargs.infile)
 
 # check start / finish moves
-assert seq[uargs.start_move], f'invalid start_move {uargs.start_move}, must be >= 0 (or a valid pythonic negative index)'
-assert seq[uargs.final_move], f'invalid final_move {uargs.final_move}, must be < {len(seq)} (or a valid pythonic negative index)'
-start_move = seq.index(seq[uargs.start_move])  # normalizes negative index cases
-final_move = seq.index(seq[uargs.final_move])  # normalizes negative index cases
+try:
+    start_move = seq.index(seq[uargs.start_move])  # normalizes negative index cases
+    final_move = seq.index(seq[uargs.final_move])  # normalizes negative index cases
+except:
+    assert False, f'start_move={uargs.start_move} or final_move={uargs.final_move} is out of range of the sequence (which has length={len(seq)})'
 assert start_move <= final_move, f'start_move {start_move} > final_move {final_move}'
 is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
@@ -516,12 +517,14 @@ logger.info('Beginning the move sequence\n')
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
+    move_counter = 0
+    num_moves = final_move - start_move + 1
     for m in range(start_move, final_move + 1):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
         device_loc_unordered = set(get_map(key='loc', posids=posids))
-        move_num = m + 1
-        move_num_text = f'target {move_num} of {len(seq)}'
+        move_counter += 1
+        move_num_text = f'target {move_counter} of {num_moves} (sequence_move_idx = {m})'
         if not move.is_defined_for_all_locations(device_loc_unordered):
             logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
@@ -541,9 +544,11 @@ try:
         calc_errors = True
         initial_request = None
         for submove_num in range(1 + n_corr):
-            extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_num}')
+            extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
+            submove_txt = f'submove {submove_num}'
+            move_with_submove_txt = f'{move_num_text}, {submove_txt}'
             if n_corr > 0:
-                extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
+                extra_log_note = pc.join_notes(extra_log_note, submove_txt)
             if move.command in sequence.general_commands:
                 if pecs_on:
                     move_measure_func = pecs.move_measure
@@ -579,7 +584,7 @@ try:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
             else:
-                logger.warning(f'Skipping move {move_num} submove {submove_num} due to unexpected command {move.command}\n')
+                logger.warning(f'Skipping {move_with_submove_txt} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
@@ -588,7 +593,7 @@ try:
                 if pecs_on:
                     apply_pos_settings(all_settings)
                 last_pos_settings = new_settings
-            logger.info(f'Doing move {move_num}, submove {submove_num}')
+            logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)
                 
@@ -615,11 +620,11 @@ try:
                     dummy_err_x2 = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     dummy_err_y2 = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     trac_errs = {posids[i]: [dummy_err_x2[i], dummy_err_y2[i]] for i in range(len(posids))}
-                err_str = f'Results for move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors given in um:'
+                err_str = f'Results for {move_with_submove_txt}, n_pos={len(posids)}, errors given in um:'
                 err_str += '\n' + summarize_errors(targ_errs, prefix='TARGETING')
                 err_str += '\n' + summarize_errors(trac_errs, prefix=' TRACKING')
                 logger.info(err_str + '\n')
-            more_moves_to_do = submove_num < n_corr or move_num < len(seq) or uargs.postpark
+            more_moves_to_do = submove_num < n_corr or m < final_move or uargs.postpark
             if more_moves_to_do:
                 do_pause()
     if uargs.postpark:
