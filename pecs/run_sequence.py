@@ -33,6 +33,8 @@ park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
 parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running the sequence. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
+parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -48,6 +50,14 @@ uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
 # read sequence file
 import sequence
 seq = sequence.Sequence.read(uargs.infile)
+
+# check start / finish moves
+assert seq[uargs.start_move], f'invalid start_move {uargs.start_move}, must be >= 0 (or a valid pythonic negative index)'
+assert seq[uargs.final_move], f'invalid final_move {uargs.final_move}, must be < {len(seq)} (or a valid pythonic negative index)'
+start_move = seq.index(seq[uargs.start_move])  # normalizes negative index cases
+final_move = seq.index(seq[uargs.final_move])  # normalizes negative index cases
+assert start_move <= final_move, f'start_move {start_move} > final_move {final_move}'
+is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
 import logging
@@ -84,7 +94,8 @@ logger.addHandler(sh)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
 logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {uargs.infile}')
-logger.info(f'Contents:\n\n{seq}')
+subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
+logger.info(f'Contents:\n\n{seq}{subseq_str}')
 
 import sys
 def quit_query(question):
@@ -129,9 +140,11 @@ except:
     device_locs = seq.get_device_locs()
     if len(device_locs) == 0:
         device_locs = range(10)
-    _get_posids = lambda: [f'DUMMY{i:05d}' for i in device_locs]
+    all_loc2id = {i:f'DUMMY{i:05d}' for i in device_locs}
+    _dummy_posids = list(all_loc2id.values())
+    _get_posids = lambda: _dummy_posids
     temp = sorted(_get_posids())
-    all_loc2id = {i: temp[i] for i in range(len(temp))}
+    
 all_id2loc = {val: key for key, val in all_loc2id.items()}
 
 class NoPosidsError(Exception):
@@ -503,7 +516,7 @@ logger.info('Beginning the move sequence\n')
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
-    for m in range(len(seq)):
+    for m in range(start_move, final_move + 1):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
         device_loc_unordered = set(get_map(key='loc', posids=posids))
