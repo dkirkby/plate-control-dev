@@ -103,7 +103,7 @@ if uargs.infile == None:
             for key, value in data.items():
                 params_dict[key.upper()] += value  # note how value comes back as a single element list here
     input_table = Table(params_dict)
-    print(f'calibration parameters: database retrieval complete!')
+    print('calibration parameters: database retrieval complete!')
 else:
     # read positioner parameter data from csv file
     booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
@@ -120,7 +120,7 @@ else:
         all_petal_ids = set(input_table['PETAL_ID'])
         undesired = input_table['PETAL_ID'] != uargs.petal_id
         input_table.remove_rows(undesired)
-    print(f'calibration parameters: read from file complete!')
+    print('calibration parameters: read from file complete!')
     
 # ensure single, unique set of parameters per positioner
 all_posids = set(input_table['POS_ID'])
