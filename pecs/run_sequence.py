@@ -541,7 +541,7 @@ try:
         calc_errors = True
         initial_request = None
         for submove_num in range(1 + n_corr):
-            extra_log_note = f'move {move_num}'
+            extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_num}')
             if n_corr > 0:
                 extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
             if move.command in sequence.general_commands:
