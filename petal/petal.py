@@ -791,11 +791,11 @@ class Petal(object):
               anticollision='default', should_anneal=True, disable_limit_angle=False):
         '''Repeatedly moves positioners to a series of positions at argued radius.
         
-        INPUTS:     posids ... either 'all', a single posid, or an iterable collection of posids (note sets don't work at DOS Console interface)
+        INPUTS:     posids ... either 'all', a single posid, or an iterable collection of posids (note sets don't work at DOS Console interface), defaults to 'all''
                     n_repeats ... integer number of repeats of the sequence, defaults to 1
                     delay ... minimum seconds from move to move, defaults to 60
-                    targets ... optional, sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
-                    anticollsion  ... optional, 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    targets ... sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
+                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''
