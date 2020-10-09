@@ -293,7 +293,7 @@ for move_id in move_ids:
         if posid in ptl.schedule.move_tables:
             ptl.schedule.move_tables[posid].for_hardware() # dummy call, to ensure inclusion of final creep rows in next display line
             ptl.schedule.move_tables[posid].display()
-            ptl.schedule.move_tables[posid].display_for('collider')
+            ptl.schedule.move_tables[posid].display_for('schedule')
             ptl.schedule.move_tables[posid].display_for('hardware')
         print('\n')
     failed_posids = ptl.send_and_execute_moves()
