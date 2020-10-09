@@ -36,7 +36,25 @@ class PosSchedule(object):
                                 verbose          = self.verbose,
                                 printfunc        = self.printfunc
                             ) for name in self.stage_order}
-        self.anneal_time = {'direct':4.0, 'retract':3.0, 'rotate':3.0, 'extend':3.0, 'expert':4.0} # times in seconds, see comments in PosScheduleStage
+        
+        # Anneal times spread out power density in time, as well as naturally reducing
+        # potential collision frequency. See comments in PosScheduleStage regarding
+        # implementation. Move time considerations as of 2020-10-09 [JHS]:
+        #   cruise 180 deg ... 180 / 176.07 deg/s --> 1.02 sec
+        #   cruise 360 deg ... 360 / 176.07 deg/s --> 2.04 sec
+        #   creep 3 deg ... 3 / 2.67 deg/s --> 1.12 sec
+        # Rationales for the values below are:
+        #   direct ... typ slowest case is ~ 3 deg creep corr move + 2x final auto-creeps --> 3.4 sec
+        #   retract ... phi cruise --> 1.0 sec
+        #   rotate ... theta cruise --> 2.0 sec
+        #   extend ... phi cruise + 2x final auto-creeps --> 3.2 sec
+        #   expert ... common case is homing, with cruise search distances 510 deg theta + 259 deg phi --> 4.4 sec
+        # Then in all cases I multiply by a factor 1.5, to give the annealing some room to spread.
+        # I think these numbers are functional, and not too inefficient. Next level of refinement
+        # would be to run a sizeable sample of targets / correction moves (maybe 1000 each) and
+        # analyze resulting stage times.
+        self.anneal_time = {'direct':5.1, 'retract':1.5, 'rotate':3.0, 'extend':4.8, 'expert':6.6}  # unit seconds
+        
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
