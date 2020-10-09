@@ -664,6 +664,7 @@ class Petal(object):
                 self.printfunc(f'frozen: {frozen}')
             times = {tbl['total_time'] for tbl in hw_tables}
             self.printfunc(f'max move table time = {max(times):.4f} sec')
+            self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
         return failed_posids      
             
@@ -1777,9 +1778,9 @@ class Petal(object):
             else:
                 msg = 'WARNING: Due to failures when sending move tables to positioners, the entire move is canceled.'
                 if n_retries <= 0:
-                    msg += f' No scheduling retries remaining.'
+                    msg += ' No scheduling retries remaining.'
                 if len(posids_to_retry) == 0:
-                    msg += f' No communicable positioners remaining to reschedule.'
+                    msg += ' No communicable positioners remaining to reschedule.'
                 self.printfunc(msg)
         return failed_send_posids
 
