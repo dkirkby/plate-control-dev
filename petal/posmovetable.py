@@ -69,7 +69,8 @@ class PosMoveTable(object):
         return str(self.as_dict())
         
     def display(self, printfunc=print, show_posid=True):
-        '''Pretty-prints the table.
+        '''Pretty-prints the table.  To return a string, instead of printing
+        immediately, argue printfunc=None.
         '''
         def fmt(x):
             if x == None:
@@ -106,10 +107,14 @@ class PosMoveTable(object):
                     output += fmt(extra_row.data[header])
         else:
             output += ' (empty: contains no row data)'
-        printfunc(output)
+        if printfunc:
+            printfunc(output)
+        else:
+            return output
         
     def display_hw(self, printfunc=print):
-        '''Pretty-prints the version that gets sent to hardware.
+        '''Pretty-prints the version that gets sent to hardware. To return a
+        string, instead of printing immediately, argue printfunc=None.
         '''
         tab = '  '
         hw = self.for_hardware()
@@ -138,7 +143,10 @@ class PosMoveTable(object):
                 elif pc.is_float(value):
                     formats[-1] += '.3f'
             output += newline + tab.join([format(hw[key][i], formats[multiples.index(key)]) for key in multiples])
-        printfunc(output)
+        if printfunc:
+            printfunc(output)
+        else:
+            return output
         
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
