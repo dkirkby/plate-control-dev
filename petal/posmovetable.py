@@ -113,6 +113,8 @@ class PosMoveTable(object):
         '''
         tab = '  '
         hw = self.for_hardware()
+        hw['row_time'] = [hw['move_time'][i] + hw['postpause'][i]/1000 for i in range(hw['nrows'])]
+        hw['net_time'] = [sum(hw['row_time'][:i]) for i in range(1, hw['nrows'] + 1)]
         output = f'move table for: {hw["posid"]} (hardware version)'
         singletons = [k for k,v in hw.items() if not isinstance(v, (list, tuple))]
         newline = f'\n{tab}'
