@@ -232,10 +232,10 @@ class PosSchedule(object):
         self._combine_stages_into_final()
         final = self.stages['final']
         if anticollision:
-            c, a, p = self._check_final_stage(msg_prefix='Penultimate')
+            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
         else:
-            c, a, p = self._check_final_stage(msg_prefix='Final')
-        colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+            c, _, p = self._check_final_stage(msg_prefix='Final')
+        colliding_sweeps, collision_pairs = c, p # for readability
         if anticollision:
             if not colliding_sweeps:
                 self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')  
@@ -248,8 +248,9 @@ class PosSchedule(object):
                     frozen.update(frozen)
                 self.printfunc(f'Adjusted posids: {adjusted}')
                 self.printfunc(f'Frozen posids: {frozen}')
-                c, a, p = self._check_final_stage(msg_prefix='Final', msg_suffix=' (should always be zero)')
-                colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+                c, _, p = self._check_final_stage(msg_prefix='Final',
+                                                  msg_suffix=' (should always be zero)')
+                colliding_sweeps, collision_pairs = c, p # for readability
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
@@ -257,8 +258,10 @@ class PosSchedule(object):
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
+        for table in self.move_tables.values():
+            table.strip()
         self._schedule_moves_store_requests_info()
-        self._schedule_moves_finish_logging(colliding_sweeps, all_sweeps)
+        self._schedule_moves_finish_logging()
 
     def conservative_move_timeout_period(self, safety_factor=4.0):
         """Returns a conservative period of time (in seconds) that one should
@@ -668,7 +671,7 @@ class PosSchedule(object):
                 table.display()
             table.append_log_note(log_note_addendum)
                 
-    def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
+    def _schedule_moves_finish_logging(self):
         """Final logging and animation steps for the schedule_moves() function."""
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
@@ -680,7 +683,9 @@ class PosSchedule(object):
         self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
-        if self.petal.animator_on and self.stages['final'].sweeps:
+        final = self.stages['final']
+        if self.petal.animator_on and final.sweeps:
+            colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)  # extra work, but frees us to tinker with tables after last collision check in normal operation (e.g. "strip()"), and anyway, animation is incredibly slow already so it doesn't really matter
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
                 for posid,sweep in colliding_sweeps.items():

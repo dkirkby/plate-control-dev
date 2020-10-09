@@ -221,7 +221,7 @@ class PosMoveTable(object):
         neither the theta nor phi axis, in any row.
         """
         for row in self.rows:
-            if row.data['dP_ideal'] or row.data['dT_ideal']:
+            if row.has_motion:
                 return False
         return True
     
@@ -258,7 +258,8 @@ class PosMoveTable(object):
     # setters
     def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
         if rowidx >= len(self.rows):
@@ -289,7 +290,8 @@ class PosMoveTable(object):
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
@@ -298,22 +300,50 @@ class PosMoveTable(object):
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['postpause'] = postpause
         self._reset_total_time_estimate()
 
+    def strip(self):
+        '''Removes two things from table:
+        
+            1. Any "zero" rows, i.e. with no motion and no pauses.
+            2. Any pauses that come after the last finite move.
+        
+        Stripping is performed only on the user-defined rows, *not* on any
+        internally auto-generated _rows_extra. In particular, case (2) means
+        that any auto-creep moves will be pushed earlier in time, so that they
+        occur immediately upon completion of the final user-defined motion.
+        '''
+        remove_pause = True
+        for i in reversed(range(len(self.rows))):
+            has_motion = self.rows[i].has_motion
+            if remove_pause:
+                if has_motion:
+                    self.rows[i].data['postpause'] = 0
+                    remove_pause = False
+                else:
+                    self.rows[i].data['prepause'] = 0
+                    self.rows[i].data['postpause'] = 0
+            has_prepause = self.rows[i].has_prepause
+            has_postpause = self.rows[i].has_postpause
+            if not has_motion and not has_prepause and not has_postpause:
+                del self.rows[i]
+        self._reset_total_time_estimate()
+
     # row manipulations
-    def insert_new_row(self,index):
+    def insert_new_row(self, index):
         newrow = PosMoveRow()
         self.rows.insert(index,newrow)
         if index > len(self.rows):
             self.insert_new_row(index) # to fill in any blanks up to index
         self._reset_total_time_estimate()
 
-    def delete_row(self,index):
+    def delete_row(self, index):
         del self.rows[index]
         self._reset_total_time_estimate()
 
@@ -532,4 +562,16 @@ class PosMoveRow(object):
 
     def copy(self):
         return copymodule.deepcopy(self)
+    
+    @property
+    def has_motion(self):
+        return self.data['dP_ideal'] != 0 or self.data['dT_ideal'] != 0
+    
+    @property
+    def has_prepause(self):
+        return self.data['prepause'] != 0
+    
+    @property
+    def has_postpause(self):
+        return self.data['postpause'] != 0
 
