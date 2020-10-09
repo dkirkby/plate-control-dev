@@ -204,7 +204,8 @@ def generate_target_set(posids):
         min_patrol = abs(ptl.collider.R1[posid] - ptl.collider.R2[posid])
         max_patrol = ptl.collider.R1[posid] + ptl.collider.R2[posid]
         if uargs.enable_phi_limit:
-            max_patrol = min(max_patrol, ptl.typical_phi_limit_angle)
+            limit_xy = model.trans.poslocTP_to_poslocXY([0, ptl.typical_phi_limit_angle])
+            max_patrol = min(max_patrol, np.hypot(limit_xy[0], limit_xy[1]))
         while posid not in targets_obsTP and attempts_remaining:
             bad_target = False
             rangeT = model.targetable_range_posintT
