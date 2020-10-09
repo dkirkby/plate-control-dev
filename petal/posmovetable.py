@@ -112,37 +112,43 @@ class PosMoveTable(object):
         else:
             return output
         
-    def display_hw(self, printfunc=print):
+    def display_for(self, output_type='hardware', printfunc=print):
         '''Pretty-prints the version that gets sent to hardware. To return a
         string, instead of printing immediately, argue printfunc=None.
         '''
         tab = '  '
-        hw = self.for_hardware()
-        hw['row_time'] = [hw['move_time'][i] + hw['postpause'][i]/1000 for i in range(hw['nrows'])]
-        hw['net_time'] = [sum(hw['row_time'][:i]) for i in range(1, hw['nrows'] + 1)]
-        output = f'move table for: {hw["posid"]} (hardware version)'
-        singletons = [k for k,v in hw.items() if not isinstance(v, (list, tuple))]
+        if output_type == 'hardware':
+            t = self.for_hardware()
+            t['row_time'] = [t['move_time'][i] + t['postpause'][i]/1000 for i in range(t['nrows'])]
+        elif output_type == 'collider':
+            t = self.for_collider()
+            t['row_time'] = [t['move_time'][i] + t['prepause'][i] + t['postpause'][i] for i in range(t['nrows'])]
+        else:
+            assert False, f'pretty printing of output_type {output_type} not yet defined'
+        t['net_time'] = [sum(t['row_time'][:i]) for i in range(1, t['nrows'] + 1)]
+        output = f'move table for: {self.posid} ({output_type} version)'
+        singletons = [k for k,v in t.items() if not isinstance(v, (list, tuple))]
         newline = f'\n{tab}'
         for key in singletons:
-            output += f'\n{tab}{key}: {hw[key]}'
-        multiples = [k for k in hw if k not in singletons]
+            output += f'\n{tab}{key}: {t[key]}'
+        multiples = [k for k in t if k not in singletons]
         headers = [str(m) for m in multiples]
-        widths = [len(h) for h in headers]
-        output += newline + tab.join(headers)
+        widths = [max(8, len(h)) for h in headers]
+        output += newline + tab.join([format(headers[i], f'^{widths[i]}s') for i in range(len(headers))])
         output += newline + tab.join(['-' * w for w in widths])
-        lengths = {len(hw[key]) for key in multiples}
+        lengths = {len(t[key]) for key in multiples}
         if len(lengths) != 1:
             output += '\n{tab}ERROR! NOT ALL COLUMNS HAVE SAME NUMBER OF ROWS!'
         for i in range(lengths.pop()):
             formats = []
             for key in headers:
                 formats += [f'>{widths[headers.index(key)]}']
-                value = hw[key][i]
+                value = t[key][i]
                 if pc.is_integer(value):
                     formats[-1] += 'd'
                 elif pc.is_float(value):
                     formats[-1] += '.3f'
-            output += newline + tab.join([format(hw[key][i], formats[multiples.index(key)]) for key in multiples])
+            output += newline + tab.join([format(t[key][i], formats[multiples.index(key)]) for key in multiples])
         if printfunc:
             printfunc(output)
         else:
@@ -411,7 +417,7 @@ class PosMoveTable(object):
             true_and_new[i].extend(new_moves[i])
         return true_and_new
 
-    def _for_output_type(self,output_type):
+    def _for_output_type(self, output_type):
         """Internal function that calculates the various output table formats and
         passes them up to the wrapper functions above.
         """
