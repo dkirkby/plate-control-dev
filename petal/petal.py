@@ -787,12 +787,13 @@ class Petal(object):
         self.schedule_send_and_execute_moves(None, should_anneal)
         
     default_dance_sequence = [(3,0), (0,1), (-3,0), (0,-1)]
-    def dance(self, posids='all', n_repeats=1, targets=default_dance_sequence,
+    def dance(self, posids='all', n_repeats=1, delay=60, targets=default_dance_sequence,
               anticollision='default', should_anneal=True, disable_limit_angle=False):
         '''Repeatedly moves positioners to a series of positions at argued radius.
         
         INPUTS:     posids ... either 'all', a single posid, or an iterable collection of posids (note sets don't work at DOS Console interface)
                     n_repeats ... integer number of repeats of the sequence, defaults to 1
+                    delay ... minimum seconds from move to move, defaults to 60
                     targets ... optional, sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
                     anticollsion  ... optional, 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function, defaults to True
@@ -801,18 +802,27 @@ class Petal(object):
         if posids == 'all':
             posids = self.all_enabled_posids()
         n_repeats = int(n_repeats)
+        delay = float(delay)
         assert n_repeats > 0, f'dance: invalid arg {n_repeats} for n_repeats'
+        assert delay > 0, f'dance: invalid arg {delay} for delay'
         count = 0
+        next_allowed_move_time = time.time() - delay + 0.001
         for n in range(n_repeats):
             for target in targets:
                 assert len(target) == 2 and all([isinstance(val, (int, float, np.integer, np.float)) for val in target]), f'dance: invalid target {target}'
                 count += 1
+                sleep_time = next_allowed_move_time - time.time()
+                if sleep_time > 0:
+                    self.printfunc(f'Pausing {sleep_time:.1f} seconds before next move.')
+                    time.sleep(sleep_time)
                 note = pc.join_notes('petal dance sequence', f'move {count}')
                 self.printfunc(note + f' to poslocXY = {target}')
+                next_allowed_move_time = time.time() + delay
                 self.quick_move(posids=posids, cmd='poslocXY', target=target, log_note=note,
                                 anticollision=anticollision, should_anneal=should_anneal,
-                                disable_limit_angle=disable_limit_angle)                        
-
+                                disable_limit_angle=disable_limit_angle)
+                
+                
 # METHODS FOR FIDUCIAL CONTROL
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set specific fiducials on or off.
