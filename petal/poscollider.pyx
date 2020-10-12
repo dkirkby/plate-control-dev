@@ -451,6 +451,8 @@ class PosCollider(object):
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].add(possible_neighbor)
+        assert len(self.pos_neighbors[posid]) <= 6, f'{posid}: num neighbors > 6 is geometrically invalid. This indicates a problem ' + \
+                                                     ' with calibration values or polygon geometry. Must be fixed before proceeding.'
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
