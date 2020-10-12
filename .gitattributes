@@ -43,9 +43,6 @@ petal/anticollision_test_harness/sequences.py -text
 petal/anticollision_test_harness/stress_test_selector.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
-petal/dummy.csv -text
-petal/dummy.gif -text
-petal/dummy.png -text
 petal/focal_surface_lookup.csv -text
 petal/generic_pos_neighbor_locs.csv -text
 petal/petal.py -text
