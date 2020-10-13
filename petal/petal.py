@@ -1908,6 +1908,8 @@ class Petal(object):
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
+        elif isinstance(ids, str): #strings that != 'all'
+            ids = {ids}
         if initialize:
             for posfidid in ids:
                 if posfidid not in self.posids.union(self.fidids): 
