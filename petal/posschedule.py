@@ -170,7 +170,7 @@ class PosSchedule(object):
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_limit(posmodel, targt_poslocTP):
             print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
-                         f'"expert" petal limit_angle at {self.petal.limit_angle}.')
+                         f'"expert" petal limit_angle at poslocP={self.petal.limit_angle}.')
             return False
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
@@ -426,20 +426,23 @@ class PosSchedule(object):
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
+        retracted_poslocP = self.collider.Eo_phi  # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to
         for posid, request in self._requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
             # always safely handled from stage to stage.
             posmodel = self.petal.posmodels[posid]
             trans = posmodel.trans
-            start_posintTP['retract'][posid] = request['start_posintTP']
-            starting_phi = start_posintTP['retract'][posid][pc.P]
-            if starting_phi > self.collider.Eo_phi or request['start_posintTP'] == request['targt_posintTP']:
-                retracted_phi = starting_phi
+            this_start_posintTP = request['start_posintTP']
+            this_start_poslocTP = trans.posintTP_to_poslocTP(this_start_posintTP)
+            start_posintTP['retract'][posid] = this_start_posintTP
+            if this_start_poslocTP[pc.P] > self.collider.Eo_phi or request['start_posintTP'] == request['targt_posintTP']:
+                retracted_posintP = start_posintTP['retract'][posid][pc.P]
             else:
-                retracted_phi = self.collider.Eo_phi # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
-            desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_phi]
-            desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_phi]
+                retracted_posintTP = trans.poslocTP_to_posintTP([0, retracted_poslocP])  # poslocT=0 is a dummy value
+                retracted_posintP = retracted_posintTP[pc.P]
+            desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_posintP]
+            desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_posintP]
             desired_final_posintTP['extend'][posid] = request['targt_posintTP']
             def calc_dtdp(name, posid):
                 tp_start = start_posintTP[name][posid]
@@ -703,6 +706,10 @@ class PosSchedule(object):
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
         final = self.stages['final']
         if self.petal.animator_on and final.sweeps:
+            note = f'move {self.petal.animator_move_number}'
+            note_time = self.petal.animator_total_time
+            self.collider.animator.set_note(note=note, time=note_time)
+            self.petal.animator_move_number += 1
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)  # extra work, but frees us to tinker with tables after last collision check in normal operation (e.g. "strip()"), and anyway, animation is incredibly slow already so it doesn't really matter
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
