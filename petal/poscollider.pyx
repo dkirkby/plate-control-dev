@@ -405,8 +405,8 @@ class PosCollider(object):
         envelope (Eo), inner clear rotation envelope (Ei) and extended-phi clear rotation
         envelope (Ee).
         """
-        self.Eo_phi = self.config['PHI_EO']   # angle above which phi is guaranteed to be within envelope Eo
-        self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
+        self.Eo_phi = self.config['PHI_EO']   # poslocP angle above which phi is guaranteed to be within envelope Eo
+        self.Ei_phi = self.config['PHI_EI']   # poslocP angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Eo_with_margin = self.Eo + 2 * self.config['EO_RADIAL_TOL'] # outer clear rotation envelope for collision checks (diameter)
         self.Eo_radius_with_margin = self.Eo_with_margin / 2 # outer clear rotation envelope for collision checks (radius)
