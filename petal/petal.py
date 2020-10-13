@@ -299,7 +299,9 @@ class Petal(object):
         self.animator_on = False
         # keeps track of total time of the current animation
         self.animator_total_time = 0
+        self.animator_move_number = 0
         self.previous_animator_total_time = 0
+        self.previous_animator_move_number = 0
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
         
@@ -1640,6 +1642,7 @@ class Petal(object):
         self.animator.clear()
         self.animator_on = True
         self.animator_total_time = 0
+        self.animator_move_number = 0
         self.collider.add_fixed_to_animator(self.animator_total_time)
 
     def stop_gathering_frames(self):
@@ -1719,6 +1722,7 @@ class Petal(object):
         self.schedule = self._new_schedule()
         if self.animator_on:
             self.previous_animator_total_time = self.animator_total_time
+            self.previous_animator_move_number = self.animator_move_number
         
     def _cancel_move(self, reset_flags=True):
         '''Resets schedule and performs posmodel cleanup commands.
@@ -1737,6 +1741,7 @@ class Petal(object):
         if self.animator_on:
             self.animator.clear_after(time=self.previous_animator_total_time)
             self.animator_total_time = self.previous_animator_total_time
+            self.animator_move_number = self.previous_animator_move_number
     
     def _handle_any_failed_send_of_move_tables(self, response, n_retries):
         '''Inspects response from petalcontroller after attempt to send move
