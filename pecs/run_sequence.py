@@ -444,7 +444,6 @@ def get_parkable_neighbors(posids):
     # function right now a functionally useless placeholder.
     all_known_as_commandable_to_pecs = set(pecs.posids)
     parkable_neighbors &= all_known_as_commandable_to_pecs
-    
     return parkable_neighbors
 
 # setup prior to running sequence
@@ -506,8 +505,15 @@ def park(park_option, is_prepark=True):
     if is_prepark:
         last_move_time = time.time()
     if real_moves:
-        pecs.park_and_measure(posids=all_to_park, mode='normal', coords=park_option, log_note=extra_note,
-                              match_radius=None, check_unmatched=False, test_tp=False)
+        kwargs = {'posids': all_to_park,
+                  'mode': 'normal',
+                  'coords': park_option,
+                  'log_note': extra_note,
+                  }
+        kwargs.update(move_meas_settings)
+        if 'anticollision' in kwargs:
+            del kwargs['anticollision']  # not an arg to park_and_measure
+        pecs.park_and_measure(**kwargs)
     if any(seq) and is_prepark:
         do_pause()
     logger.info('Parking complete\n')
