@@ -1925,6 +1925,8 @@ class Petal(object):
         else:
             for posfidid in ids:
                 # Unsets flags in reset_mask
+                if posfidid not in self.posids.union(self.fidids): 
+                    continue
                 self.pos_flags[posfidid] = (self.pos_flags[posfidid] | self.reset_mask) ^ self.reset_mask
         return
 
