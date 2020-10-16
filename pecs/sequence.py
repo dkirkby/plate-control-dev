@@ -343,19 +343,14 @@ class Move(object):
                 assert is_number(x), f'target {x} is not a number'
             self.target0 = [target0]
             self.target1 = [target1]
-            self.device_loc = [device_loc]
-            self._log_note = [log_note] if is_string(log_note) else list(log_note)[0]
+            self.device_loc = [device_loc]           
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
             assert (len(target0) == len(target1) == len(device_loc)), 'args target0, target1, and device_loc are not of equal length'
             self.target0 = list(target0)
             self.target1 = list(target1)
             self.device_loc = list(device_loc)
-            if is_string(log_note):
-                self._log_note = [log_note] * len(self.device_loc)
-            else:
-                assert len(log_note) == len(self.device_loc)
-                self._log_note = list(log_note)
+        self.log_note = log_note
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
         if command in homing_commands:
@@ -364,8 +359,7 @@ class Move(object):
         allowed_posloc = possible_device_locs | {'any'}
         assert all([x in allowed_posloc for x in self.device_loc]), 'all elements of device_loc must be valid device locations'
         self.command = command
-        
-        self._pos_settings = self._validate_pos_settings(pos_settings)
+        self.pos_settings = pos_settings
         self.allow_corr = bool(allow_corr)
         self._sequence_name_getter = None
     
@@ -399,6 +393,17 @@ class Move(object):
             note = pc.join_notes(*new_parts)
             notes.append(note)
         return notes
+    
+    @log_note.setter
+    def log_note(self, note):
+        if self.has_multiple_targets:
+            if is_string(note):
+                self._log_note = [note] * len(self.device_loc)
+            else:
+                assert len(note) == len(self.device_loc)
+                self._log_note = list(note)
+        else:
+            self._log_note = [note] if is_string(note) else list(note)[0]
     
     def get_log_notes(self, device_locs='any'):
         '''Returns list of log note values for the collection device_locs, in
@@ -434,6 +439,11 @@ class Move(object):
         d = pos_defaults.copy()
         d.update(self._pos_settings)
         return d
+    
+    @pos_settings.setter
+    def pos_settings(self, settings):
+        '''Settings dict, may contain any subset of pos_defaults keys.'''
+        self._pos_settings = self._validate_pos_settings(settings)
     
     @property
     def non_default_pos_settings(self):
