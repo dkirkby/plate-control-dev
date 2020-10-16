@@ -276,10 +276,14 @@ class PosSchedule(object):
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
+        if self.petal.animator_on:
+            anim_tables = {posid: table.copy() for posid, table in self.move_tables.items()}
+        else:
+            anim_tables = {}
         for table in self.move_tables.values():
             table.strip()
         self._schedule_moves_store_requests_info()
-        self._schedule_moves_finish_logging()
+        self._schedule_moves_finish_logging(anim_tables)
 
     def conservative_move_timeout_period(self, safety_factor=4.0):
         """Returns a conservative period of time (in seconds) that one should
@@ -692,7 +696,7 @@ class PosSchedule(object):
                 table.display()
             table.append_log_note(log_note_addendum)
                 
-    def _schedule_moves_finish_logging(self):
+    def _schedule_moves_finish_logging(self, anim_tables={}):
         """Final logging and animation steps for the schedule_moves() function."""
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
@@ -704,13 +708,21 @@ class PosSchedule(object):
         self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
-        final = self.stages['final']
-        if self.petal.animator_on and final.sweeps:
+        if self.petal.animator_on and anim_tables:
+            final = self.stages['final']
+            dummy_stats = posschedstats.PosSchedStats(enabled=False)
+            anim_stage = posschedulestage.PosScheduleStage(collider=final.collider,
+                                                           stats=dummy_stats,
+                                                           power_supply_map=final._power_supply_map,
+                                                           verbose=final.verbose,
+                                                           printfunc=final.printfunc)
+            for table in anim_tables.values():
+                anim_stage.add_table(table)
+            colliding_sweeps, all_sweeps = anim_stage.find_collisions(anim_stage.move_tables)                       
             note = f'move {self.petal.animator_move_number}'
             note_time = self.petal.animator_total_time
             self.collider.animator.set_note(note=note, time=note_time)
             self.petal.animator_move_number += 1
-            colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)  # extra work, but frees us to tinker with tables after last collision check in normal operation (e.g. "strip()"), and anyway, animation is incredibly slow already so it doesn't really matter
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
                 for posid,sweep in colliding_sweeps.items():
