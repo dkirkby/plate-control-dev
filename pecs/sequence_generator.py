@@ -81,17 +81,20 @@ make_sparse_csv.append(seq)
 # ----------------
 import xy_targets_generator
 n_targs = 24
+calib_seqs = {}
 for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
     seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""}',
                             long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}')
     targs = xy_targets_generator.filled_annulus(n_points=n_targs,
                                                 r_min=0.0,
-                                                r_max=3.3 if limited else 6.0,
+                                                r_max=3.1 if limited else 6.0,
                                                 random=False)
     for targ in targs:
         move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
         seq.append(move)
     seqs.append(seq)
+    if limited == True:
+        calib_seqs['xy'] = seq  # for re-use in calibration script below
 
 
 # BASIC HOMING SEQUENCES
@@ -131,6 +134,7 @@ for axis in ['theta', 'phi']:
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
+    calib_seqs[axis] = seq  # for re-use in calibration script below
     
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
@@ -145,6 +149,23 @@ for axis in ['theta', 'phi']:
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', pos_settings=settings, allow_corr=False)
         seq.append(move)
     seqs.append(seq)
+
+
+# CALIBRATION SEQUENCE
+# --------------------
+settings = {}
+seq = sequence.Sequence(short_name='RC calib',
+                        long_name='rehome and calibrate',
+                        details='typical sequence of hitting hard limits, then running arcs on theta and phi, then a regular cartesian grid')
+move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note='homing', allow_corr=False)
+seq.append(move)
+for key in ['theta', 'phi', 'xy']:
+    for move in calib_seqs[key]:
+        move.log_note = f'{key} {"arc" if key in ["theta", "phi"] else "grid"}'
+        move.pos_settings = {}
+        move.allow_corr = False
+        seq.append(move)
+seqs.append(seq)
 
 
 # HARDSTOP DEBOUNCE MEASUREMENTS
