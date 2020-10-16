@@ -45,14 +45,14 @@ sim_fail_freq = {'send_tables': 0.0}
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
-pos_param_sequence_id = 'PTL01_01001' # 'cmds_unit_test'
-move_request_sequence_id = '01001_ntarg005_set000' # 'cmds_unit_test'
+pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_mille' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
 # Other ids and notes
 fidids = {}
-petal_id = 1
+petal_id = 0
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -69,7 +69,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
@@ -134,18 +134,18 @@ loop = 0
 for pos_param_id, pos_params in pos_param_sequence.items():
     for posid, params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
-        state.store('POS_T', start_posintTP[0])
-        state.store('POS_P', start_posintTP[1])
+        state.store('POS_T', start_posintTP[0], register_if_altered=False)
+        state.store('POS_P', start_posintTP[1], register_if_altered=False)
         for key,val in params.items():
-            state.store(key,val)
+            state.store(key, val, register_if_altered=False)
         if ignore_params_ctrl_enabled:
-            state.store('CTRL_ENABLED', True)
+            state.store('CTRL_ENABLED', True, register_if_altered=False)
         if params['DEVICE_LOC'] in retract_and_disable:
             orig_params[posid] = {key:state._val[key] for key in ['CTRL_ENABLED', 'CLASSIFIED_AS_RETRACTED']}
-            state.store('POS_T', retracted_TP[0])
-            state.store('POS_P', retracted_TP[1])
-            state.store('CTRL_ENABLED', False)
-            state.store('CLASSIFIED_AS_RETRACTED', True)
+            state.store('POS_T', retracted_TP[0], register_if_altered=False)
+            state.store('POS_P', retracted_TP[1], register_if_altered=False)
+            state.store('CTRL_ENABLED', False, register_if_altered=False)
+            state.store('CLASSIFIED_AS_RETRACTED', True, register_if_altered=False)
         state.write()
     ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
@@ -312,10 +312,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         ptl.generate_animation()
     for posid, params in orig_params.items():
         for key,value in params.items():
-            ptl.states[posid].store(key, value)
+            ptl.states[posid].store(key, value, register_if_altered=False)
         ptl.states[posid].write()
     loop += 1
-    
-# quick temporary test
-p = 'M02226'
-ptl.set_posfid_val(p, 'PRINCIPLE_HARDSTOP_CLEARANCE_T', 10)
+

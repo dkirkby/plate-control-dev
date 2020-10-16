@@ -281,9 +281,9 @@ class Axis(object):
         self.hardstop_debounce = self._calc_hardstop_debounce()
         motor_props = self.motor_calib_properties
         self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio'] / motor_props['gear_calib']
-        self.full_range = self._calc_full_range()
-        self.debounced_range = self._calc_debounced_range()
-        self.near_full_range = self._calc_near_full_range()
+        self._full_range = self._calc_full_range()
+        self._debounced_range = self._calc_debounced_range()
+        self._near_full_range = self._calc_near_full_range()
 
     @property
     def pos(self):
@@ -339,6 +339,25 @@ class Axis(object):
             return min(d)
         else:
             return self.get_maxpos(use_near_full_range) - (d[1] - d[0])
+        
+    @property
+    def full_range(self):
+        '''Returns 1x2 list, [min,max] values for full travel range.'''
+        return self._full_range.copy()
+    
+    @property
+    def debounced_range(self):
+        '''Returns 1x2 list, [min,max] values for debounced travel range.'''
+        return self._debounced_range.copy()
+    
+    @property
+    def near_full_range(self):
+        '''Returns 1x2 list, [min,max] values for a travel range between "full"
+        and "debounced" which allows some small additional margin. In particular
+        this is used for robustness when working with travel distances that have
+        been discretized according to motor steps.
+        '''
+        return self._near_full_range.copy()    
 
     @property
     def last_primary_hardstop_dir(self):

@@ -266,8 +266,7 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        # Change below when proper petalman implementation exists
-        centers = pd.concat(list(self.ptlm.get_centers(return_coord='QS').values())).reset_index(drop=True)
+        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
@@ -337,7 +336,7 @@ class PECS:
                  num_meas ... how many FVC images to take (the results will be median-ed)
         
         OUTPUTS: result ... pandas dataframe that includes columns:
-                            ['DQ', 'DS', 'FLAG', 'FWHM', 'MAG', 'MEAS_ERR',
+                            ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR',
                              'mea_Q', 'mea_S', 'COMMAND', 'tgt_posintT',
                              'tgt_posintP', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
                              'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
@@ -580,10 +579,10 @@ class PECS:
         
         # columns get renamed
         merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
-                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
+                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAG': 'FLAGS'},
                       inplace=True)
-        mask = merged['FLAG'].notnull()
-        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAG'])
+        mask = merged['FLAGS'].notnull()
+        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
         # get expected (tracked) posintTP angles
         exppos = (self.ptlm.get_positions(return_coord='posintTP',

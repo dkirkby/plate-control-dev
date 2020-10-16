@@ -316,7 +316,7 @@ for path in paths:
         print(f'Now reading: {path}')  # debug breakpoint
     seq = sequence.Sequence.read(path)
     print(seq,'\n')
-    if 'motortest' in seq[0].log_note:
+    if any('motortest' in s for s in seq[0].log_note):
         axis = 0 if 'THETA' in seq.normalized_short_name else 1
         deltas = [getattr(move, f'target{axis}') for move in seq]
         cumsum = np.cumsum(deltas).tolist()

@@ -2,7 +2,13 @@ from posmodel import PosModel
 import posschedule
 import posmovetable
 import posstate
-import poscollider
+try:
+    import poscollider
+except:
+    import sys
+    print('Error while importing poscollider. Make sure you have compiled the cython file ' +
+          'poscollider.pyx. Use setup.py in the petal directory, see usage comments in there.')
+    sys.exit(1)
 import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
@@ -27,6 +33,13 @@ try:
 except ImportError:
     def raise_error(*args, **kwargs):
         raise RuntimeError(*args, **kwargs)
+try:
+    # Perhaps force this to be a requirement in the future?
+    from DOSlib.flags import POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK, ENABLED_RESET_MASK, NON_PETAL_MASK
+    FLAGS_AVAILABLE = True
+except ImportError:
+    FLAGS_AVAILABLE = False
+    
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -55,7 +68,8 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
-        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius of acceptable positioner move requests
+        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -67,7 +81,7 @@ class Petal(object):
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True):
+                 phi_limit_on=True, sync_mode='hard'):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -113,6 +127,9 @@ class Petal(object):
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
+        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        assert sync_mode.lower() in ['hard','soft'], f'Invalid sync mode: {sync_mode}'
+        self.sync_mode = sync_mode
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0} 
@@ -167,27 +184,23 @@ class Petal(object):
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
-        self.pos_bit = 1<<2
-        self.fid_bit = 1<<3
-        self.bad_fiber_fvc_bit = 1<<5
-        self.ctrl_disabled_bit = 1<<16
-        self.fiber_broken_bit = 1<<17
-        self.comm_error_bit = 1<<18
-        self.overlap_targ_bit = 1<<19
-        self.frozen_anticol_bit = 1<<20
-        self.unreachable_targ_bit = 1<<21
-        self.restricted_targ_bit = 1<<22
-        self.multi_request_bit = 1<<23
-        self.dev_nonfunctional_bit = 1<<24
-        self.movetable_rejected_bit = 1<<25
-        self.exceeded_lims_bit = 1<<26
-        self.bad_neighbor_bit = 1<<27
-        self.missing_fvc_spot_bit = 1<<28
-        self.bad_performance_bit = 1<<29
+        if FLAGS_AVAILABLE:
+            self.flags = POSITIONER_FLAGS_MASKS
+            self.reset_mask = REQUEST_RESET_MASK
+            self.enabled_mask = ENABLED_RESET_MASK
+            self.non_petal_mask = NON_PETAL_MASK
+            self.missing_flag = 0
+        else:
+            self.printfunc('WARNING: DOSlib.flags not imported! Flags will not be set!')
+            self.flags = {}
+            self.reset_mask = 0
+            self.enabled_mask = 0
+            self.non_petal_mask = 0
+            self.missing_flag = 0
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
-        self._initialize_pos_flags(enabled_only=False)
-        self._apply_state_enable_settings()
+        self._initialize_pos_flags(initialize=True, enabled_only=False)
+        self._apply_all_state_enable_settings()
 
         self.hw_states = {}
 
@@ -264,21 +277,20 @@ class Petal(object):
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
         self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
-        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
-        # positioners
-        self.sync_mode = 'soft'
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
         '''
+        kwargs = {'printfunc': self.printfunc, 'use_neighbor_loc_dict': True}
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(config=self.anticol_settings, printfunc=self.printfunc)
+            kwargs['config'] = self.anticol_settings
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file, printfunc=self.printfunc)
-            self.anticol_settings = self.collider.config
+            kwargs['configfile'] = collider_file
+        self.collider = poscollider.PosCollider(**kwargs)
+        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
@@ -287,7 +299,9 @@ class Petal(object):
         self.animator_on = False
         # keeps track of total time of the current animation
         self.animator_total_time = 0
+        self.animator_move_number = 0
         self.previous_animator_total_time = 0
+        self.previous_animator_move_number = 0
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
         
@@ -360,13 +374,13 @@ class Petal(object):
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] |= self.ctrl_disabled_bit
+                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
                 marked_for_delete.add(posid)
                 if self.verbose:
                     self.printfunc(f'petal: {posid} CTRL_ENABLED=False, '
                                    f'{len(marked_for_delete)} to delete')
             elif self.schedule.already_requested(posid):
-                self.pos_flags[posid] |= self.multi_request_bit
+                self.pos_flags[posid] |= self.flags.get('MULTIPLEREQUESTS', self.missing_flag)
                 marked_for_delete.add(posid)
                 if self.verbose:
                     self.printfunc(f'petal: {posid} already requested, '
@@ -451,7 +465,7 @@ class Petal(object):
         self._initialize_pos_flags(ids = {posid for posid in requests})
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            self.pos_flags[posid] |= self.ctrl_disabled_bit
+            self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
             del requests[posid]
         for posid, request in requests.items():
             if posid not in self.posids:
@@ -493,7 +507,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= self.ctrl_disabled_bit
+                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
         for posid, posmodel in enabled.items():
             search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
@@ -549,7 +563,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= self.ctrl_disabled_bit
+                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
         for posid, posmodel in enabled.items():
             directions = {}
             phi_note = None
@@ -645,8 +659,14 @@ class Petal(object):
             response = self.comm.send_tables(hw_tables)
         failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries)
         if n_retries == 0 or not failed_posids:
+            frozen = self.schedule.get_frozen_posids()
+            for posid in frozen:
+                self.pos_flags[posid] |= self.flags.get('FROZEN', self.missing_flag) # Mark as frozen by anticollision
+            if any(frozen):
+                self.printfunc(f'frozen: {frozen}')
             times = {tbl['total_time'] for tbl in hw_tables}
             self.printfunc(f'max move table time = {max(times):.4f} sec')
+            self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
         return failed_posids      
             
@@ -767,7 +787,44 @@ class Petal(object):
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves(None, should_anneal)
-
+        
+    default_dance_sequence = [(3,0), (0,1), (-3,0), (0,-1)]
+    def dance(self, posids='all', n_repeats=1, delay=60, targets=default_dance_sequence,
+              anticollision='default', should_anneal=True, disable_limit_angle=False):
+        '''Repeatedly moves positioners to a series of positions at argued radius.
+        
+        INPUTS:     posids ... either 'all', a single posid, or an iterable collection of posids (note sets don't work at DOS Console interface), defaults to 'all''
+                    n_repeats ... integer number of repeats of the sequence, defaults to 1
+                    delay ... minimum seconds from move to move, defaults to 60
+                    targets ... sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
+                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    should_anneal ... see comments in schedule_moves() function, defaults to True
+                    disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
+        '''
+        if posids == 'all':
+            posids = self.all_enabled_posids()
+        n_repeats = int(n_repeats)
+        delay = float(delay)
+        assert n_repeats > 0, f'dance: invalid arg {n_repeats} for n_repeats'
+        assert delay > 0, f'dance: invalid arg {delay} for delay'
+        count = 0
+        next_allowed_move_time = time.time() - delay + 0.001
+        for n in range(n_repeats):
+            for target in targets:
+                assert len(target) == 2 and all([isinstance(val, (int, float, np.integer, np.float)) for val in target]), f'dance: invalid target {target}'
+                count += 1
+                sleep_time = next_allowed_move_time - time.time()
+                if sleep_time > 0:
+                    self.printfunc(f'Pausing {sleep_time:.1f} seconds before next move.')
+                    time.sleep(sleep_time)
+                note = pc.join_notes('petal dance sequence', f'move {count}')
+                self.printfunc(note + f' to poslocXY = {target}')
+                next_allowed_move_time = time.time() + delay
+                self.quick_move(posids=posids, cmd='poslocXY', target=target, log_note=note,
+                                anticollision=anticollision, should_anneal=should_anneal,
+                                disable_limit_angle=disable_limit_angle)
+                
+                
 # METHODS FOR FIDUCIAL CONTROL
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set specific fiducials on or off.
@@ -1305,13 +1362,9 @@ class Petal(object):
         for posid in posids:
             if posid not in self.posids:
                 continue  # this posid does not belong to this petal
-            if not(self.posmodels[posid].is_enabled):
-                self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
-            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):
-                self.pos_flags[posid] |= self.fiber_broken_bit
-                self.pos_flags[posid] |= self.bad_fiber_fvc_bit
-            if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                self.pos_flags[posid] |= self.dev_nonfunctional_bit
+            self._apply_state_enable_settings(posid)
+            if self.posmodels[posid].is_enabled:
+                self.pos_flags[posid] = (self.pos_flags[posid] | self.enabled_mask) ^ self.enabled_mask
             pos_flags[posid] = self.pos_flags[posid]
         if should_reset:
             self._initialize_pos_flags()
@@ -1589,6 +1642,7 @@ class Petal(object):
         self.animator.clear()
         self.animator_on = True
         self.animator_total_time = 0
+        self.animator_move_number = 0
         self.collider.add_fixed_to_animator(self.animator_total_time)
 
     def stop_gathering_frames(self):
@@ -1641,6 +1695,10 @@ class Petal(object):
         for m in self.schedule.move_tables.values():
             hw_tbl = m.for_hardware()
             hw_tables.append(hw_tbl)
+            err = m.error_str
+            if err:
+                self.printfunc(err)
+                m.display(self.printfunc)
         return hw_tables
 
     def _postmove_cleanup(self):
@@ -1648,17 +1706,23 @@ class Petal(object):
         PosModel instances can be informed that the move was physically done on
         the hardware.
         """
+        if self.schedule_stats.is_enabled():
+            for posid in self.posids:
+                avoidance = self.schedule_stats.get_avoidances(posid)
+                if avoidance:
+                    self.set_posfid_val(posid, 'LOG_NOTE', f'collision avoidance: {avoidance}')
         for m in self.schedule.move_tables.values():
             if m.posmodel.posid in self._posids_where_tables_were_just_sent:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
-                self.pos_flags[m.posid] |= self.movetable_rejected_bit
+                self.pos_flags[m.posid] |= self.flags.get('REJECTED', self.missing_flag)
         self.commit(mode='both')  # commit() determines whether anything actually needs pushing to db
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
         if self.animator_on:
             self.previous_animator_total_time = self.animator_total_time
+            self.previous_animator_move_number = self.animator_move_number
         
     def _cancel_move(self, reset_flags=True):
         '''Resets schedule and performs posmodel cleanup commands.
@@ -1677,6 +1741,7 @@ class Petal(object):
         if self.animator_on:
             self.animator.clear_after(time=self.previous_animator_total_time)
             self.animator_total_time = self.previous_animator_total_time
+            self.animator_move_number = self.previous_animator_move_number
     
     def _handle_any_failed_send_of_move_tables(self, response, n_retries):
         '''Inspects response from petalcontroller after attempt to send move
@@ -1755,9 +1820,9 @@ class Petal(object):
             else:
                 msg = 'WARNING: Due to failures when sending move tables to positioners, the entire move is canceled.'
                 if n_retries <= 0:
-                    msg += f' No scheduling retries remaining.'
+                    msg += ' No scheduling retries remaining.'
                 if len(posids_to_retry) == 0:
-                    msg += f' No communicable positioners remaining to reschedule.'
+                    msg += ' No communicable positioners remaining to reschedule.'
                 self.printfunc(msg)
         return failed_send_posids
 
@@ -1770,7 +1835,7 @@ class Petal(object):
         """
         disabled = set()
         for posid in posids:
-            self.pos_flags[posid] |= self.comm_error_bit
+            self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
             if auto_disabling_on and self.posmodels[posid].is_enabled:
                 accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True)
                 if accepted:
@@ -1837,64 +1902,61 @@ class Petal(object):
         power_supply_map['other'] = self.posids - already_mapped
         return power_supply_map
 
-    def _initialize_pos_flags(self, ids='all', enabled_only=True):
+    def _initialize_pos_flags(self, ids='all', initialize=False, enabled_only=True):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
 
         FVC/Petal bit string (When bits are passed to FVC, petal bits are wiped out)
-
-        FVC BITS
-        1 - Pinhole Center
-        2 - Fiber Center
-        3 - Fiducial Center
-        4 -
-        5 - Bad Fiber or Fiducial
-        6 - 15 reserved
-
-        PETAL BITS
-        16 - CTRL_ENABLED = False
-        17 - FIBER_INTACT = False
-        18 - Communication error
-        19 - Overlapping targets
-        20 - Frozen by anticollision
-        21 - Unreachable by positioner
-        22 - Targeting restricted boundries
-        23 - Requested multiple times
-        24 - Classified Nonfunctional
-        25 - Movetable rejected
+        
+        See https://desi.lbl.gov/trac/wiki/FPS/PositionerFlags
+        OR DOSlib.flags
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
-        for posfidid in ids:
-            if posfidid not in self.posids.union(self.fidids): 
-                continue
-            if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
-                if not(enabled_only) or self.posmodels[posfidid].is_enabled:
-                    self.pos_flags[posfidid] = self.pos_bit
-            else:
-                self.pos_flags[posfidid] = self.fid_bit
-        if hasattr(self, 'disabled_fids') and ids == 'all':
-            for fid in self.disabled_fids:
-                self.pos_flags[fid] = self.fid_bit | self.ctrl_disabled_bit
+        elif isinstance(ids, str): #strings that != 'all'
+            ids = {ids}
+        if initialize:
+            for posfidid in ids:
+                if posfidid not in self.posids.union(self.fidids): 
+                    continue
+                if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
+                    if not(enabled_only) or self.posmodels[posfidid].is_enabled:
+                        self.pos_flags[posfidid] = self.flags.get('POSITIONER', self.missing_flag)
+                else:
+                    self.pos_flags[posfidid] = self.flags.get('FIDUCIAL', self.missing_flag)
+            if hasattr(self, 'disabled_fids') and ids == 'all':
+                for fid in self.disabled_fids:
+                    self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
+        else:
+            for posfidid in ids:
+                # Unsets flags in reset_mask
+                if posfidid not in self.posids.union(self.fidids): 
+                    continue
+                self.pos_flags[posfidid] = (self.pos_flags[posfidid] | self.reset_mask) ^ self.reset_mask
         return
 
-    def _apply_state_enable_settings(self):
+    def _apply_state_enable_settings(self, devid):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
            KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
         """
-        for devid in self.posids: #.union(self.fidids):
-            if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
-                self.pos_flags[devid] |= self.ctrl_disabled_bit
-                self.pos_flags[devid] |= self.dev_nonfunctional_bit
-                self.disabled_devids.append(devid)
-            if devid in self.posids:
-                if not self.get_posfid_val(devid, 'FIBER_INTACT'):
-                    self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
-                    self.pos_flags[devid] |= self.ctrl_disabled_bit
-                    self.pos_flags[devid] |= self.fiber_broken_bit
-                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit
-                    self.disabled_devids.append(devid)
+        if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('NONFUNCTIONAL', self.missing_flag)
+            self.disabled_devids.append(devid)
+        if not self.get_posfid_val(devid, 'FIBER_INTACT'):
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('BROKENFIBER', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('BADPOSFID', self.missing_flag)
+            self.disabled_devids.append(devid)
+
+    def _apply_all_state_enable_settings(self):
+        """Read positioner/fiducial configuration settings and disable/set flags accordingly.
+           KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
+        """
+        for devid in self.posids: 
+            self._apply_state_enable_settings(devid)
 
     def _petal_configure(self, constants = 'DEFAULT'):
         """
@@ -1932,7 +1994,7 @@ class Petal(object):
         #Reset values
         self._remove_posid_from_sent_tables('all')
         self._initialize_pos_flags() # Reset posflags
-        self._apply_state_enable_settings()
+        self._apply_all_state_enable_settings()
         self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
         self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB

@@ -91,6 +91,20 @@ class PosScheduleStage(object):
         for posids in supply_map.values():
             group = []
             group_time = 0
+            
+            # 2020-10-02 [JHS] This sorting step was required to resolve a complex, and non-deterministic bug
+            # in move scheduling. That bug was first encountered during exposure_id 3047, exposure_iter 46,
+            # on petal 1, 2020-10-01. I never managed to track down how adding a sort here resolves the issue.
+            # But in principle, since there is no random number generation going on anywhere in the code, our
+            # best assumption was that *some* unordered for-loop operation was causing wrong behavior on some
+            # runs. The line below is the only place I found where adding a sorting step had any tangible impact
+            # on the move tables that get generated. And after I added it, the error never arose again, in 85
+            # consecutive runs of replay.py upon the 3047.46 move data. Then I turned off the sorted() call as
+            # a test, and counted errors on 10% of runs (9 of 85 attempts). Also, I noted that without this sort,
+            # the total move table times were non-deterministic, varying with each run. (That alone is a good
+            # enough reason to include it.)
+            posids = sorted(posids)
+            
             for posid in posids:
                 group.append(posid)
                 group_time += times[posid]
@@ -152,8 +166,12 @@ class PosScheduleStage(object):
                 'forced' ... only freeze, and *must* do so
                 'forced_recursive' ... like 'forced', then closes any follow-on neighbor collisions
 
-        Return value is a set containing the posids of any robot(s) whose move
-        tables were adjusted in the course of the function call.
+        Returns a tuple:
+            
+            item 0 ... set containing the posids of any robot(s) whose move
+                       tables were adjusted in the course of the function call
+                       
+            item 1 ... set of only those posids which were specifically "frozen"
 
         With freezing == 'off' or 'on', the path adjustment algorithm goes through a
         series of options, trying adding various pauses and pre-moves to avoid collision.
@@ -181,8 +199,10 @@ class PosScheduleStage(object):
         In other words, a neighbor's neighbor will not be affected by this function.
         """
         stats_enabled = self.stats.is_enabled()
+        adjusted = set()
+        frozen = set()
         if self.sweeps[posid].collision_case == pc.case.I:
-            return set()
+            return adjusted, frozen
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
             methods = ['freeze'] if freezing != 'off' else []
         elif freezing in {'forced','forced_recursive'}:
@@ -191,8 +211,7 @@ class PosScheduleStage(object):
             methods = pc.nonfreeze_adjustment_methods
         else:
             methods = pc.all_adjustment_methods
-        adjusted = set()
-        for method in methods:
+        for method in methods:        
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
@@ -224,14 +243,14 @@ class PosScheduleStage(object):
                     else:
                         collision_resolved = True
                     if collision_resolved:
-                        self.stats.add_collisions_resolved(method, {old_collision_id})
+                        self.stats.add_collisions_resolved(posid, method, {old_collision_id})
 
                 # store results
                 old_colliding = self.colliding # note how sequence here emphasizes that this must occur before store_collision_finding_results(), which affects self.colliding. in a perfect world, I would re-factor functionally to remove the state-dependence [JHS]                
                 self.store_collision_finding_results(col_to_store, all_to_store)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen() # needs to occur after storing results above
-                    adjusted.add(posid)
+                    frozen.add(posid)
                
                 # recursively-forced freezing
                 if freezing == 'forced_recursive':
@@ -247,14 +266,15 @@ class PosScheduleStage(object):
                             if not self.move_tables[p].is_motionless: # does that table have any contents inside to be frozen?
                                 freeze_is_possible = True
                         if freeze_is_possible: 
-                            recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
+                            adjusted, recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
                             adjusted.update(recursed_newly_frozen) 
+                            frozen.update(recursed_newly_frozen)
                         else:
                             self.printfunc(' --> no further freezing possible on ' + str(p) + ' --- already motionless')
                         verified = p not in self.colliding
                         self.printfunc(' --> recursive forced freeze attempted on ' + str(p) + '. Verified now non-collidng? ' + str(verified))
                 break # note indentation level of this return statement is essential. it breaks out of the methods for loop. do not remove again!
-        return adjusted
+        return adjusted, frozen
 
     def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection
@@ -325,7 +345,10 @@ class PosScheduleStage(object):
     def store_collision_finding_results(self, colliding_sweeps, all_sweeps):
         """Stores sweep data as-generated by find_collisions method.
         """
-        self.sweeps.update(all_sweeps)
+        previously_frozen = {posid for posid, sweep in self.sweeps.items() if sweep.is_frozen}
+        should_update = set(all_sweeps.keys()) - previously_frozen
+        updates = {posid: all_sweeps[posid] for posid in should_update}
+        self.sweeps.update(updates)
         all_checked = {posid for posid in all_sweeps}
         now_colliding = {posid for posid in colliding_sweeps}
         now_not_colliding = all_checked.difference(now_colliding)
@@ -352,6 +375,12 @@ class PosScheduleStage(object):
             if not s.check_continuity(self.sweep_continuity_check_stepsize, self.collider.posmodels[p]):
                 discontinuous.add(p)
         return discontinuous
+
+    def get_frozen_posids(self):
+        '''Returns set of any posids whose move sweeps have been marked so far as frozen.
+        '''
+        frozen = {posid for posid, sweep in self.sweeps.items() if sweep.is_frozen}
+        return frozen                
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
@@ -476,7 +505,7 @@ class PosScheduleStage(object):
                 start = t.init_posintTP[0]
                 limits = posmodels[p].targetable_range_posintT
                 direction = 1 if p == posid else -1 # neighbor repels from primary
-                if 'cw' in method:
+                if 'ccw' not in method:
                     direction *= -1
                 if direction > 0:
                     furthest_existing_excursion = max(tables_data[p]['net_dT'] + [0]) # zero element prevents accidentally adding margin (if all net_dT < 0) that temporally might not exist when you hoped it would

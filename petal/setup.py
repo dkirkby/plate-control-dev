@@ -1,12 +1,12 @@
 from distutils.core import setup
 from Cython.Build import cythonize
-import os
+#import os
 
 for module in ['poscollider']:
-    for item in os.listdir():
-        for ext_types_to_remove in ['.so', '.pyd', '.c', '.html']:
-            if module in item and os.path.splitext(item)[-1] in ext_types_to_remove:
-                os.remove(item)
+    # for item in os.listdir():
+    #     for ext_types_to_remove in ['.so', '.pyd', '.c', '.html']:
+    #         if module in item and os.path.splitext(item)[-1] in ext_types_to_remove:
+    #             os.remove(item)
     setup(name=module, ext_modules=cythonize(module + '.pyx', annotate=True))
 
 # General tips for the Cython-uninitiated...

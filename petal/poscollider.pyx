@@ -405,8 +405,8 @@ class PosCollider(object):
         envelope (Eo), inner clear rotation envelope (Ei) and extended-phi clear rotation
         envelope (Ee).
         """
-        self.Eo_phi = self.config['PHI_EO']   # angle above which phi is guaranteed to be within envelope Eo
-        self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
+        self.Eo_phi = self.config['PHI_EO']   # poslocP angle above which phi is guaranteed to be within envelope Eo
+        self.Ei_phi = self.config['PHI_EI']   # poslocP angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Eo_with_margin = self.Eo + 2 * self.config['EO_RADIAL_TOL'] # outer clear rotation envelope for collision checks (diameter)
         self.Eo_radius_with_margin = self.Eo_with_margin / 2 # outer clear rotation envelope for collision checks (radius)
@@ -451,6 +451,8 @@ class PosCollider(object):
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].add(possible_neighbor)
+        assert len(self.pos_neighbors[posid]) <= 6, f'{posid}: num neighbors > 6 is geometrically invalid. This indicates a problem ' + \
+                                                     ' with calibration values or polygon geometry. Must be fixed before proceeding.'
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""

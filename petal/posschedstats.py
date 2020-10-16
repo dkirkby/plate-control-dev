@@ -89,6 +89,7 @@ class PosSchedStats(object):
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
                         }
+        self.avoidances = {}
         self._latest_saved_row = None
         dummy_id = pc.timestamp_str() + ' (' + _unregistered_schedule_str + ')'
         self.register_new_schedule(schedule_id=dummy_id, num_pos=num_pos)
@@ -111,6 +112,7 @@ class PosSchedStats(object):
             val = None if key == final_checks_str else 0
             self.numbers[key].append(val)
         self.numbers['n pos'][-1] = num_pos
+        self.avoidances[self.latest] = {}
 
     def set_num_move_tables(self, n):
         """Record number of move tables in the current schedule."""
@@ -123,15 +125,24 @@ class PosSchedStats(object):
         these_collisions = self.collisions[self.latest]
         these_collisions['found'] = these_collisions['found'].union(collision_pair_ids)
         
-    def add_collisions_resolved(self, method, collision_pair_ids):
+    def add_collisions_resolved(self, posid, method, collision_pair_ids):
         """Add collisions that have been resolved in the current schedule.
+            posid ... string, the positioner that was adjusted
             method ... string, collision resolution method
             collision_pair_ids ... set of collision_pair_ids resolved by method
         """
-        this_dict = self.collisions[self.latest]['resolved']
+        latest = self.latest
+        this_dict = self.collisions[latest]['resolved']
         if method not in this_dict:
             this_dict[method] = set()
         this_dict[method] = this_dict[method].union(collision_pair_ids)
+        for pair in collision_pair_ids:
+            split = set(pair.split('-'))
+            assert posid in split, f'posschedstats: {posid} not found in collision pair {pair}!'
+            other = (split - {posid}).pop()
+            if posid not in self.avoidances[latest]:
+                self.avoidances[latest][posid] = []
+            self.avoidances[latest][posid] += [f'{method}/{other}']
         
     def get_collisions_resolved_by(self, method='freeze'):
         '''Returns set of all collisions resolved by method in the latest
@@ -140,6 +151,35 @@ class PosSchedStats(object):
         if method in this_dict:
             return this_dict[method].copy()
         return {}
+    
+    def get_avoidances(self, posid):
+        '''Returns collection of all collision avoidances for that positioner
+        in the latest schedule. Will be empty if none found.'''
+        latest = self.latest
+        out = []
+        if posid in self.avoidances[latest]:
+            out = self.avoidances[latest][posid]
+        return out
+    
+    @property
+    def total_unresolved(self):
+        '''Returns count of how many collisions were recorded as unresolved after
+        final collision check. For the latest schedule_id.
+        '''
+        value = self.numbers[final_checks_str][-1]
+        if value == None:
+            return 0
+        return value
+    
+    @property
+    def total_resolved(self):
+        '''Returns count of how many collisions were recorded as resolved.
+        '''
+        this_dict = self.collisions[self.latest]['resolved']
+        count = 0
+        for collision_pairs in this_dict.values():
+            count += len(collision_pairs)
+        return count
         
     def add_request(self):
         """Increment requests count."""
@@ -341,7 +381,7 @@ class PosSchedStats(object):
         If the argument footers=True, then a number of rows will be returned
         instead, which match up to the normal table. These special rows will
         give max, min, mean, rms, and median for each data column, collated by
-        anticollision  method (e.g. 'adjust' vs 'freeze'). That's no new
+        anticollision method (e.g. 'adjust' vs 'freeze'). That's no new
         information --- just a convenience when for example evaluating sims of
         hundreds of targets in a row.
         """

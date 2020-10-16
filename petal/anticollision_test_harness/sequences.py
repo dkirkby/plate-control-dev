@@ -6,44 +6,15 @@ import csv
 import harness_constants as hc
 
 # Define sequences here. The user selects them by the key (the sequnce id).
-positioner_param_sequences = {'cmds_unit_test':[90000],
-                              0:[99000],
-                              1:[99000,99001],
-                              2:[99002],
-                              3:[99003],
-                              'one real petal':[98004],
-                              'two real petals':[98002,98003],
-                              'many real petals':[98002,98003,98004,98005,98006,
-                                                  98007,98008,98009,98010,98011],
-                              'PTL03_03001':[3001],
-                              'PTL01_01001':[1001],
-                              'PTL01_01002':[1002], # has expanded keepouts
+positioner_param_sequences = {'cmds_unit_test':['ptl01_00001'],
+                              'ptl01_sept2020_nominal':['ptl01_00001'],
+                              'ptl01_sept2020_expanded':['ptl01_00002'], # has expanded keepouts
                               }
 
 move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
-                              0:[0],
-                              1:[0,1],
-                              2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                              3:[20,21,22,23,24],
-                              4:[20,21],
-                              5:[21],
-                              'many':[i for i in range(100)],
-                              '04000':[4000],
-                              '04000-04001':[4000,4001],
-                              '04000-04009':[i for i in range(4000,4010)],
-                              '04006-04007':[i for i in range(4006,4008)],
-                              '04000-04019':[i for i in range(4000,4020)],
-                              '04000-04049':[i for i in range(4000,4050)],
-                              '04000-04099':[i for i in range(4000,4100)],
-                              '04000-04999':[i for i in range(4000,5000)],
-                              '04108-04110':[i for i in range(4108,4111)],
-                              '03000':[3000],
-                              '03000-03001':[i for i in range(3000,3002)],
-                              '03000-03009':[i for i in range(3000,3010)],
-                              '03000-03999':[i for i in range(3000,4000)],
-                              '01000':[1000],
-                              '01000-01001':[i for i in range(1000,1002)],
-                              '01000-01999':[i for i in range(1000,2000)],
+                              'ptl01_set00_single':['ptl01_set00_00001'],
+                              'ptl01_set00_double':[f'ptl01_set00_{i:05}' for i in (0,1)],
+                              'ptl01_set00_mille':[f'ptl01_set00_{i:05}' for i in range(1000)],
                              }
 
 stress_sequences_petal3_subset7a = {'03001_ntarg001_set000': [3229],

@@ -4,11 +4,12 @@ import inspect
 import numpy as np
 import math
 from datetime import datetime, timedelta
+import time
 import pytz
 from collections import OrderedDict
 import csv
 try:
-    from DOSlib.flags import POSITIONER_FLAGS_BITS, POSITIONER_FLAGS_MASK, POSITIONER_FLAGS_VERBOSE
+    from DOSlib.flags import POSITIONER_FLAGS_BITS, POSITIONER_FLAGS_MASKS, POSITIONER_FLAGS_VERBOSE
     flags_imported = True
 except:
     POSITIONER_FLAGS_BITS = {}
@@ -131,8 +132,11 @@ gear_ratio['faulhaber'] = 256.0  		 # faulhaber "256:1", output rotation/motor i
 T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
+
+# some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
+max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
@@ -322,7 +326,7 @@ def decipher_posflags(flags, sep=';', verbose=True):
     def decipher_flag(flag, sep, verbose):
             if flags_imported:
                 status_list = []
-                for key, val in POSITIONER_FLAGS_MASK:
+                for key, val in POSITIONER_FLAGS_MASKS.items():
                     if (flag & val) != 0:
                         if verbose:
                             status_list.append(POSITIONER_FLAGS_VERBOSE[key])
@@ -514,6 +518,18 @@ def dir_date_str(t=None):
     t = t.astimezone(pytz.timezone('America/Phoenix')) - timedelta(hours=12)
     return f'{t.year:04}{t.month:02}{t.day:02}'
 
+def compact_timestamp(nowtime=None, basetime=1582915648):
+    '''Compact, readable time code. Default return string is six characters
+    in length; will exceed this length at basetime + 69 years. Precision is
+    rounded to seconds. Default argument baselines it at a recent time on
+    Feb 28, 2020, 10:47 AM PST. The argument nowtime is just there for testing.
+    '''
+    maxchar = 6
+    nowtime = time.time() if not nowtime else nowtime
+    relative_now = math.floor(nowtime - basetime)
+    converted = np.base_repr(relative_now, base=36)
+    padded = converted.rjust(maxchar,'0') if len(converted) < maxchar else converted
+    return padded
 
 # other misc functions
 def ordinal_str(number):
@@ -529,3 +545,12 @@ def ordinal_str(number):
     if last_digit == '3':
         return numstr + 'rd'
     return numstr + 'th'
+
+def is_integer(x):
+    return isinstance(x, (int, np.integer))
+
+def is_float(x):
+    return isinstance(x, (float, np.floating))
+
+def is_string(x):
+    return isinstance(x, (str, np.str))

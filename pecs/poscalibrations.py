@@ -120,7 +120,7 @@ class PosCalibrations(PECS):
             return
         updates = (pd.concat(list(updates.values())).set_index('DEVICE_ID')
                    .sort_index()).rename(
-                columns={'FLAGS': 'FLAG',
+                columns={'FLAG': 'FLAGS',
                          'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
         cols = [f'OLD_{key}' for key in self.keys_collect]
@@ -128,17 +128,17 @@ class PosCalibrations(PECS):
         for df in [used_pos, unused_pos]:
             df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
-                               'FLAGS': 'FLAG'}, inplace=True)
+                               'FLAG': 'FLAGS'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
-        used_pos.drop('FLAG', axis=1, inplace=True)
+        used_pos.drop('FLAGS', axis=1, inplace=True)
         calib_fit = used_pos.join(updates).append(unused_pos, sort=True)
         calib_fit.sort_index(inplace=True)
         # overwrite flags with focalplane flags and add status
         flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
-                     flags_dict, orient='index', columns=['FLAG'])
+                     flags_dict, orient='index', columns=['FLAGS'])
                  for flags_dict in self.ptlm.get_pos_flags().values()]
-        calib_fit['FLAG'] = pd.concat(flags)
-        calib_fit['STATUS'] = pc.decipher_posflags(calib_fit['FLAG'])
+        calib_fit['FLAGS'] = pd.concat(flags)
+        calib_fit['STATUS'] = pc.decipher_posflags(calib_fit['FLAGS'])
         # clean up and record additional entries in updates
         calib_fit['tgt_posintT'] = req.set_index('DEVICE_ID')['X1']
         calib_fit['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']

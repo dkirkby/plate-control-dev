@@ -38,6 +38,10 @@ class PosMoveTable(object):
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
         self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
         self._orig_command = ''
+        self._warning_flag = 'WARNING'
+        self._error_flag = 'ERROR'
+        self._not_yet_calculated = '(not yet calculated)'
+        self._latest_total_time_est = self._reset_total_time_estimate()
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -54,6 +58,7 @@ class PosMoveTable(object):
              'allow_cruise':          c.allow_cruise,
              'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
              'orig_command':          c._orig_command,
+             'latest_total_time_est': c._latest_total_time_est
              }
         return d
     
@@ -64,15 +69,18 @@ class PosMoveTable(object):
         return str(self.as_dict())
         
     def display(self, printfunc=print, show_posid=True):
+        '''Pretty-prints the table.  To return a string, instead of printing
+        immediately, argue printfunc=None.
+        '''
         def fmt(x):
             if x == None:
                 x = str(x)
-            if type(x) == str:
+            if pc.is_string(x):
                 return format(x,'>11s')
-            elif type(x) == int or type(x) == float:
+            elif pc.is_integer(x) or pc.is_float(x):
                 return format(x,'>11g')
         tab = '  '
-        output = f'{tab}move table for: {self.posid}\n' if show_posid else ''
+        output = f'move table for: {self.posid}\n' if show_posid else ''
         output += f'{tab}Original command: {self._orig_command}\n'
         output += f'{tab}Initial posintTP: {self.init_posintTP}\n'
         output += f'{tab}Initial poslocTP: {self.init_poslocTP}\n'
@@ -99,8 +107,57 @@ class PosMoveTable(object):
                     output += fmt(extra_row.data[header])
         else:
             output += ' (empty: contains no row data)'
-        printfunc(output)
-
+        if printfunc:
+            printfunc(output)
+        else:
+            return output
+        
+    def display_for(self, output_type='hardware', printfunc=print):
+        '''Pretty-prints the version that gets sent to hardware. To return a
+        string, instead of printing immediately, argue printfunc=None.
+        '''
+        tab = '  '
+        if output_type == 'hardware':
+            t = self.for_hardware()
+            t['row_time'] = [t['move_time'][i] + t['postpause'][i]/1000 for i in range(t['nrows'])]
+        elif output_type == 'collider':
+            t = self.for_collider()
+        elif output_type == 'schedule':
+            t = self.for_schedule()
+        else:
+            assert False, f'pretty printing of output_type {output_type} not yet defined'
+        if 'row_time' not in t:
+            t['row_time'] = [t['move_time'][i] + t['prepause'][i] + t['postpause'][i] for i in range(t['nrows'])]
+        if 'net_time' not in t:
+            t['net_time'] = [sum(t['row_time'][:i]) for i in range(1, t['nrows'] + 1)]
+        output = f'move table for: {self.posid} ({output_type} version)'
+        singletons = [k for k,v in t.items() if not isinstance(v, (list, tuple))]
+        newline = f'\n{tab}'
+        for key in singletons:
+            output += f'\n{tab}{key}: {t[key]}'
+        multiples = [k for k in t if k not in singletons]
+        headers = [str(m) for m in multiples]
+        widths = [max(8, len(h)) for h in headers]
+        output += newline + tab.join([format(headers[i], f'^{widths[i]}s') for i in range(len(headers))])
+        output += newline + tab.join(['-' * w for w in widths])
+        lengths = {len(t[key]) for key in multiples}
+        if len(lengths) != 1:
+            output += '\n{tab}ERROR! NOT ALL COLUMNS HAVE SAME NUMBER OF ROWS!'
+        for i in range(lengths.pop()):
+            formats = []
+            for key in headers:
+                formats += [f'>{widths[headers.index(key)]}']
+                value = t[key][i]
+                if pc.is_integer(value):
+                    formats[-1] += 'd'
+                elif pc.is_float(value):
+                    formats[-1] += '.3f'
+            output += newline + tab.join([format(t[key][i], formats[multiples.index(key)]) for key in multiples])
+        if printfunc:
+            printfunc(output)
+        else:
+            return output
+        
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
         new.rows = [row.copy() for row in self.rows]
@@ -164,7 +221,7 @@ class PosMoveTable(object):
         neither the theta nor phi axis, in any row.
         """
         for row in self.rows:
-            if row.data['dP_ideal'] or row.data['dT_ideal']:
+            if row.has_motion:
                 return False
         return True
     
@@ -181,16 +238,34 @@ class PosMoveTable(object):
     def append_log_note(self, note):
         '''Appends a note to the current log_note.'''
         self._log_note = pc.join_notes(self._log_note, note)
+        
+    @property
+    def error_str(self):
+        '''Returns a string that is either empty or contains human-readable
+        error messages, suitable for printout at a console or in a log.'''
+        msg = ''
+        i = 0
+        for row in self.rows + self._rows_extra:
+            auto_cmd = row.data['auto_cmd']
+            is_err = self._warning_flag in auto_cmd or self._error_flag in auto_cmd
+            if is_err:
+                msg += f'\nRow {i}: {auto_cmd}'
+            i += 1
+        if msg:
+            msg = f'{self.posid} move table contains errors/warnings:' + msg
+        return msg
 
     # setters
     def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data[dist_label[axisid]] = distance
+        self._reset_total_time_estimate()
 
     def store_orig_command(self, string, val1=None, val2=None):
         '''To keep a note of original move command associated with this move
@@ -215,29 +290,62 @@ class PosMoveTable(object):
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['prepause'] = prepause
+        self._reset_total_time_estimate()
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
-        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        If row index does not exist yet, then it will be added, and any blank
+        filler rows will be generated in-between.
         """
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['postpause'] = postpause
+        self._reset_total_time_estimate()
+
+    def strip(self):
+        '''Removes two things from table:
+        
+            1. Any "zero" rows, i.e. with no motion and no pauses.
+            2. Any pauses that come after the last finite move.
+        
+        Stripping is performed only on the user-defined rows, *not* on any
+        internally auto-generated _rows_extra. In particular, case (2) means
+        that any auto-creep moves will be pushed earlier in time, so that they
+        occur immediately upon completion of the final user-defined motion.
+        '''
+        remove_pause = True
+        for i in reversed(range(len(self.rows))):
+            has_motion = self.rows[i].has_motion
+            if remove_pause:
+                if has_motion:
+                    self.rows[i].data['postpause'] = 0
+                    remove_pause = False
+                else:
+                    self.rows[i].data['prepause'] = 0
+                    self.rows[i].data['postpause'] = 0
+            has_prepause = self.rows[i].has_prepause
+            has_postpause = self.rows[i].has_postpause
+            if not has_motion and not has_prepause and not has_postpause:
+                del self.rows[i]
+        self._reset_total_time_estimate()
 
     # row manipulations
-    def insert_new_row(self,index):
+    def insert_new_row(self, index):
         newrow = PosMoveRow()
         self.rows.insert(index,newrow)
         if index > len(self.rows):
             self.insert_new_row(index) # to fill in any blanks up to index
+        self._reset_total_time_estimate()
 
-    def delete_row(self,index):
+    def delete_row(self, index):
         del self.rows[index]
+        self._reset_total_time_estimate()
 
     def extend(self, other_move_table):
         """Extend one move table with another.
@@ -245,6 +353,7 @@ class PosMoveTable(object):
         you want other_move_table to override these flags, this must be explicitly
         done separately.
         """
+        self._reset_total_time_estimate()
         if self == other_move_table:
             return
         for otherrow in other_move_table.rows:
@@ -313,13 +422,20 @@ class PosMoveTable(object):
             for i in [pc.T,pc.P]:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                 err_dist[i] = ideal_total[i] - actual_total[i]
+                if abs(err_dist[i]) > pc.max_auto_creep_distance:
+                    auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
+                                       f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
+                                        'which indicates likely upstream problem in the move schedule!'
+                    err_dist[i] = pc.sign(err_dist[i]) * pc.max_auto_creep_distance
+                else:
+                    auto_cmd_warning = ''
                 move = self.posmodel.true_move(axisid=i,
                                                distance=err_dist[i],
                                                allow_cruise=False,
                                                limits=extra_row_limits,
                                                init_posintTP=latest_TP)
                 new_moves[i].append(move)
-                new_moves[i][-1]['auto_cmd'] = '(auto final creep)'
+                new_moves[i][-1]['auto_cmd'] = f'(auto final creep{auto_cmd_warning})'
                 latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
         for i in range(len(new_moves[0])):
@@ -327,8 +443,6 @@ class PosMoveTable(object):
             self._rows_extra[i].data = {'dT_ideal': new_moves[pc.T][i]['distance'],
                                         'dP_ideal': new_moves[pc.P][i]['distance'],
                                         'prepause': 0,
-                                        'move_time': max(new_moves[pc.T][i]['move_time'],
-                                                         new_moves[pc.P][i]['move_time']),
                                         'postpause': 0,
                                         'auto_cmd': new_moves[pc.T][i]['auto_cmd'],
                                         }
@@ -337,7 +451,7 @@ class PosMoveTable(object):
             true_and_new[i].extend(new_moves[i])
         return true_and_new
 
-    def _for_output_type(self,output_type):
+    def _for_output_type(self, output_type):
         """Internal function that calculates the various output table formats and
         passes them up to the wrapper functions above.
         """
@@ -353,8 +467,7 @@ class PosMoveTable(object):
             table['Tdot'] = [true_moves[pc.T][i]['speed'] for i in row_range]
             table['Pdot'] = [true_moves[pc.P][i]['speed'] for i in row_range]
             table['prepause'] = [rows[i].data['prepause'] for i in row_range]
-        if output_type in {'collider', 'schedule', 'full', 'hardware'}:
-            table['postpause'] = [rows[i].data['postpause'] for i in row_range]
+            table['postpause'] = [rows[i].data['postpause'] for i in row_range]            
         if output_type in {'hardware', 'full'}:
             table['motor_steps_T'] = [true_moves[pc.T][i]['motor_step'] for i in row_range]
             table['motor_steps_P'] = [true_moves[pc.P][i]['motor_step'] for i in row_range]
@@ -371,16 +484,26 @@ class PosMoveTable(object):
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-            for i in row_range:  # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
-                if rows[i].data['prepause']:
-                    for key in ['motor_steps_T','motor_steps_P','move_time']:
-                        table[key].insert(i, 0)
-                    for key in ['speed_mode_T','speed_mode_P']:
-                        table[key].insert(i, 'creep') # speed mode doesn't matter here
-                    table['postpause'].insert(i, rows[i].data['prepause'])
+            
+            # interior rows
+            table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
+            
+            # last row
+            table['postpause'].append(rows[-1].data['postpause'])
+            
+            # new first row, if necessary (because hardware only supports postpauses)
+            leading_prepause = rows[0].data['prepause']
+            if leading_prepause:
+                table['postpause'].insert(0, leading_prepause)
+                for key in ['motor_steps_T','motor_steps_P','move_time']:
+                    table[key].insert(0, 0)
+                for key in ['speed_mode_T','speed_mode_P']:
+                    table[key].insert(0, 'creep') # speed mode doesn't matter here
+                    
             table['nrows'] = len(table['move_time'])
             table['total_time'] = sum(table['move_time'] + table['postpause']) # in seconds
             table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds
+            self._latest_total_time_est = table['total_time']
             return table
         table['nrows'] = len(table['dT'])
         if output_type == 'collider':
@@ -390,6 +513,7 @@ class PosMoveTable(object):
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
                 table['net_time'][i] += table['net_time'][i-1]
+            self._latest_total_time_est = table['net_time'][-1]
         if output_type in {'schedule', 'cleanup', 'full'}:
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
@@ -416,6 +540,9 @@ class PosMoveTable(object):
             table['poslocXY'] = [trans.posintTP_to_poslocXY(tp) for tp in table['posintTP']]
             table['QS'] = [trans.poslocXY_to_QS(xy) for xy in table['poslocXY']]
         return table
+    
+    def _reset_total_time_estimate(self):
+        self._latest_total_time_est = self._not_yet_calculated
 
 class PosMoveRow(object):
     """The general user does not directly use the internal values of a
@@ -423,10 +550,9 @@ class PosMoveRow(object):
     formats that are exported by PosMoveTable.
     """
     def __init__(self):
-        self.data = {'dT_ideal':  0,  # [deg] ideal theta distance to move (as seen by external observer)
+        self.data = {'prepause':  0,  # [sec] delay for this number of seconds before executing the move
+                     'dT_ideal':  0,  # [deg] ideal theta distance to move (as seen by external observer)
                      'dP_ideal':  0,  # [deg] ideal phi distance to move (as seen by external observer)
-                     'prepause':  0,  # [sec] delay for this number of seconds before executing the move
-                     'move_time': 0,  # [sec] time it takes the move to execute
                      'postpause': 0,  # [sec] delay for this number of seconds after the move has completed
                      'auto_cmd': '',  # [string] auto-generated command info corresponding to this row
                      }
@@ -436,4 +562,16 @@ class PosMoveRow(object):
 
     def copy(self):
         return copymodule.deepcopy(self)
+    
+    @property
+    def has_motion(self):
+        return self.data['dP_ideal'] != 0 or self.data['dT_ideal'] != 0
+    
+    @property
+    def has_prepause(self):
+        return self.data['prepause'] != 0
+    
+    @property
+    def has_postpause(self):
+        return self.data['postpause'] != 0
 

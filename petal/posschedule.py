@@ -36,7 +36,25 @@ class PosSchedule(object):
                                 verbose          = self.verbose,
                                 printfunc        = self.printfunc
                             ) for name in self.stage_order}
-        self.anneal_time = {'direct':4.0, 'retract':3.0, 'rotate':3.0, 'extend':3.0, 'expert':4.0} # times in seconds, see comments in PosScheduleStage
+        
+        # Anneal times spread out power density in time, as well as naturally reducing
+        # potential collision frequency. See comments in PosScheduleStage regarding
+        # implementation. Move time considerations as of 2020-10-09 [JHS]:
+        #   cruise 180 deg ... 180 / 176.07 deg/s --> 1.02 sec
+        #   cruise 360 deg ... 360 / 176.07 deg/s --> 2.04 sec
+        #   creep 3 deg ... 3 / 2.67 deg/s --> 1.12 sec
+        # Rationales for the values below are:
+        #   direct ... typ slowest case is ~ 3 deg creep corr move + 2x final auto-creeps --> 3.4 sec
+        #   retract ... phi cruise --> 1.0 sec
+        #   rotate ... theta cruise --> 2.0 sec
+        #   extend ... phi cruise + 2x final auto-creeps --> 3.2 sec
+        #   expert ... common case is homing, with cruise search distances 510 deg theta + 259 deg phi --> 4.4 sec
+        # Then in all cases I multiply by a factor 1.5, to give the annealing some room to spread.
+        # I think these numbers are functional, and not too inefficient. Next level of refinement
+        # would be to run a sizeable sample of targets / correction moves (maybe 1000 each) and
+        # analyze resulting stage times.
+        self.anneal_time = {'direct':5.1, 'retract':1.5, 'rotate':3.0, 'extend':4.8, 'expert':6.6}  # unit seconds
+        
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
@@ -78,7 +96,7 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.clock()
+            timer_start = time.perf_counter()
             self.stats.add_request()
         self._all_received_requested_posids.add(posid)
         def print_denied(string):
@@ -88,7 +106,7 @@ class PosSchedule(object):
         trans = posmodel.trans
         if self.already_requested(posid):
             print_denied('Cannot request more than one target per positioner in a given schedule.')
-            self.petal.pos_flags[posid] |= self.petal.multi_request_bit
+            self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return False
         if self._deny_request_because_disabled(posmodel):
             print_denied('Positioner is disabled.')
@@ -146,13 +164,13 @@ class PosSchedule(object):
             print_denied('Bad uv_type: ' + str(uv_type))
             return False
         if unreachable:
-            self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
+            self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
             print_denied(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_limit(posmodel, targt_poslocTP):
             print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
-                         f'"expert" petal limit_angle at {self.petal.limit_angle}.')
+                         f'"expert" petal limit_angle at poslocP={self.petal.limit_angle}.')
             return False
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
@@ -174,7 +192,7 @@ class PosSchedule(object):
                        }
         self._requests[posid] = new_request
         if stats_enabled:
-            self.stats.add_requesting_time(time.clock() - timer_start)
+            self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
         return True
 
@@ -232,21 +250,25 @@ class PosSchedule(object):
         self._combine_stages_into_final()
         final = self.stages['final']
         if anticollision:
-            c, a, p = self._check_final_stage(msg_prefix='Penultimate')
+            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
         else:
-            c, a, p = self._check_final_stage(msg_prefix='Final')
-        colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+            c, _, p = self._check_final_stage(msg_prefix='Final')
+        colliding_sweeps, collision_pairs = c, p # for readability
         if anticollision:
             if not colliding_sweeps:
                 self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')  
             else:
                 adjusted = set()
+                frozen = set()
                 for posid in colliding_sweeps:
-                    these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
+                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
                     adjusted.update(these_adjusted)
-                self.printfunc('Adjusted posids: ' + str(adjusted))
-                c, a, p = self._check_final_stage(msg_prefix='Final', msg_suffix=' (should always be zero)')
-                colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+                    frozen.update(frozen)
+                self.printfunc(f'Adjusted posids: {adjusted}')
+                self.printfunc(f'Frozen posids: {frozen}')
+                c, _, p = self._check_final_stage(msg_prefix='Final',
+                                                  msg_suffix=' (should always be zero)')
+                colliding_sweeps, collision_pairs = c, p # for readability
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
@@ -254,8 +276,14 @@ class PosSchedule(object):
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
+        if self.petal.animator_on:
+            anim_tables = {posid: table.copy() for posid, table in self.move_tables.items()}
+        else:
+            anim_tables = {}
+        for table in self.move_tables.values():
+            table.strip()
         self._schedule_moves_store_requests_info()
-        self._schedule_moves_finish_logging(colliding_sweeps, all_sweeps)
+        self._schedule_moves_finish_logging(anim_tables)
 
     def conservative_move_timeout_period(self, safety_factor=4.0):
         """Returns a conservative period of time (in seconds) that one should
@@ -284,7 +312,7 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.clock()
+            timer_start = time.perf_counter()
         if self._deny_request_because_disabled(move_table.posmodel):
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
@@ -292,7 +320,7 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
-            self.stats.add_expert_table_time(time.clock() - timer_start)
+            self.stats.add_expert_table_time(time.perf_counter() - timer_start)
             
     def expert_mode_is_on(self):
         """Returns boolean stating whether scheduling is in expert mode. This is
@@ -318,7 +346,16 @@ class PosSchedule(object):
         function, in the same order they were added.
         """
         return self._expert_added_tables_sequence
-    
+
+    def get_frozen_posids(self):
+        '''Returns set of any posids whose move tables are marked as frozen.
+        Intended to be called *after* doing schedule_moves().
+        '''
+        frozen = set()
+        for stage in self.stages.values():
+            frozen |= stage.get_frozen_posids()
+        return frozen
+
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
         stage. Any move requests are ignored.
@@ -377,10 +414,8 @@ class PosSchedule(object):
             adjustment_performed = False
             for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
-                    newly_frozen = stage.adjust_path(posid, freezing='forced_recursive')
+                    adjusted, frozen = stage.adjust_path(posid, freezing='forced_recursive')
                     adjustment_performed = True
-                    for p in newly_frozen:
-                        self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                     if self.verbose:
                         self.printfunc("remaining stage.colliding " + str(stage.colliding))
             if self.stats.is_enabled() and adjustment_performed:
@@ -395,20 +430,23 @@ class PosSchedule(object):
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
+        retracted_poslocP = self.collider.Eo_phi  # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to
         for posid, request in self._requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
             # always safely handled from stage to stage.
             posmodel = self.petal.posmodels[posid]
             trans = posmodel.trans
-            start_posintTP['retract'][posid] = request['start_posintTP']
-            starting_phi = start_posintTP['retract'][posid][pc.P]
-            if starting_phi > self.collider.Eo_phi or request['start_posintTP'] == request['targt_posintTP']:
-                retracted_phi = starting_phi
+            this_start_posintTP = request['start_posintTP']
+            this_start_poslocTP = trans.posintTP_to_poslocTP(this_start_posintTP)
+            start_posintTP['retract'][posid] = this_start_posintTP
+            if this_start_poslocTP[pc.P] > self.collider.Eo_phi or request['start_posintTP'] == request['targt_posintTP']:
+                retracted_posintP = start_posintTP['retract'][posid][pc.P]
             else:
-                retracted_phi = self.collider.Eo_phi # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
-            desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_phi]
-            desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_phi]
+                retracted_posintTP = trans.poslocTP_to_posintTP([0, retracted_poslocP])  # poslocT=0 is a dummy value
+                retracted_posintP = retracted_posintTP[pc.P]
+            desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_posintP]
+            desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_posintP]
             desired_final_posintTP['extend'][posid] = request['targt_posintTP']
             def calc_dtdp(name, posid):
                 tp_start = start_posintTP[name][posid]
@@ -434,14 +472,14 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
+            not_the_last_stage = name != self.RRE_stage_order[-1]
             while stage.colliding and attempts_sequence:
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        adjusted = stage.adjust_path(posid, freezing)
-                        for p in adjusted:
-                            self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
-                            if name != self.RRE_stage_order[-1]: # i.e. some next stage exists
+                        adjusted, frozen = stage.adjust_path(posid, freezing)
+                        for p in frozen:
+                            if not_the_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
                                 adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]
@@ -494,7 +532,7 @@ class PosSchedule(object):
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
-            self.petal.pos_flags[posmodel.posid] |= self.petal.ctrl_disabled_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('NOTCTLENABLED', self.petal.missing_flag)
             return True
         return False
     
@@ -537,7 +575,7 @@ class PosSchedule(object):
         if fixed_case:
             interfering_neighbors.add(pc.case.names[fixed_case])
         if interfering_neighbors:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.overlap_targ_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('OVERLAP', self.petal.missing_flag)
         return interfering_neighbors
 
     def _deny_request_because_out_of_bounds(self, posmodel, target_poslocTP):
@@ -546,7 +584,7 @@ class PosSchedule(object):
         """
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_poslocTP)
         if out_of_bounds:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.restricted_targ_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.get('BOUNDARYVIOLATION', self.petal.missing_flag)
             return True
         return False
 
@@ -557,7 +595,7 @@ class PosSchedule(object):
         '''
         if self.petal.limit_angle:
             if target_poslocTP[1] < self.petal.limit_angle:
-                self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
+                self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
                 return True
         return False
     
@@ -577,7 +615,7 @@ class PosSchedule(object):
     def _schedule_moves_initialize_logging(self, anticollision):
         """Initial logging tasks for the schedule_moves() function."""
         if self.stats.is_enabled():
-            self.__timer_start = time.clock()
+            self.__timer_start = time.perf_counter()
             self.stats.set_scheduling_method(str(anticollision))
             self.__original_request_posids = set(self._requests.keys())
             self.__max_net_time = 0
@@ -658,19 +696,33 @@ class PosSchedule(object):
                 table.display()
             table.append_log_note(log_note_addendum)
                 
-    def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
+    def _schedule_moves_finish_logging(self, anim_tables={}):
         """Final logging and animation steps for the schedule_moves() function."""
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            self.stats.add_scheduling_time(time.clock() - self.__timer_start)
+            self.stats.add_scheduling_time(time.perf_counter() - self.__timer_start)
             freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
             if freeze_collisions:
                 self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
         self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
-        if self.petal.animator_on and self.stages['final'].sweeps:
+        if self.petal.animator_on and anim_tables:
+            final = self.stages['final']
+            dummy_stats = posschedstats.PosSchedStats(enabled=False)
+            anim_stage = posschedulestage.PosScheduleStage(collider=final.collider,
+                                                           stats=dummy_stats,
+                                                           power_supply_map=final._power_supply_map,
+                                                           verbose=final.verbose,
+                                                           printfunc=final.printfunc)
+            for table in anim_tables.values():
+                anim_stage.add_table(table)
+            colliding_sweeps, all_sweeps = anim_stage.find_collisions(anim_stage.move_tables)                       
+            note = f'move {self.petal.animator_move_number}'
+            note_time = self.petal.animator_total_time
+            self.collider.animator.set_note(note=note, time=note_time)
+            self.petal.animator_move_number += 1
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
                 for posid,sweep in colliding_sweeps.items():

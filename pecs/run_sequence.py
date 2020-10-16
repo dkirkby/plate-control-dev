@@ -31,8 +31,10 @@ parser.add_argument('-nb', '--num_best', type=int, default=default_n_best, help=
 parser.add_argument('-nw', '--num_worst', type=int, default=default_n_worst, help=f'int, number of worst performers to display in log messages for each measurement (default is {default_n_worst})')
 park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
-parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, if argued, then an initial parking move will be performed prior to running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
-parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, if argued, then an final parking move will be performed after running the sequence. Parking will be done for all selected positioners and (where possible) neighbors. Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running the sequence. Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
+parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
+parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -48,6 +50,15 @@ uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
 # read sequence file
 import sequence
 seq = sequence.Sequence.read(uargs.infile)
+
+# check start / finish moves
+try:
+    start_move = seq.index(seq[uargs.start_move])  # normalizes negative index cases
+    final_move = seq.index(seq[uargs.final_move])  # normalizes negative index cases
+except:
+    assert False, f'start_move={uargs.start_move} or final_move={uargs.final_move} is out of range of the sequence (which has length={len(seq)})'
+assert start_move <= final_move, f'start_move {start_move} > final_move {final_move}'
+is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
 import logging
@@ -84,7 +95,8 @@ logger.addHandler(sh)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
 logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {uargs.infile}')
-logger.info(f'Contents:\n\n{seq}')
+subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
+logger.info(f'Contents:\n\n{seq}{subseq_str}')
 
 import sys
 def quit_query(question):
@@ -126,9 +138,14 @@ except:
     # still a useful case, for testing some portion of the script offline
     logger.warning('PECS initialization failed (hint: double-check whether you need to join instance in this terminal')
     pecs_on = False
-    _get_posids = lambda: [f'DUMMY{i:05d}' for i in range(10)]
+    device_locs = seq.get_device_locs()
+    if len(device_locs) == 0:
+        device_locs = range(10)
+    all_loc2id = {i:f'DUMMY{i:05d}' for i in device_locs}
+    _dummy_posids = list(all_loc2id.values())
+    _get_posids = lambda: _dummy_posids
     temp = sorted(_get_posids())
-    all_loc2id = {i: temp[i] for i in range(len(temp))}
+    
 all_id2loc = {val: key for key, val in all_loc2id.items()}
 
 class NoPosidsError(Exception):
@@ -138,7 +155,7 @@ def get_posids():
     '''Wrapper function to get list of currently enabled + selected posids, including
     raising an exception if that list is empty.'''
     posids = _get_posids()
-    if not any(posids):
+    if len(posids) == 0:
         raise NoPosidsError
     return posids
 
@@ -427,13 +444,13 @@ def get_parkable_neighbors(posids):
     # function right now a functionally useless placeholder.
     all_known_as_commandable_to_pecs = set(pecs.posids)
     parkable_neighbors &= all_known_as_commandable_to_pecs
-    
     return parkable_neighbors
 
 # setup prior to running sequence
 if pecs_on:
     # cache the pos settings
-    cache_path = cache_current_pos_settings(get_posids())
+    cache_posids = get_posids()
+    cache_path = cache_current_pos_settings(cache_posids)
     logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
     
     # set phi limit angle for the test
@@ -488,8 +505,15 @@ def park(park_option, is_prepark=True):
     if is_prepark:
         last_move_time = time.time()
     if real_moves:
-        pecs.park_and_measure(posids=all_to_park, mode='normal', coords=park_option, log_note=extra_note,
-                              match_radius=None, check_unmatched=False, test_tp=False)
+        kwargs = {'posids': all_to_park,
+                  'mode': 'normal',
+                  'coords': park_option,
+                  'log_note': extra_note,
+                  }
+        kwargs.update(move_meas_settings)
+        if 'anticollision' in kwargs:
+            del kwargs['anticollision']  # not an arg to park_and_measure
+        pecs.park_and_measure(**kwargs)
     if any(seq) and is_prepark:
         do_pause()
     logger.info('Parking complete\n')
@@ -499,26 +523,38 @@ logger.info('Beginning the move sequence\n')
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
-    for m in range(len(seq)):
+    move_counter = 0
+    num_moves = final_move - start_move + 1
+    for m in range(start_move, final_move + 1):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
         device_loc_unordered = set(get_map(key='loc', posids=posids))
-        move_num = m + 1
-        move_num_text = f'target {move_num} of {len(seq)}'
-        if not move.is_defined_for_locations(device_loc_unordered):
+        move_counter += 1
+        move_num_text = f'target {move_counter} of {num_moves} (sequence_move_idx = {m})'
+        if not move.is_defined_for_all_locations(device_loc_unordered):
             logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
         descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
         logger.info(f'Move settings are {descriptive_dict}\n')
-        correctable = move.command in sequence.general_commands and move.allow_corr
-        n_corr = uargs.num_corr if correctable else 0
-        errs = None
+        correction_not_defined = move.command not in sequence.general_commands
+        correction_not_allowed = not move.allow_corr
+        not_correctable = correction_not_allowed or correction_not_defined 
+        if uargs.num_corr > 0 and not_correctable:
+            reason = f'not defined for {move.command} moves' if correction_not_defined else ''
+            reason += ', and ' if correction_not_defined and correction_not_allowed else ''
+            reason += 'disabled for this row in the sequence file' if correction_not_allowed else ''
+            logger.info(f'Correction move skipped ({reason})')
+        n_corr = 0 if not_correctable else uargs.num_corr
+        targ_errs = None
         calc_errors = True
+        initial_request = None
         for submove_num in range(1 + n_corr):
-            extra_log_note = f'move {move_num}'
+            extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
+            submove_txt = f'submove {submove_num}'
+            move_with_submove_txt = f'{move_num_text}, {submove_txt}'
             if n_corr > 0:
-                extra_log_note = pc.join_notes(extra_log_note, f'submove {submove_num}')
+                extra_log_note = pc.join_notes(extra_log_note, submove_txt)
             if move.command in sequence.general_commands:
                 if pecs_on:
                     move_measure_func = pecs.move_measure
@@ -526,7 +562,7 @@ try:
                     submove = move
                 else:
                     operable = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-                    posids = [p for p in operable if p in errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
+                    posids = [p for p in operable if p in targ_errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
                     no_err_val = set(operable) - set(posids)
                     if any(no_err_val):
                         logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
@@ -534,14 +570,15 @@ try:
                     device_loc_map = get_map(key='ids', posids=posids)
                     # note below how order is preserved for target0, target1, and device_loc
                     # lists, on the assumption that get_posids() returns a list
+                    device_locs = [device_loc_map[posid] for posid in posids]
                     submove = sequence.Move(command='poslocdXdY',
-                                            target0=[-errs[posid][0] for posid in posids],
-                                            target1=[-errs[posid][1] for posid in posids],
-                                            device_loc=[device_loc_map[posid] for posid in posids],
-                                            log_note=move.log_note,
+                                            target0=[-targ_errs[posid][0] for posid in posids],
+                                            target1=[-targ_errs[posid][1] for posid in posids],
+                                            device_loc=device_locs,
+                                            log_note=move.get_log_notes(device_locs),
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
-                request = submove.make_request(loc2id_map=get_map('loc'),log_note=extra_log_note)
+                request = submove.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
@@ -553,7 +590,7 @@ try:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
             else:
-                logger.warning(f'Skipping move {move_num} submove {submove_num} due to unexpected command {move.command}\n')
+                logger.warning(f'Skipping {move_with_submove_txt} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
@@ -562,7 +599,7 @@ try:
                 if pecs_on:
                     apply_pos_settings(all_settings)
                 last_pos_settings = new_settings
-            logger.info(f'Doing move {move_num}, submove {submove_num}')
+            logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)
                 
@@ -589,11 +626,11 @@ try:
                     dummy_err_x2 = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     dummy_err_y2 = np.random.normal(loc=0, scale=0.1, size=len(posids))
                     trac_errs = {posids[i]: [dummy_err_x2[i], dummy_err_y2[i]] for i in range(len(posids))}
-                err_str = f'Results for move {move_num}, submove {submove_num}, n_pos={len(posids)}, errors given in um:'
+                err_str = f'Results for {move_with_submove_txt}, n_pos={len(posids)}, errors given in um:'
                 err_str += '\n' + summarize_errors(targ_errs, prefix='TARGETING')
                 err_str += '\n' + summarize_errors(trac_errs, prefix=' TRACKING')
                 logger.info(err_str + '\n')
-            more_moves_to_do = submove_num < n_corr or move_num < len(seq) or uargs.postpark
+            more_moves_to_do = submove_num < n_corr or m < final_move or uargs.postpark
             if more_moves_to_do:
                 do_pause()
     if uargs.postpark:
@@ -609,7 +646,7 @@ if pecs_on:
     # restore the original pos settings
     orig_settings = retrieve_cached_pos_settings(cache_path)
     logger.info(f'Retrieved original positioner settings from {cache_path}')
-    new_cache_path = cache_current_pos_settings(posids)
+    new_cache_path = cache_current_pos_settings(cache_posids)
     new_settings = retrieve_cached_pos_settings(new_cache_path)
     if orig_settings == new_settings:
         logger.info('No net change of positioner settings detected between start and finish' +

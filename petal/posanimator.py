@@ -35,6 +35,7 @@ class PosAnimator(object):
                         #  'time'  : [] # list of time values at which an update or change is to be applied
                         #  'poly'  : [] # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
                         #  'style' : [] # list of dictionaries, defining the plotting style to draw the polygon at that time
+        self.global_notes = {0: ''}
         self.labels = {}
         self.label_size = 'x-small'
         self.cropping_on = True # crop the frames to just surround the robots
@@ -134,6 +135,7 @@ class PosAnimator(object):
             while item['time'] and item['time'][-1] >= time:
                 for key in ['time', 'poly', 'style']:
                     item[key].pop()
+        self.global_notes = {time: note for time, note in self.global_notes.items() if time <= time}
 
     def is_empty(self):
         """Whether the animator contains any frame data yet."""
@@ -185,19 +187,39 @@ class PosAnimator(object):
         key = len(self.labels)
         self.labels[key] = {'text':text, 'x':x, 'y':y}
 
+    @property    
+    def all_times(self):
+        """Inspect contents and return the frame times."""
+        temp = np.array([])
+        for item in self.items.values():
+            temp = np.append(temp, item['time'])
+        all_times = np.unique(temp)        
+        return all_times
+    
+    def set_note(self, note=None, time=None):
+        '''Add a string to the animation plot.
+        
+            note ... str, will be displayed on plots. None clears existing note.
+            time ... seconds, global time. None sets note to display at latest time.
+        '''
+        note = str(note) if note else ''
+        time = float(time) if time else max(self.all_times)
+        self.global_notes[time] = note
+
     def anim_init(self):
         """Sets up the animation, using the data that has been already entered via the
         add_or_change_item method. Returns boolean stating success or not.
         """
+        if self.live_animate:
+            plt.ion()
+        else:
+            plt.ioff()
         self.anim_fig = plt.figure(self.fignum, figsize=(20,15))
         self.anim_ax = plt.axes()
-        temp = np.array([])
-        for item in self.items.values():
-            temp = np.append(temp, item['time'])
-        self.all_times = np.unique(temp)
-        if len(self.all_times) == 0:
+        all_times = self.all_times
+        if len(all_times) == 0:
             return False
-        self.finish_time = max(self.all_times)
+        self.finish_time = max(all_times)
         self.patches = []
         xmin = np.inf
         xmax = -np.inf
@@ -214,7 +236,7 @@ class PosAnimator(object):
                 ymin = min(ymin,min(item['poly'][0][1]) - margin)
                 ymax = max(ymax,max(item['poly'][0][1]) + margin)
             item['patch_idx'] = i
-            item['last_frame'] = self.all_times.tolist().index(item['time'][-1])
+            item['last_frame'] = all_times.tolist().index(item['time'][-1])
             i += 1
         for label in self.labels.values():
             plt.text(s=label['text'], x=label['x'], y=label['y'], family='monospace', horizontalalignment='center', size=self.label_size)
@@ -237,7 +259,6 @@ class PosAnimator(object):
         if not successful:
             print('Animator not initialized. Usually due to no frames available to animate.')
             return
-        plt.ion()
         frame_number = 1
         stdout_message_period = 50 # number of frames per update message
         image_paths = {}
@@ -258,11 +279,26 @@ class PosAnimator(object):
             for i in range(round(self.start_end_still_time/self.timestep)):
                 frame_number,path = self.grab_frame(frame_number)
                 image_paths[frame_number] = path
-        frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
+        all_times = self.all_times
+        frame_times = np.arange(min(all_times), max(all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
+        note_times = sorted(self.global_notes.keys())
+        assert max(note_times) <= max(frame_times)
+        assert min(note_times) >= min(frame_times)
+        note_idx = 0
         for frame in range(len(frame_times)):
-            frame_start_time = time.clock()
+            frame_start_time = time.perf_counter()
             self.anim_frame_update(frame)
-            plt.title('time: ' + format(frame*self.timestep,'5.2f') + ' / ' + format(self.finish_time,'5.2f') + ' sec')
+            if note_times:
+                this_time = frame_times[frame]
+                until_now = [i for i in range(len(note_times)) if note_times[i] <= this_time]
+                note_idx = until_now[-1]
+                note = self.global_notes[note_times[note_idx]]
+            else:
+                note = ''
+            title = f'time: {frame*self.timestep:5.2f} / {self.finish_time:5.2f} sec'
+            if note:
+                title += f'\n{note}'
+            plt.title(title)
             if self.save_movie:
                 frame_number,path = self.grab_frame(frame_number)
                 image_paths[frame_number] = path
@@ -270,7 +306,7 @@ class PosAnimator(object):
                     print(' ... animation frame ' + str(frame) + ' of approx ' + str(len(frame_times)) + ' saved')
             if self.live_animate:
                 plt.pause(0.001) # just to force a refresh of the plot window (hacky, yep. that's matplotlib for ya.)
-                time.sleep(max(0,self.timestep-(time.clock()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
+                time.sleep(max(0,self.timestep-(time.perf_counter()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
         if self.save_movie:
             for i in range(round(self.start_end_still_time/self.timestep)):
                 frame_number,path = self.grab_frame(frame_number)
@@ -280,7 +316,9 @@ class PosAnimator(object):
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
             output_file = os.path.join(self.save_dir, timestamp + 'schedule_anim' + suffix + '.mp4')
             ffmpeg_cmd = self.ffmpeg_path + ' -y -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.codec + ' ' + output_file
-            os.system(ffmpeg_cmd)
+            err = os.system(ffmpeg_cmd)
+            if err:
+                output_file = 'FAILED - check ffmpeg installation'
         if self.delete_imgs:
             for path in image_paths.values():
                 os.remove(path)
@@ -289,7 +327,7 @@ class PosAnimator(object):
     def grab_frame(self, frame_number):
         """Saves current figure to an image file. Returns next frame number."""
         path = os.path.join(self.frame_dir, self.framefile_prefix + str(frame_number).zfill(self.n_framefile_digits) + self.framefile_extension)
-        plt.savefig(path)
+        plt.savefig(path, bbox_inches='tight')
         return frame_number + 1, path
 
     @staticmethod
