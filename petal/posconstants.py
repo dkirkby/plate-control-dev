@@ -554,3 +554,84 @@ def is_float(x):
 
 def is_string(x):
     return isinstance(x, (str, np.str))
+
+# style info for plotting positioners
+plot_styles = {
+    'ferrule':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'phi arm':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'central body':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+        
+    'positioner element unbold':
+        {'linestyle' : '--',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.6',
+         'facecolor' : 'none'},
+
+    'collision':
+        {'linestyle' : '-',
+         'linewidth' : 2,
+         'edgecolor' : 'red',
+         'facecolor' : 'none'},
+
+    'frozen':
+        {'linestyle' : '-',
+         'linewidth' : 2,
+         'edgecolor' : 'blue',
+         'facecolor' : 'none'},                            
+
+    'line at 180':
+        {'linestyle' : '-.',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.6',
+         'facecolor' : 'none'},
+
+    'Eo':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+        
+    'Eo bold':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'Ei':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+
+    'Ee':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+
+    'PTL':
+        {'linestyle' : '--',
+         'linewidth' : 1,
+         'edgecolor' : '0.5',
+         'facecolor' : 'none'},
+
+    'GFA':
+        {'linestyle' : '--',
+         'linewidth' : 1,
+         'edgecolor' : '0.5',
+         'facecolor' : 'none'}
+    }
