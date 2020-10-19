@@ -118,6 +118,8 @@ class Petal(object):
 
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
+        if petal_loc:
+            self.petal_loc = int(petal_loc)  # within conditional because I don't know details of init args [JHS]
         self.shape = shape
         self._last_state = None
         self._posids_where_tables_were_just_sent = set()
@@ -1580,11 +1582,7 @@ class Petal(object):
                 operand = float(value)
         except:
             assert False, f'{err_prefix} invalid type {type(value)} for value {value}'
-        if posids == 'all':
-            posids = self.posids
-        else:
-            posids = {posids} if isinstance(posids, str) else set(posids)
-        assert len(posids) > 0, f'{err_prefix} empty posids argument'
+        posids = self._validate_posids_arg(posids)
         if key in position_keys:
             def getter(posid):
                 expected = self.posmodels[posid].expected_current_position
@@ -1628,6 +1626,80 @@ class Petal(object):
                 pass
             out = f'total entries found = {len(found)}\n{out}'
         return out
+    
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='eog'):
+        '''Graphical view of the current expected positions of one or many positioners.
+        
+        INPUTS:  posids ... single posid or collection of posids to be plotted
+                 include_neighbors ... boolean, whether to also plot neighbors of posids (default=True)
+                 path ... string, directory where to save the plot file to disk
+                 viewer ... string, the program with which to immediately view the file (default='eog')
+                 
+                 Regarding the image viewer, None or '' will suppress immediate display.
+                 When running in Windows, the suggested viewer argument is 'explorer'.
+                 
+        OUTPUT:  path of output plot file will be returned
+        '''
+        import matplotlib.pyplot as plt
+        c = self.collider  # just for brevity below
+        posids = self._validate_posids_arg(posids)
+        if include_neighbors:
+            for posid in posids.copy():
+                posids |= c.pos_neighbors[posid]
+        plt.ioff()
+        x0 = [c.x0[posid] for posid in posids]
+        y0 = [c.y0[posid] for posid in posids]
+        x_span = max(x0) - min(x0)
+        y_span = max(y0) - min(y0)
+        x_inches = max(8, np.ceil(x_span/16))
+        y_inches = max(6, np.ceil(y_span/16))
+        fig = plt.figure(num=0, figsize=(x_inches, y_inches), dpi=150)
+        def plot_poly(key, poly):
+            sty = pc.plot_styles[key]
+            pts = poly.points
+            plt.plot(pts[0], pts[1], linestyle=sty['linestyle'], linewidth=sty['linewidth'], color=sty['edgecolor'])
+        for posid in posids:
+            locTP = self.posmodels[posid].expected_current_poslocTP        
+            polys = {'Eo': c.Eo_polys[posid], 
+                     'line at 180': c.Eo_polys[posid],
+                     'central body': c.place_central_body(posid, locTP[pc.T]),
+                     'phi arm': c.place_phi_arm(posid, locTP),
+                     'ferrule': c.place_ferrule(posid, locTP),
+                     }
+            for key, poly in polys.items():
+                plot_poly(key, poly)
+            plt.text(x=c.x0[posid], y=c.y0[posid],
+                     s=f'{posid}\n{self.posmodels[posid].deviceloc:03d}',
+                     family='monospace', horizontalalignment='center', size='x-small')
+        plt.axis('equal')
+        xlim = plt.xlim()  # will restore this zoom window after plotting petal and gfa
+        ylim = plt.ylim()  # will restore this zoom window after plotting petal and gfa
+        plot_poly('PTL', c.keepout_PTL)
+        plot_poly('GFA', c.keepout_GFA)
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.xlabel('flat x (mm)')
+        plt.ylabel('flat y (mm)')
+        basename = f'posplot_{pc.compact_timestamp()}.png'
+        plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
+        if not path:
+            path = pc.dirs['temp_files']
+        path = os.path.join(path, basename)
+        plt.tight_layout()
+        plt.savefig(path)
+        plt.close(fig)
+        if viewer:
+            os.system(f'{viewer} {path} &')
+        return path
+             
+    def _validate_posids_arg(self, posids):
+        '''Handles / validates a user argument of posids. Returns a set.'''
+        if posids == 'all':
+            posids = self.posids
+        else:
+            posids = {posids} if isinstance(posids, str) else set(posids)
+        assert len(posids) > 0, '_validate_posids_arg: empty posids argument'
+        return posids
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
