@@ -1688,7 +1688,7 @@ class Petal(object):
         plt.tight_layout()
         plt.savefig(path)
         plt.close(fig)
-        if viewer:
+        if viewer and viewer not in {'None','none','False','false','0'}:
             os.system(f'{viewer} {path} &')
         return path
              
