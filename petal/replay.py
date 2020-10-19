@@ -14,7 +14,7 @@ null_move_id_large = get_move_id(99999,999)
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
-                    help='Path to input csv file(s), containing results from "get_posmoves --with-calib" ' +
+                    help='Path to input csv file(s), containing results from "get_posmoves -c -t" ' +
                          '(see that function''s help for full syntax). Regex is ok (like M*.csv). Multiple ' +
                          'file args are also ok (like M00001.csv M00002.csv M01*.csv), as is a directory ' +
                          'that contains the files.')
@@ -104,7 +104,9 @@ for path in infiles:
         else:
             vec = [typefunc(x) for x in table[key]]
         new[key] = vec
-    input_tables.append(Table(new))
+    new_table = Table(new)
+    if len(new_table) > 0:
+        input_tables.append(Table(new))
 t = vstack(input_tables)
 t.sort(keys=['POS_ID', 'DATE'])
 
