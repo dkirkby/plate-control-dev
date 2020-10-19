@@ -513,7 +513,15 @@ def park(park_option, is_prepark=True):
         kwargs.update(move_meas_settings)
         if 'anticollision' in kwargs:
             del kwargs['anticollision']  # not an arg to park_and_measure
+        if uargs.test_tp:
+            orig_tp_frac = pecs.tp_frac
+            pecs.tp_frac = 1.0
+            if orig_tp_frac != pecs.tp_frac:
+                logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
         pecs.park_and_measure(**kwargs)
+        if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
+            pecs.tp_frac = orig_tp_frac
+            logger.info(f'Restored tp update error fraction to {pecs.tp_frac}')
     if any(seq) and is_prepark:
         do_pause()
     logger.info('Parking complete\n')
