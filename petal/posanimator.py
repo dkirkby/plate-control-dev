@@ -43,84 +43,7 @@ class PosAnimator(object):
         self.crop_box = {'xmin':-np.inf, 'xmax':np.inf, 'ymin': -np.inf, 'ymax':np.inf}
         self.pospoly_keys = {'ferrule', 'phi arm', 'central body', 'line at 180', 'Eo', 'Ei', 'Ee'}
         self.fixpoly_keys = {'PTL','GFA'}
-        self.styles = {'ferrule':
-                           {'linestyle' : '-',
-                            'linewidth' : 0.5,
-                            'edgecolor' : 'green',
-                            'facecolor' : 'none'},
-
-                       'phi arm':
-                           {'linestyle' : '-',
-                            'linewidth' : 1,
-                            'edgecolor' : 'green',
-                            'facecolor' : 'none'},
-
-                       'central body':
-                           {'linestyle' : '-',
-                            'linewidth' : 1,
-                            'edgecolor' : 'green',
-                            'facecolor' : 'none'},
-                           
-                       'positioner element unbold':
-                           {'linestyle' : '--',
-                            'linewidth' : 0.5,
-                            'edgecolor' : '0.6',
-                            'facecolor' : 'none'},
-
-                       'collision':
-                           {'linestyle' : '-',
-                            'linewidth' : 2,
-                            'edgecolor' : 'red',
-                            'facecolor' : 'none'},
-
-                       'frozen':
-                           {'linestyle' : '-',
-                            'linewidth' : 2,
-                            'edgecolor' : 'blue',
-                            'facecolor' : 'none'},                            
-
-                       'line at 180':
-                           {'linestyle' : '-.',
-                            'linewidth' : 0.5,
-                            'edgecolor' : '0.6',
-                            'facecolor' : 'none'},
-
-                       'Eo':
-                           {'linestyle' : '-',
-                            'linewidth' : 0.5,
-                            'edgecolor' : '0.9',
-                            'facecolor' : 'none'},
-                           
-                       'Eo bold':
-                           {'linestyle' : '-',
-                            'linewidth' : 1,
-                            'edgecolor' : 'green',
-                            'facecolor' : 'none'},
-
-                       'Ei':
-                           {'linestyle' : '-',
-                            'linewidth' : 0.5,
-                            'edgecolor' : '0.9',
-                            'facecolor' : 'none'},
-
-                       'Ee':
-                           {'linestyle' : '-',
-                            'linewidth' : 0.5,
-                            'edgecolor' : '0.9',
-                            'facecolor' : 'none'},
-
-                       'PTL':
-                           {'linestyle' : '--',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.5',
-                            'facecolor' : 'none'},
-
-                       'GFA':
-                           {'linestyle' : '--',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.5',
-                            'facecolor' : 'none'}
-                       }
+        self.styles = pc.plot_styles
 
 
     def clear(self):
@@ -325,11 +248,15 @@ class PosAnimator(object):
         return output_file
 
     def grab_frame(self, frame_number):
-        """Saves current figure to an image file. Returns next frame number."""
+        """Saves current figure to an image file.
+        Returns a tuple containing:
+            next frame number
+            path saved to
+        """
         path = os.path.join(self.frame_dir, self.framefile_prefix + str(frame_number).zfill(self.n_framefile_digits) + self.framefile_extension)
         plt.savefig(path, bbox_inches='tight')
-        return frame_number + 1, path
-
+        return frame_number + 1, path  
+    
     @staticmethod
     def get_patch(item,index):
         return plt.Polygon(pc.transpose(item['poly'][index]),
