@@ -1654,10 +1654,9 @@ class Petal(object):
         x_inches = max(8, np.ceil(x_span/16))
         y_inches = max(6, np.ceil(y_span/16))
         fig = plt.figure(num=0, figsize=(x_inches, y_inches), dpi=150)
-        def plot_poly(key, poly):
-            sty = pc.plot_styles[key]
+        def plot_poly(poly, style):
             pts = poly.points
-            plt.plot(pts[0], pts[1], linestyle=sty['linestyle'], linewidth=sty['linewidth'], color=sty['edgecolor'])
+            plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'])
         for posid in posids:
             locTP = self.posmodels[posid].expected_current_poslocTP        
             polys = {'Eo': c.Eo_polys[posid], 
@@ -1666,16 +1665,20 @@ class Petal(object):
                      'phi arm': c.place_phi_arm(posid, locTP),
                      'ferrule': c.place_ferrule(posid, locTP),
                      }
+            overlaps = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
             for key, poly in polys.items():
-                plot_poly(key, poly)
+                style = pc.plot_styles[key].copy()
+                if overlaps and key in {'central body', 'phi arm', 'ferrule'}:
+                    style['edgecolor'] = 'red'
+                plot_poly(poly, style)
             plt.text(x=c.x0[posid], y=c.y0[posid],
                      s=f'{posid}\n{self.posmodels[posid].deviceloc:03d}',
                      family='monospace', horizontalalignment='center', size='x-small')
         plt.axis('equal')
         xlim = plt.xlim()  # will restore this zoom window after plotting petal and gfa
         ylim = plt.ylim()  # will restore this zoom window after plotting petal and gfa
-        plot_poly('PTL', c.keepout_PTL)
-        plot_poly('GFA', c.keepout_GFA)
+        plot_poly(c.keepout_PTL, pc.plot_styles['PTL'])
+        plot_poly(c.keepout_GFA, pc.plot_styles['GFA'])
         plt.xlim(xlim)
         plt.ylim(ylim)
         plt.xlabel('flat x (mm)')
@@ -1691,6 +1694,21 @@ class Petal(object):
         if viewer and viewer not in {'None','none','False','false','0'}:
             os.system(f'{viewer} {path} &')
         return path
+    
+    def get_overlaps(self):
+        '''Returns a string describing all cases where positioners' current expected
+        positoner of their polygonal keepout envelope overlaps with their neighbors.
+        (Hint: also try "quick_plot posids=all" for graphical view.)
+        '''
+        overlaps = {}
+        for posid in self.posids:
+            these = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
+            if these:
+                overlaps[posid] = these
+        as_list = sorted(set(overlaps))
+        s = f'num pos with overlapping polygons = {len(as_list)}'
+        s += f'\n{as_list}'
+        return s
              
     def _validate_posids_arg(self, posids):
         '''Handles / validates a user argument of posids. Returns a set.'''
