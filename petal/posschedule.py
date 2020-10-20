@@ -168,9 +168,9 @@ class PosSchedule(object):
             print_denied(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
-        if self._deny_request_because_limit(posmodel, targt_poslocTP):
-            print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
-                         f'"expert" petal limit_angle at poslocP={self.petal.limit_angle}.')
+        err = self._deny_request_because_limit(posmodel, targt_poslocTP)
+        if err:
+            print_denied(f'Target {err}')
             return False
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
@@ -591,20 +591,23 @@ class PosSchedule(object):
     def _deny_request_because_limit(self, posmodel, poslocTP):
         '''Check for cases where angle exceeds phi limit. This limit may either
         be imposed globally across the petal, or due ot a positioner being
-        classified as retracted.
+        classified as retracted. Returns '' if ok otherwise an error string
+        describing the denial reason.
         '''
+        err = ''
         limit_angle = None
         if self.petal.limit_angle:
             limit_angle = self.petal.limit_angle
         if posmodel.classified_as_retracted:
             limit_angle = self.collider.Eo_phi if limit_angle == None else max(self.collider.Eo_phi, limit_angle)
         if limit_angle == None or poslocTP[1] >= limit_angle:
-            return False
+            return err
         # [JHS] 2020-10-20 "EXPERTLIMIT" flag below does not capture the distinction between
         # denying due to global limit vs denying due to classified as retracted. But at least
         # if not flagging the precise cause, it does still flag the same effect.
         self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
-        return True
+        err = f'poslocP={poslocTP[1]:.3f} is outside phi limit angle={limit_angle:.1f}'
+        return err
     
     def _deny_request_because_starting_out_of_range(self, posmodel):
         '''Checks for case where an out-of-range initial POS_T or POS_P (the
