@@ -73,7 +73,12 @@ class PosModel(object):
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
         return self.state._val['CTRL_ENABLED']
-
+    
+    @property
+    def classified_as_retracted(self):
+        """Returns whether the positioner has been classified as retracted or not."""
+        return self.state._val['CLASSIFIED_AS_RETRACTED']
+    
     @property
     def expected_current_posintTP(self):
         """Returns the internally-tracked expected position of the
