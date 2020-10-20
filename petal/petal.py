@@ -1659,17 +1659,29 @@ class Petal(object):
             plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'])
         for posid in posids:
             locTP = self.posmodels[posid].expected_current_poslocTP        
-            polys = {'Eo': c.Eo_polys[posid], 
-                     'line at 180': c.Eo_polys[posid],
+            polys = {'Eo': c.Eo_polys[posid],
+                     'line t0': c.line_t0_polys[posid],
                      'central body': c.place_central_body(posid, locTP[pc.T]),
+                     'arm lines': c.place_arm_lines(posid, locTP),
                      'phi arm': c.place_phi_arm(posid, locTP),
                      'ferrule': c.place_ferrule(posid, locTP),
                      }
+            styles = {key: pc.plot_styles[key].copy() for key in polys}
             overlaps = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
+            enabled = self.posmodels[posid].is_enabled
+            pos_parts = {'central body', 'phi arm', 'ferrule'}
+            if self.posmodels[posid].classified_as_retracted:
+                styles['Eo'] = pc.plot_styles['Eo bold'].copy()
+                for key in pos_parts:
+                    styles[key]['edgecolor'] = pc.plot_styles['Eo']['edgecolor']
+                pos_parts = {'Eo'}
             for key, poly in polys.items():
-                style = pc.plot_styles[key].copy()
-                if overlaps and key in {'central body', 'phi arm', 'ferrule'}:
-                    style['edgecolor'] = 'red'
+                style = styles[key]
+                if key in pos_parts:
+                    if overlaps:
+                        style['edgecolor'] = 'red'
+                    if not enabled:  # intentionally overrides overlaps
+                        style['edgecolor'] = 'orange'
                 plot_poly(poly, style)
             plt.text(x=c.x0[posid], y=c.y0[posid],
                      s=f'{posid}\n{self.posmodels[posid].deviceloc:03d}',
