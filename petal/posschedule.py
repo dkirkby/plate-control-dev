@@ -588,16 +588,23 @@ class PosSchedule(object):
             return True
         return False
 
-    def _deny_request_because_limit(self, posmodel, target_poslocTP):
+    def _deny_request_because_limit(self, posmodel, poslocTP):
+        '''Check for cases where angle exceeds phi limit. This limit may either
+        be imposed globally across the petal, or due ot a positioner being
+        classified as retracted.
         '''
-        Check for cases where target exceeds angle limit set by experts.
-        Useful to avoid needed to worry about anticollision.
-        '''
+        limit_angle = None
         if self.petal.limit_angle:
-            if target_poslocTP[1] < self.petal.limit_angle:
-                self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
-                return True
-        return False
+            limit_angle = self.petal.limit_angle
+        if posmodel.classified_as_retracted:
+            limit_angle = self.collider.Eo_phi if limit_angle == None else max(self.collider.Eo_phi, limit_angle)
+        if limit_angle == None or poslocTP[1] >= limit_angle:
+            return False
+        # [JHS] 2020-10-20 "EXPERTLIMIT" flag below does not capture the distinction between
+        # denying due to global limit vs denying due to classified as retracted. But at least
+        # if not flagging the precise cause, it does still flag the same effect.
+        self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
+        return True
     
     def _deny_request_because_starting_out_of_range(self, posmodel):
         '''Checks for case where an out-of-range initial POS_T or POS_P (the
