@@ -95,7 +95,7 @@ class PosCollider(object):
                 self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points, Eo_style_override)
                 # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
                 # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
-                self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
+                self.animator.add_or_change_item('line t0', self.posindexes[posid], start_time, self.line_t0_polys[posid].points)
                 self.add_posid_label(posid)
             
     def add_posid_label(self, posid):
@@ -302,13 +302,41 @@ class PosCollider(object):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued poslocTP (theta,phi) angles.
         """
-        return self.keepouts_P[posid].place_as_phi_arm(poslocTP[0],poslocTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
+        return self.keepouts_P[posid].place_as_phi_arm(theta=poslocTP[0],
+                                                       phi=poslocTP[1],
+                                                       x0=self.x0[posid],
+                                                       y0=self.y0[posid],
+                                                       r1=self.R1[posid])
 
     def place_central_body(self, posid, poslocT):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued poslocT theta angle.
         """
-        return self.keepouts_T[posid].place_as_central_body(poslocT,self.x0[posid],self.y0[posid])
+        return self.keepouts_T[posid].place_as_central_body(theta=poslocT,
+                                                            x0=self.x0[posid],
+                                                            y0=self.y0[posid])
+    
+    def place_arm_lines(self, posid, poslocTP):
+        '''Generates, rotates, and translates a PosPoly with two lines through the
+        central body and phi arms. These graphically indicate the theta dnd phi
+        angles more precisely, when making plots.
+        '''
+        cdef PosPoly poly_t
+        cdef PosPoly poly_p
+        cdef PosPoly combo
+        t_line_x = [0, self.R1[posid]]
+        p_line_x = [0, self.R2[posid]]
+        line_y = [0,0]
+        poly_t = PosPoly([t_line_x, line_y], close_polygon=False)
+        poly_p = PosPoly([p_line_x, line_y], close_polygon=False)
+        poly_t = poly_t.place_as_central_body(theta=poslocTP[0], x0=self.x0[posid], y0=self.y0[posid])
+        poly_p = poly_p.place_as_phi_arm(theta=poslocTP[0], phi=poslocTP[1], x0=self.x0[posid], y0=self.y0[posid], r1=self.R1[posid])
+        t_points = poly_t.points
+        p_points = poly_p.points
+        combo_x_pts = t_points[0] + p_points[0]
+        combo_y_pts = t_points[1] + p_points[1]
+        combo = PosPoly([combo_x_pts, combo_y_pts], close_polygon=False)
+        return combo
 
     def place_ferrule(self, posid, poslocTP):
         """Rotates and translates the ferrule to position defined by the positioner's
@@ -366,14 +394,8 @@ class PosCollider(object):
             self.keepout_expansions[posid] = {key:posmodel.state.read(key) for key in pc.keepout_expansion_keys}
             classified_retracted = posmodel.state.read('CLASSIFIED_AS_RETRACTED')
             disabled = not posmodel.state.read('CTRL_ENABLED')
-            if classified_retracted and disabled:
+            if classified_retracted:
                 self.classified_as_retracted.add(posid)
-            elif classified_retracted and not disabled:
-                if verbose:
-                   self.printfunc('Warning: While initializing ' + str(posid) + ' in poscollider.pyx, ' +
-                                  'encountered CLASSIFIED_AS_RETRACTED == True while CTRL_ENABLED == True. ' +
-                                  'This is inconsistent and must be resolved! For now, proceeding as if ' +
-                                  'CLASSIFIED_AS_RETRACTED == False.' )
 
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
@@ -416,11 +438,13 @@ class PosCollider(object):
         self.Eo_poly_with_margin = PosPoly(self._circle_poly_points(self.Eo_with_margin, self.config['RESOLUTION_EO']))
         self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
         self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
-        self.line180_poly = PosPoly([[0,0],[-self.Eo/2,0]],close_polygon=False)
+        line_x = [0, self.Eo/2]
+        line_y = [0, 0]
+        self.line_t0_poly = PosPoly([line_x, line_y], close_polygon=False)
         self.Eo_polys = {}
         self.Ei_polys = {}
         self.Ee_polys = {}
-        self.line180_polys = {}
+        self.line_t0_polys = {}
         for posid in self.posids:
             x = self.x0[posid]
             y = self.y0[posid]
@@ -431,7 +455,7 @@ class PosCollider(object):
             self.Eo_polys[posid] = Eo_poly.translated(x,y)
             self.Ei_polys[posid] = self.Ei_poly.translated(x,y)
             self.Ee_polys[posid] = self.Ee_poly.translated(x,y)
-            self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
+            self.line_t0_polys[posid] = self.line_t0_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
