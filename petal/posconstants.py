@@ -593,11 +593,17 @@ plot_styles = {
          'edgecolor' : 'blue',
          'facecolor' : 'none'},                            
 
-    'line at 180':
+    'line t0':
         {'linestyle' : '-.',
          'linewidth' : 0.5,
          'edgecolor' : '0.6',
          'facecolor' : 'none'},
+        
+    'arm lines':
+        {'linestyle' : '--',
+         'linewidth' : 0.7,
+         'edgecolor' : 'black',
+         'facecolor' : 'none'},        
 
     'Eo':
         {'linestyle' : '-',
