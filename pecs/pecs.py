@@ -368,6 +368,10 @@ class PECS:
         '''
         assert axis in {'both', 'phi', 'phi_only', 'theta', 'theta_only'}
         assert debounce in {True, False}
+        if anticollision not in {'freeze', None}:
+            anticollision = 'freeze'
+            self.print(f'Anticollision method {anticollision} is not supported during rehome.' +
+                       f' Reverting to {anticollision}')
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(ids=posids, axis=axis, debounce=debounce,
