@@ -1637,13 +1637,14 @@ class Petal(object):
                  fmt ... string, image file format like png, jpg, pdf, etc (default 'png')
                  
                  Regarding the image viewer, None or '' will suppress immediate display.
-                 When running in Windows, defaults to whatever program Explorer has set as image viewer.
-                 When running in Linux or other OS, defaults to eog.
+                 When running in Windows or Mac, defaults to whatever image viewer programs they have set as default.
+                 When running in Linux, defaults to eog.
                  
         OUTPUT:  path of output plot file will be returned
         '''
-        default_viewer_windows = 'explorer'
-        default_viewer_other = 'eog'
+        default_viewers = {'nt': 'explorer',
+                           'mac': 'open',  # 2020-10-22 [JHS] I do not have a mac on which to test this
+                           'posix': 'eog'}
         import matplotlib.pyplot as plt
         c = self.collider  # just for brevity below
         posids = self._validate_posids_arg(posids)
@@ -1709,7 +1710,10 @@ class Petal(object):
         plt.close(fig)
         if viewer and viewer not in {'None','none','False','false','0'}:
             if viewer == 'default':
-                viewer = default_viewer_windows if os.name == 'nt' else default_viewer_other
+                if os.name in default_viewers:
+                    viewer = default_viewers[os.name]
+                else:
+                    self.printfunc(f'quick_plot: no default image viewer setting available for current os={os.name}')
             os.system(f'{viewer} {path} &')
         return path
     
