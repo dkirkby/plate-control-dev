@@ -1627,20 +1627,23 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
     
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='eog', fmt='png'):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png'):
         '''Graphical view of the current expected positions of one or many positioners.
         
-        INPUTS:  posids ... single posid or collection of posids to be plotted
+        INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
                  include_neighbors ... boolean, whether to also plot neighbors of posids (default=True)
-                 path ... string, directory where to save the plot file to disk
-                 viewer ... string, the program with which to immediately view the file (default='eog')
+                 path ... string, directory where to save the plot file to disk (defaults to dir defined in posconstants)
+                 viewer ... string, the program with which to immediately view the file (see comments below)
                  fmt ... string, image file format like png, jpg, pdf, etc (default 'png')
                  
                  Regarding the image viewer, None or '' will suppress immediate display.
-                 When running in Windows, the suggested viewer argument is 'explorer'.
+                 When running in Windows, defaults to whatever program Explorer has set as image viewer.
+                 When running in Linux or other OS, defaults to eog.
                  
         OUTPUT:  path of output plot file will be returned
         '''
+        default_viewer_windows = 'explorer'
+        default_viewer_other = 'eog'
         import matplotlib.pyplot as plt
         c = self.collider  # just for brevity below
         posids = self._validate_posids_arg(posids)
@@ -1705,6 +1708,8 @@ class Petal(object):
         plt.savefig(path)
         plt.close(fig)
         if viewer and viewer not in {'None','none','False','false','0'}:
+            if viewer == 'default':
+                viewer = default_viewer_windows if os.name == 'nt' else default_viewer_other
             os.system(f'{viewer} {path} &')
         return path
     
