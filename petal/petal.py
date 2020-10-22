@@ -1659,9 +1659,25 @@ class Petal(object):
         x_inches = max(8, np.ceil(x_span/16))
         y_inches = max(6, np.ceil(y_span/16))
         fig = plt.figure(num=0, figsize=(x_inches, y_inches), dpi=150)
+        
+        # 2020-10-22 [JHS] current implementation of labeling in legend is brittle,
+        # in that it relies on colors to determine which label to apply. Better
+        # implementation would be to combine legend labels into named styles.
+        color_labels = {'green': 'normal',
+                        'orange': 'disabled',
+                        'red': 'overlap',
+                        'black': 'poslocTP',
+                        'gray': 'posintT=0'}
+        label_order = [x for x in color_labels.values()]
         def plot_poly(poly, style):
             pts = poly.points
-            plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'])
+            color = style['edgecolor']
+            if color in color_labels:
+                label = color_labels[color]
+                del color_labels[color]
+            else:
+                label = None
+            plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'], label=label)
         for posid in posids:
             locTP = self.posmodels[posid].expected_current_poslocTP        
             polys = {'Eo': c.Eo_polys[posid],
@@ -1702,6 +1718,10 @@ class Petal(object):
         plt.ylabel('flat y (mm)')
         basename = f'posplot_{pc.compact_timestamp()}.{fmt}'
         plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
+        handles, labels = plt.gca().get_legend_handles_labels()
+        handles = [handles[labels.index(L)] for L in label_order if L in labels]
+        labels = [L for L in label_order if L in labels]
+        plt.legend(handles, labels)
         if not path:
             path = pc.dirs['temp_files']
         path = os.path.join(path, basename)

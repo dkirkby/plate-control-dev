@@ -596,7 +596,7 @@ plot_styles = {
     'line t0':
         {'linestyle' : '-.',
          'linewidth' : 0.5,
-         'edgecolor' : '0.6',
+         'edgecolor' : 'gray',
          'facecolor' : 'none'},
         
     'arm lines':
