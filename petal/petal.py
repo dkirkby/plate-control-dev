@@ -1627,19 +1627,26 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
     
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='eog'):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='eog', fmt='png', backend=None):
         '''Graphical view of the current expected positions of one or many positioners.
         
         INPUTS:  posids ... single posid or collection of posids to be plotted
                  include_neighbors ... boolean, whether to also plot neighbors of posids (default=True)
                  path ... string, directory where to save the plot file to disk
                  viewer ... string, the program with which to immediately view the file (default='eog')
+                 fmt ... string, image file format like png, jpg, pdf, etc (default 'png')
+                 backend ... string, select matplotlib backend (default None --> current systm configuration)
                  
                  Regarding the image viewer, None or '' will suppress immediate display.
                  When running in Windows, the suggested viewer argument is 'explorer'.
                  
         OUTPUT:  path of output plot file will be returned
         '''
+        import matplotlib
+        old_backend = matplotlib.get_backend()
+        if backend:
+            matplotlib.use(backend)
+            self.printfunc(f'Using matplotlib backend {matplotlib.get_backend()}')
         import matplotlib.pyplot as plt
         c = self.collider  # just for brevity below
         posids = self._validate_posids_arg(posids)
@@ -1695,7 +1702,7 @@ class Petal(object):
         plt.ylim(ylim)
         plt.xlabel('flat x (mm)')
         plt.ylabel('flat y (mm)')
-        basename = f'posplot_{pc.compact_timestamp()}.png'
+        basename = f'posplot_{pc.compact_timestamp()}.{fmt}'
         plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
         if not path:
             path = pc.dirs['temp_files']
@@ -1705,6 +1712,7 @@ class Petal(object):
         plt.close(fig)
         if viewer and viewer not in {'None','none','False','false','0'}:
             os.system(f'{viewer} {path} &')
+        matplotlib.use(old_backend)
         return path
     
     def get_overlaps(self):
