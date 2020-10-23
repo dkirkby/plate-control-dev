@@ -216,6 +216,7 @@ class PECS:
             posids = None
         else:
             selection = user_text.split()
+            selection = list(set(selection)) # Stop repeated entries.
             kw = 'busids' if 'can' in selection[0] else 'posids'
             kwarg.update({kw: selection})
             enabled_only = False
