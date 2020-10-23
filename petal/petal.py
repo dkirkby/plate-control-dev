@@ -1353,10 +1353,18 @@ class Petal(object):
         pos = set(posids).intersection(self.posids)
         return {p: self.posmodels[p] for p in pos if self.posmodels[p].is_enabled}
 
-    def get_pos_flags(self, posids='all', should_reset = False):
-        '''Getter function for self.pos_flags that carries out a final is_enabled
-        check before passing them off. Important in case the PC sets ctrl_enabled = False
-        when a positioner is not responding.
+    def get_pos_flags(self, posids='all', should_reset=False):
+        '''Returns positioner flags. Also see function decipher_posflags, for
+        interpreting the flag integers.
+        
+        INPUTS:  posids ... 'all' or iterable collection of positioner id strings
+                 should_reset ... will re-initialize all flags (default=False)
+                 
+        OUTPUTS: dict with keys=posids, values=flag integers
+        
+        Detail: this is a getter function for self.pos_flags that carries out a final
+        is_enabled check before passing them back. Important in case the PC sets
+        ctrl_enabled = False when a positioner is not responding.
         '''
         pos_flags = {}
         if posids == 'all':
