@@ -1355,12 +1355,13 @@ class Petal(object):
         pos = set(posids).intersection(self.posids)
         return {p: self.posmodels[p] for p in pos if self.posmodels[p].is_enabled}
 
-    def get_pos_flags(self, posids='all', should_reset=False):
+    def get_pos_flags(self, posids='all', should_reset=False, decipher=False):
         '''Returns positioner flags. Also see function decipher_posflags, for
         interpreting the flag integers.
         
         INPUTS:  posids ... 'all' or iterable collection of positioner id strings
                  should_reset ... will re-initialize all flags (default=False)
+                 decipher ... insted of integers, return deciphered human-readable strings (default=False)
                  
         OUTPUTS: dict with keys=posids, values=flag integers
         
@@ -1380,6 +1381,8 @@ class Petal(object):
             pos_flags[posid] = self.pos_flags[posid]
         if should_reset:
             self._initialize_pos_flags()
+        if decipher:
+            pos_flags = {posid: pc.decipher_posflags(flag)[0] for posid, flag in pos_flags.items()}
         return pos_flags
     
     def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False):
