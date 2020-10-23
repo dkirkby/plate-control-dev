@@ -555,6 +555,12 @@ def is_float(x):
 def is_string(x):
     return isinstance(x, (str, np.str))
 
+def is_boolean(x):
+    return x in {True, False, 0, 1} or str(x).lower() in {'true', 'false', '0', '1'}
+
+def boolean(x):
+    return False if x in {False, 0, None} or str(x).lower() in {'false', '0', 'none'} else True
+                         
 # style info for plotting positioners
 plot_styles = {
     'ferrule':
