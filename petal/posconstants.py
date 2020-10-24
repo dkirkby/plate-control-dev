@@ -556,10 +556,26 @@ def is_string(x):
     return isinstance(x, (str, np.str))
 
 def is_boolean(x):
-    return x in {True, False, 0, 1} or str(x).lower() in {'true', 'false', '0', '1'}
+    return x in [True, False, 0, 1] or str(x).lower() in ['true', 'false', '0', '1']
+
+def is_collection(x):
+    if isinstance(x, (dict, list, tuple, set)):
+        return True
+    if is_integer(x) or is_float(x) or is_string(x) or is_boolean(x):
+        return False
+    return '__len__' in dir(x)
 
 def boolean(x):
-    return False if x in {False, 0, None} or str(x).lower() in {'false', '0', 'none'} else True
+    '''Cast input to boolean.'''
+    if x in {True, False}:
+        return x
+    if x == None or is_integer(x) or is_float(x):
+        return bool(x)
+    if is_string(x):
+        return x.lower() not in {'false', '0', 'none', 'null', 'no', 'n'}
+    if is_collection(x):
+        return len(x) > 0
+    assert False, f'posconstants.boolean(): undefined interpretation for {x}'
                          
 # style info for plotting positioners
 plot_styles = {
