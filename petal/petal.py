@@ -1312,49 +1312,6 @@ class Petal(object):
         '''
         return (self._exposure_id is not None) and (self._exposure_iter is not None)
 
-    def display(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS']):
-        '''Returns a printable string tabulating current position (in several 
-        coordinate systems), overlap status, and enabled status for one or more
-        positioners.
-        
-        INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
-                 coords ... specify one or more particular coordinate systems to display
-                            valid: 'posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS', 'flatXY', 'ptlXY'
-        
-        OUTPUTS: string for display
-        '''
-        posids = self._validate_posids_arg(posids)
-        if pc.is_string(coords):
-            coords = [coords]
-        else:
-            assert pc.is_collection(coords)
-            coords = list(coords)
-        coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
-        coord_formats.update({key: '7.3f' for key in ['poslocXY']})
-        coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
-        columns = ['POS_ID', 'LOC', 'BUS', 'CAN', 'ENABLED', 'OVERLAP'] + coords
-        overlaps = self.get_overlaps(as_dict=True)
-        overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
-        data = {c:[] for c in columns}
-        for posid in posids:
-            model = self.posmodels[posid]
-            data['POS_ID'].append(posid)
-            data['LOC'].append(model.deviceloc)
-            data['BUS'].append(model.busid)
-            data['CAN'].append(model.canid)
-            data['ENABLED'].append(model.is_enabled)
-            data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
-            pos = self.posmodels[posid].expected_current_position
-            for coord in coords:
-                strs = [format(x, coord_formats[coord]) for x in pos[coord]]
-                data[coord].append(', '.join(strs))
-        t = AstropyTable(data)
-        t.sort('POS_ID')
-        s = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
-        s += f'(displaying {len(t)} of {len(self.posids)} positioners):\n'
-        s += '\n'.join(t.pformat_all(align='^'))
-        return s
-
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid,
         according to the internal tracking of its posmodel object. Returns a two
@@ -1580,6 +1537,57 @@ class Petal(object):
         else:
             out = f'No posid {posid} found'
         return out
+    
+    def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], return_table=False):
+        '''Returns a printable string tabulating current position (in several 
+        coordinate systems), overlap status, and enabled status for one or more
+        positioners.
+        
+        INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
+                 coords ... specify one or more particular coordinate systems to display
+                            valid: 'posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS', 'flatXY', 'ptlXY'
+                 return_table ... boolean to return astropy table, rather than printable string (default False)
+        
+        OUTPUTS: string for display
+        '''
+        posids = self._validate_posids_arg(posids)
+        if pc.is_string(coords):
+            coords = [coords]
+        else:
+            assert pc.is_collection(coords)
+            coords = list(coords)
+        coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
+        coord_formats.update({key: '7.3f' for key in ['poslocXY']})
+        coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
+        coord_splits ={c: (c[:-1], c[:-2] + c[-1]) for c in coord_formats}
+        columns = ['POSID', 'LOCID', 'BUSID', 'CANID', 'ENABLED', 'OVERLAP']
+        for coord in coords:
+            columns += list(coord_splits[coord])
+        overlaps = self.get_overlaps(as_dict=True)
+        overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
+        data = {c:[] for c in columns}
+        for posid in posids:
+            model = self.posmodels[posid]
+            data['POSID'].append(posid)
+            data['LOCID'].append(model.deviceloc)
+            data['BUSID'].append(model.busid)
+            data['CANID'].append(model.canid)
+            data['ENABLED'].append(model.is_enabled)
+            data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
+            pos = self.posmodels[posid].expected_current_position
+            for coord in coords:
+                for i in (0, 1):
+                    split_name = coord_splits[coord][i]
+                    value = format(pos[coord][i], coord_formats[coord])
+                    data[split_name].append(value)
+        t = AstropyTable(data)
+        t.sort('POSID')
+        if return_table:
+            return t
+        s = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
+        s += f'(displaying {len(t)} of {len(self.posids)} positioners):\n'
+        s += '\n'.join(t.pformat_all(align='^'))
+        return s
     
     def quick_query(self, key=None, op='', value='', posids='all', mode='compact'):
         '''Returns a list of posids which have a parameter key with some
