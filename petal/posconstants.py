@@ -567,7 +567,7 @@ def is_collection(x):
 
 def boolean(x):
     '''Cast input to boolean.'''
-    if x in {True, False}:
+    if x in [True, False]:
         return x
     if x == None or is_integer(x) or is_float(x):
         return bool(x)
