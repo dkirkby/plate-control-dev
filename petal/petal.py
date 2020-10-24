@@ -1312,6 +1312,49 @@ class Petal(object):
         '''
         return (self._exposure_id is not None) and (self._exposure_iter is not None)
 
+    def display(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS']):
+        '''Returns a printable string tabulating current position (in several 
+        coordinate systems), overlap status, and enabled status for one or more
+        positioners.
+        
+        INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
+                 coords ... specify one or more particular coordinate systems to display
+                            valid: 'posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS', 'flatXY', 'ptlXY'
+        
+        OUTPUTS: string for display
+        '''
+        posids = self._validate_posids_arg(posids)
+        if pc.is_string(coords):
+            coords = [coords]
+        else:
+            assert pc.is_collection(coords)
+            coords = list(coords)
+        coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
+        coord_formats.update({key: '7.3f' for key in ['poslocXY']})
+        coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
+        columns = ['POS_ID', 'LOC', 'BUS', 'CAN', 'ENABLED', 'OVERLAP'] + coords
+        overlaps = self.get_overlaps(as_dict=True)
+        overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
+        data = {c:[] for c in columns}
+        for posid in posids:
+            model = self.posmodels[posid]
+            data['POS_ID'].append(posid)
+            data['LOC'].append(model.deviceloc)
+            data['BUS'].append(model.busid)
+            data['CAN'].append(model.canid)
+            data['ENABLED'].append(model.is_enabled)
+            data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
+            pos = self.posmodels[posid].expected_current_position
+            for coord in coords:
+                strs = [format(x, coord_formats[coord]) for x in pos[coord]]
+                data[coord].append(', '.join(strs))
+        t = AstropyTable(data)
+        t.sort('POS_ID')
+        s = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
+        s += f'(displaying {len(t)} of {len(self.posids)} positioners):\n'
+        s += '\n'.join(t.pformat_all(align='^'))
+        return s
+
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid,
         according to the internal tracking of its posmodel object. Returns a two
@@ -1750,9 +1793,14 @@ class Petal(object):
             os.system(f'{viewer} {path} &')
         return path
     
-    def get_overlaps(self):
+    def get_overlaps(self, as_dict=False):
         '''Returns a string describing all cases where positioners' current expected
         positoner of their polygonal keepout envelope overlaps with their neighbors.
+        
+        INPUTS:  as_dict ... optional boolean, argue True to eturn a python dict rather than
+                             string. Dict will have keys = posids and values = set of overlapping
+                             neighbors for that posid
+        
         (Hint: also try "quick_plot posids=all" for graphical view.)
         '''
         overlaps = {}
@@ -1760,18 +1808,25 @@ class Petal(object):
             these = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
             if these:
                 overlaps[posid] = these
-        as_list = sorted(set(overlaps))
-        s = f'num pos with overlapping polygons = {len(as_list)}'
-        s += f'\n{as_list}'
+        if as_dict:
+            return overlaps
+        listified = sorted(set(overlaps))
+        s = f'num pos with overlapping polygons = {len(listified)}'
+        s += f'\n{listified}'
         return s
              
     def _validate_posids_arg(self, posids):
         '''Handles / validates a user argument of posids. Returns a set.'''
         if posids == 'all':
             posids = self.posids
+        elif pc.is_string(posids):
+            posids = {posids}
         else:
-            posids = {posids} if isinstance(posids, str) else set(posids)
+            assert pc.is_collection(posids), '_validate_posids_arg: invalid arg {posids}'
+            posids = set(posids)
         assert len(posids) > 0, '_validate_posids_arg: empty posids argument'
+        unknowns = posids - self.posids
+        assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
         return posids
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
