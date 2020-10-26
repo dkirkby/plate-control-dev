@@ -65,7 +65,8 @@ class PECS:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
                                constants_version=self.constants_version,
                                use_desimeter=self.use_desimeter,
-                               match_to_positioner_centers=self.match_to_positioner_centers)
+                               match_to_positioner_centers=self.match_to_positioner_centers,
+                               use_arcprep=self.use_arcprep)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         else:
