@@ -59,7 +59,7 @@ class PosSchedule(object):
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
         self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
-        self._all_received_requested_posids = set()  # every posid that received a request, whether accepted or not (diferent)
+        self._all_requested_posids = {'regular': set(), 'expert': set()}  # every posid that received a request, whether accepted or not
 
     @property
     def collider(self):
@@ -99,25 +99,21 @@ class PosSchedule(object):
         if stats_enabled:
             timer_start = time.perf_counter()
             self.stats.add_request()
-        self._all_received_requested_posids.add(posid)
+        self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         if self.already_requested(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
-            error = self._print_denied(posid, 'Cannot request more than one target per positioner in a given schedule.')
-            return error
+            return self._denied_str('Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
-            error = self._print_denied(posid, POS_DISABLED_MSG)
-            return error
+            return self._denied_str(POS_DISABLED_MSG)
         if self._deny_request_because_starting_out_of_range(posmodel):
-            error = self._print_denied(posid, f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
+            return self._denied_str(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
                                  f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
-            return error
         if not allow_initial_interference:
             interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
             if interfering_neighbors:
-                error = self._print_denied(posid, f'Interference at initial position with {interfering_neighbors}')
-                return error
+                return self._denied_str(f'Interference at initial position with {interfering_neighbors}')
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
         
@@ -159,25 +155,20 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            error = self._print_denied(posid, 'Bad uv_type: ' + str(uv_type))
-            return error
+            return self._denied_str('Bad uv_type: ' + str(uv_type))
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
-            error = self._print_denied(posid, f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
-            return error
+            return self._denied_str(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         limit_err = self._deny_request_because_limit(posmodel, targt_poslocTP)
         if limit_err:
-            error = self._print_denied(posid, f'Target {limit_err}')
-            return error
+            return self._denied_str(f'Target {limit_err}')
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
-            error = self._print_denied(posid, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-            return error
+            return self._denied_str(f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
         if self.should_check_petal_boundaries:
             if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
-                error = self._print_denied(posid, 'Target exceeds a fixed boundary.')
-                return error
+                return self._denied_str('Target exceeds a fixed boundary.')
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
                        'posmodel': posmodel,
@@ -192,8 +183,7 @@ class PosSchedule(object):
         if stats_enabled:
             self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
-        error = None
-        return error
+        return None
 
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -229,15 +219,17 @@ class PosSchedule(object):
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        num_requests_received = len(self._all_received_requested_posids)
-        self.printfunc(f'num target requests received = {num_requests_received}')
-        if num_requests_received > 0:
-            self.printfunc(f'num target requests accepted = {len(self._requests)}')
-            rejected_posids = self._all_received_requested_posids - set(self._requests)
-            self.printfunc(f'num target requests rejected = {len(rejected_posids)}')
-            if rejected_posids:
-                self.printfunc(f'pos with rejected request(s): {rejected_posids}')
-        self.printfunc(f'num expert move tables = {len(self.stages["expert"].move_tables)}')
+        for kind in ['regular', 'expert']:
+            received = self._all_requested_posids[kind]
+            accepted = set(self._requests.keys()) if kind == 'regular' else self.get_posids_with_expert_tables()
+            rejected = received - accepted
+            if len(received) > 0:
+                prefix = f'num {kind} target requests'
+                self.printfunc(f'{prefix} received = {len(received)}')
+                self.printfunc(f'{prefix} accepted = {len(accepted)}')
+                self.printfunc(f'{prefix} rejected = {len(rejected)}')
+                if rejected:
+                    self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
@@ -314,16 +306,14 @@ class PosSchedule(object):
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
             timer_start = time.perf_counter()
+        self._all_requested_posids['expert'].add(move_table.posid)
         if self._deny_request_because_disabled(move_table.posmodel):
-            posid = move_table.posmodel.posid
-            error = self._print_denied(posid, POS_DISABLED_MSG)
-            return error
+            return self._denied_str(POS_DISABLED_MSG)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
             self.stats.add_expert_table_time(time.perf_counter() - timer_start)
-        error = None
-        return error
+        return None
             
     def expert_mode_is_on(self):
         """Returns boolean stating whether scheduling is in expert mode. This is
@@ -358,6 +348,11 @@ class PosSchedule(object):
         for stage in self.stages.values():
             frozen |= stage.get_frozen_posids()
         return frozen
+
+    def get_posids_with_expert_tables(self):
+        '''Returns set of any posids for which an "expert" table has been added.
+        '''
+        return {table.posid for table in self._expert_added_tables_sequence}
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -783,9 +778,7 @@ class PosSchedule(object):
             return False
         return True
     
-    def _print_denied(self, posid, string):
-        s = f'Target request denied: {string}'
-        self.printfunc(f'{posid}: {s}')
-        return s
+    def _denied_str(self, string):
+        return f'Target request denied: {string}'
 
 POS_DISABLED_MSG = 'Positioner is disabled.'

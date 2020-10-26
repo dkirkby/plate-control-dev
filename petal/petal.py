@@ -310,7 +310,7 @@ class Petal(object):
 
     # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests, allow_initial_interference=False):
+    def request_targets(self, requests, allow_initial_interference=False, _is_retry=False):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
 
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -346,6 +346,8 @@ class Petal(object):
                                     ... if the subdict contains no note field, then '' will be added automatically
                                     
             allow_initial_interference ... rarely used, only by experts, see comments in posschedule.py
+            
+            _is_retry ... boolean, internally used, whether this is a retry (e.g. cases where failed to send move_tables)
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
@@ -364,9 +366,6 @@ class Petal(object):
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
-        if self.verbose:
-            self.printfunc(f'petal: requests received {len(requests)}')
-        # self.info(requests)  # this breaks when petal is not prepared by petalApp
         marked_for_delete = set()
         for posid in requests:
             if posid not in self.posids:
@@ -383,14 +382,10 @@ class Petal(object):
                                     allow_initial_interference=allow_initial_interference)
             if error:
                 marked_for_delete.add(posid)
-                if self.verbose:
-                    self.printfunc(f'petal: {posid} request not accepted, {len(marked_for_delete)} to delete')
-                self.set_posfid_val(posid, 'LOG_NOTE', error)
+                error_str = f'{"move request retry: " if _is_retry else ""}{error}'
+                self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
-        if self.verbose:
-            self.printfunc(f'petal: {len(requests)} requests approved, '
-                           f'{len(marked_for_delete)} deleted')
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -452,10 +447,7 @@ class Petal(object):
         request_targets command, where only the first request to a given positioner would be valid.)
         """
         self._initialize_pos_flags(ids = {posid for posid in requests})
-        marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
-        for posid in marked_for_delete:
-            self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
-            del requests[posid]
+        denied = set()
         for posid, request in requests.items():
             if posid not in self.posids:
                 pass
@@ -472,7 +464,12 @@ class Petal(object):
             if 'postmove_cleanup_cmds' in request:
                 for axisid, cmd_str in request['postmove_cleanup_cmds'].items():
                     table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
-            self.schedule.expert_add_table(table)
+            error = self.schedule.expert_add_table(table)
+            if error:
+                denied.add(posid)
+                self._print_and_store_note(posid, f'direct_dtdp: {error}')
+        for posid in denied:
+            del requests[posid]
         return requests
 
     def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note=''):
@@ -491,19 +488,16 @@ class Petal(object):
             direction ... +1 or -1
             cmd_prefix ... optional, allows adding a descriptive string to the log
         """
+        posids = {posids} if isinstance(posids, str) else set(posids)
         self._initialize_pos_flags(ids = posids)
-        posids = {posids} if isinstance(posids,str) else set(posids)
-        enabled = self.enabled_posmodels(posids)
         for posid in posids:
-            if posid not in enabled.keys():
-                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
-        for posid, posmodel in enabled.items():
-            search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
-            table = posmovetable.PosMoveTable(posmodel)
+            model = self.posmodels[posid]
+            search_dist = pc.sign(direction)*model.axis[axisid].limit_seeking_search_distance
+            table = posmovetable.PosMoveTable(model)
             table.should_antibacklash = False
             table.should_final_creep  = False
             table.allow_exceed_limits = True
-            table.allow_cruise = not(posmodel.state._val['CREEP_TO_LIMITS'])
+            table.allow_cruise = not(model.state._val['CREEP_TO_LIMITS'])
             dist = [0,0]
             dist[axisid] = search_dist
             table.set_move(0, pc.T, dist[0])
@@ -518,7 +512,9 @@ class Petal(object):
             else:
                 direction_cmd_suffix = 'maxpos'
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
-            self.schedule.expert_add_table(table)
+            error = self.schedule.expert_add_table(table)
+            if error:
+                self._print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
 
     def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
@@ -547,13 +543,10 @@ class Petal(object):
         axis = 'phi_only' if axis == 'phi' else axis  # deal with common typo
         axis = 'theta_only' if axis == 'theta' else axis  # deal with common typo
         assert axis in {'both', 'phi_only', 'theta_only'}, f'Error in request_homing, unrecognized arg axis={axis}'
-        posids = {posids} if isinstance(posids,str) else set(posids)
+        posids = {posids} if isinstance(posids, str) else set(posids)
         self._initialize_pos_flags(ids = posids)
-        enabled = self.enabled_posmodels(posids)
         for posid in posids:
-            if posid not in enabled.keys():
-                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
-        for posid, posmodel in enabled.items():
+            model = self.posmodels[posid]
             directions = {}
             phi_note = None
             if axis in {'both', 'phi_only'}:
@@ -561,7 +554,7 @@ class Petal(object):
                 phi_note = pc.join_notes(log_note, 'homing phi')
                 self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note=phi_note)
             if axis in {'both', 'theta_only'}:
-                directions[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
+                directions[pc.T] = model.axis[pc.T].principle_hardstop_direction
                 theta_note = 'homing theta'
                 if phi_note == None:
                     theta_note = pc.join_notes(log_note, theta_note)
@@ -571,10 +564,10 @@ class Petal(object):
             for i, direction in directions.items():
                 cmd_prefix = f'self.axis[{i}].last_primary_hardstop_dir ='
                 if direction < 0:
-                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
+                    hardstop_debounce[i] = model.axis[i].hardstop_debounce[0]
                     postmove_cleanup_cmds[i] = f'{cmd_prefix} -1.0'
                 else:
-                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
+                    hardstop_debounce[i] = model.axis[i].hardstop_debounce[1]
                     postmove_cleanup_cmds[i] = f'{cmd_prefix} +1.0'
             if debounce:
                 request = {posid:{'target': hardstop_debounce,
@@ -2000,14 +1993,16 @@ class Petal(object):
                                f'positioners (num tries remaining = {n_retries})')
                 if expert_mode:
                     for move_table in expert_tables_to_retry:
-                        self.schedule.expert_add_table(move_table)
+                        error = self.schedule.expert_add_table(move_table)
+                        if error:
+                            self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
                 else:
                     cleaned = {}
                     for posid, req in requests_to_retry.items():
                         cleaned[posid] = {'command': req['command'],
                                           'target': [req['cmd_val1'], req['cmd_val2']],
                                           'log_note': req['log_note']}
-                    self.request_targets(cleaned) # 2020-04-30 [JHS] anything useful to be done with return value?
+                    self.request_targets(cleaned, _is_retry=True) # 2020-04-30 [JHS] anything useful to be done with return value?
                 anticollision = self.__current_schedule_moves_anticollision
                 should_anneal = self.__current_schedule_moves_should_anneal
                 self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
@@ -2206,6 +2201,13 @@ class Petal(object):
             self._posids_where_tables_were_just_sent = set()         
         elif posid in self._posids_where_tables_were_just_sent:
             self._posids_where_tables_were_just_sent.remove(posid)
+
+    def _print_and_store_note(self, posid, msg):
+        '''Print out a message for one posid and also store the message to its
+        log note field.
+        '''
+        self.printfunc(f'{posid}: {msg}')
+        self.set_posfid_val(posid, 'LOG_NOTE', msg)
 
 if __name__ == '__main__':
     '''
