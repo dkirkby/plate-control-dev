@@ -102,18 +102,19 @@ class PosSchedule(object):
         self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
+        target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
         if self.already_requested(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
-            return self._denied_str('Cannot request more than one target per positioner in a given schedule.')
+            return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
-            return self._denied_str(POS_DISABLED_MSG)
+            return self._denied_str(target_str, POS_DISABLED_MSG)
         if self._deny_request_because_starting_out_of_range(posmodel):
-            return self._denied_str(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
+            return self._denied_str(target_str, f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
                                  f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
         if not allow_initial_interference:
             interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
             if interfering_neighbors:
-                return self._denied_str(f'Interference at initial position with {interfering_neighbors}')
+                return self._denied_str(target_str, f'Interference at initial position with {interfering_neighbors}')
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
         
@@ -155,20 +156,21 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            return self._denied_str('Bad uv_type: ' + str(uv_type))
+            return self._denied_str(target_str, 'Bad uv_type')
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
-            return self._denied_str(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
+            return self._denied_str(target_str, 'Target not reachable.')
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         limit_err = self._deny_request_because_limit(posmodel, targt_poslocTP)
         if limit_err:
-            return self._denied_str(f'Target {limit_err}')
+            return self._denied_str(target_str, limit_err)
+        if self.should_check_petal_boundaries:
+            bounds_err = self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP)
+            if bounds_err:
+                return self._denied_str(target_str, bounds_err)
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
-            return self._denied_str(f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-        if self.should_check_petal_boundaries:
-            if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
-                return self._denied_str('Target exceeds a fixed boundary.')
+            return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
                        'posmodel': posmodel,
@@ -308,7 +310,9 @@ class PosSchedule(object):
             timer_start = time.perf_counter()
         self._all_requested_posids['expert'].add(move_table.posid)
         if self._deny_request_because_disabled(move_table.posmodel):
-            return self._denied_str(POS_DISABLED_MSG)
+            sched_table = move_table.for_schedule()
+            target_str = f'expert_net_dtdp=({sched_table["net_dT"][-1]:.3f}, {sched_table["net_dP"][-1]:.3f})'
+            return self._denied_str(target_str, POS_DISABLED_MSG)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
@@ -579,18 +583,21 @@ class PosSchedule(object):
     def _deny_request_because_out_of_bounds(self, posmodel, target_poslocTP):
         """Checks for case where a target request is definitively unreachable
         due to being beyond a fixed petal or GFA boundary.
+        
+        Returns '' if ok otherwise an error string describing the denial reason.
         """
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_poslocTP)
         if out_of_bounds:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.get('BOUNDARYVIOLATION', self.petal.missing_flag)
-            return True
-        return False
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('BOUNDARYVIOLATION', self.petal.missing_flag)
+            return f'Target exceeds fixed boundary "{pc.case.names[out_of_bounds]}".'
+        return ''
 
     def _deny_request_because_limit(self, posmodel, poslocTP):
         '''Check for cases where angle exceeds phi limit. This limit may either
         be imposed globally across the petal, or due ot a positioner being
-        classified as retracted. Returns '' if ok otherwise an error string
-        describing the denial reason.
+        classified as retracted.
+        
+        Returns '' if ok otherwise an error string describing the denial reason.
         '''
         err = ''
         limit_angle = None
@@ -604,7 +611,7 @@ class PosSchedule(object):
         # denying due to global limit vs denying due to classified as retracted. But at least
         # if not flagging the precise cause, it does still flag the same effect.
         self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
-        err = f'poslocP={poslocTP[1]:.3f} is outside phi limit angle={limit_angle:.1f}'
+        err = f'Target poslocP={poslocTP[1]:.3f} is outside phi limit angle={limit_angle:.1f}.'
         return err
     
     def _deny_request_because_starting_out_of_range(self, posmodel):
@@ -778,7 +785,7 @@ class PosSchedule(object):
             return False
         return True
     
-    def _denied_str(self, string):
-        return f'Target request denied: {string}'
+    def _denied_str(self, target_str, msg_str):
+        return f'Target request denied: {target_str}. {msg_str}'
 
 POS_DISABLED_MSG = 'Positioner is disabled.'
