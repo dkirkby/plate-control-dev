@@ -375,30 +375,17 @@ class Petal(object):
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+            error = self.schedule.request_target(posid=posid,
+                                    uv_type=requests[posid]['command'],
+                                    u=requests[posid]['target'][0],
+                                    v=requests[posid]['target'][1],
+                                    log_note=requests[posid]['log_note'],
+                                    allow_initial_interference=allow_initial_interference)
+            if error:
                 marked_for_delete.add(posid)
                 if self.verbose:
-                    self.printfunc(f'petal: {posid} CTRL_ENABLED=False, '
-                                   f'{len(marked_for_delete)} to delete')
-            elif self.schedule.already_requested(posid):
-                self.pos_flags[posid] |= self.flags.get('MULTIPLEREQUESTS', self.missing_flag)
-                marked_for_delete.add(posid)
-                if self.verbose:
-                    self.printfunc(f'petal: {posid} already requested, '
-                                   f'{len(marked_for_delete)} to delete')
-            else:
-                accepted = self.schedule.request_target(posid=posid,
-                                        uv_type=requests[posid]['command'],
-                                        u=requests[posid]['target'][0],
-                                        v=requests[posid]['target'][1],
-                                        log_note=requests[posid]['log_note'],
-                                        allow_initial_interference=allow_initial_interference)
-                if not accepted:
-                    marked_for_delete.add(posid)
-                    if self.verbose:
-                        self.printfunc(f'petal: {posid} request not accepted, '
-                                       f'{len(marked_for_delete)} to delete')
+                    self.printfunc(f'petal: {posid} request not accepted, {len(marked_for_delete)} to delete')
+                self.set_posfid_val(posid, 'LOG_NOTE', error)
         for posid in marked_for_delete:
             del requests[posid]
         if self.verbose:
