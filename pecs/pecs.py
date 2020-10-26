@@ -55,6 +55,8 @@ class PECS:
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
+        if self.exposure_dir is None:
+            self.exposure_dir = '/exposures/desi/'
         self.printfunc = printfunc
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
@@ -92,6 +94,8 @@ class PECS:
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
+        if interactive:
+            self.home_adc() #asks to home, not automatic
         if interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs)  # choose which petal to operate
         elif interactive is False:
@@ -435,18 +439,21 @@ class PECS:
         return result
 
     def home_adc(self):
-        try:
-            adc = SimpleProxy('ADC')
-            if self._parse_yn(input('Home ADC? (y/n): ')):
-                self.print('Homing ADC...')
-                retcode = adc._send_command('home', controllers=[1, 2])
-                self.print(f'ADC.home returned code: {retcode}')
-        except Exception as e:
-            print(f'Exception homing ADC, {e}')
+        if self.adc_available:
+            try:
+                adc = SimpleProxy('ADC')
+                if self._parse_yn(input('Home ADC? (y/n): ')):
+                    self.print('Homing ADC...')
+                    retcode = adc._send_command('home', controllers=[1, 2])
+                    self.print(f'ADC.home returned code: {retcode}')
+            except Exception as e:
+                print(f'Exception homing ADC, {e}')
+        else:
+            return
 
     def fvc_collect(self):
         destination = os.path.join(
-            '/exposures/desi', pc.dir_date_str(t=self.start_time),
+            self.exposure_dir, pc.dir_date_str(t=self.start_time),
             f'{self.exp.id:08}')
         # os.makedirs(destination, exist_ok=True)  # no permission anyway
         try:
@@ -455,7 +462,7 @@ class PECS:
             self.print(f'FVCCollector.configure returned code: {retcode}')
             retcode = fvccoll._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
-                logbook=False)
+                logbook=False, remove_after_transfer=self.fvc_cleanup)
             self.print(f'FVCCollector.collect returned code: {retcode}')
             if retcode == 'SUCCESS':
                 self.print('FVC data associated with exposure ID '
