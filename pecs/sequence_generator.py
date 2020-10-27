@@ -236,8 +236,9 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
     seq = sequence.Sequence(short_name = f'motortest {prefix} {short_suffix}',
                             long_name = f'{prefix} motor test, {long_suffix}',
                             details = details)
-    i = 0 if prefix.lower()[0] == 't' else 1
-    deltas = wiggle(forward_deltas, case=i)
+    i = 0 if 'THETA' in seq.normalized_short_name else 1
+    case = 0  # at one point I had case=i, to do phi differently from theta
+    deltas = wiggle(forward_deltas, case=case)
     for j in range(len(deltas)):
         target = [0,0]
         target[i] = deltas[j]
@@ -245,16 +246,21 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
         seq.append(move)
     return seq
 
+# Common values for "wiggle" inputs
+forward_deltas = {'cruise0': [1, 4, 16, 32],
+                  'cruise1': [1, 4, 8, 12],
+                  'creep': [0.5, 1.0, 1.5, 2.0],
+                  }
+
 # Theta and phi performance at nominal settings
 details = '''Settings: default
 Moves: Several moves at cruise speed, each followed by the usual final creep moves for precision positioning and antibacklash.'
 Purpose: Baseline tests for typical proper function.'''
 options = {}
-short_suffix = 'nominal'
+prefix = 'nominal'
 long_suffix = 'performance at nominal settings'
-forward_deltas = [1, 5, 15, 30]
-seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['cruise0'], options))
+seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['cruise1'], options))
 
 # Theta and phi cruise-only at otherwise nominal settings
 details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON
@@ -264,11 +270,10 @@ options = {'FINAL_CREEP_ON': False,
            'ANTIBACKLASH_ON': False,
            'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'] # smallest finite value
            }
-short_suffix = 'cruiseonly'
+prefix = 'cruiseonly'
 long_suffix = 'cruise-only, at otherwise nominal settings'
-forward_deltas = [1, 5, 15, 30]
-seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['cruise0'], options))
+seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['cruise1'], options))
 
 # Theta and phi cruise-only, with spinup/down power disabled
 details = '''Settings: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON. Set CURR_SPIN_UP_DOWN = 0.
@@ -280,11 +285,10 @@ options = {'FINAL_CREEP_ON': False,
            'CURR_SPIN_UP_DOWN': 0,
            'SPINUPDOWN_PERIOD': 1 # smallest finite value
           }
-short_suffix = 'cruise nospinupdown'
+prefix = 'cruise nospinupdown'
 long_suffix = 'cruise-only, with spinup/down power disabled'
-forward_deltas = [1, 5, 15, 30]
-seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['cruise0'], options))
+seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['cruise1'], options))
 
 # Theta and phi creep-only at otherwise nominal settings
 details = '''Settings: Turn on parameter ONLY_CREEP.
@@ -292,11 +296,10 @@ Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in creep mode.'''
 options = {'ONLY_CREEP': True,
            'FINAL_CREEP_ON': False}
-short_suffix = 'creeponly'
+prefix = 'creeponly'
 long_suffix = 'creep-only, at otherwise nominal settings'
-forward_deltas = [0.5, 1.0, 1.5, 2.0]
-seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['creep'], options))
+seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['creep'], options))
 
 # Theta and phi fast creep
 details = '''Settings: Halve the creep period thereby doubling the creep speed.
@@ -305,11 +308,10 @@ Purpose: Determine whether creep performance can be improved under existing firm
 options = {'ONLY_CREEP': True,
            'CREEP_PERIOD': 1,
            'FINAL_CREEP_ON': False}
-short_suffix = 'fastcreep'
+prefix = 'fastcreep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
-forward_deltas = [0.5, 1.0, 1.5, 2.0]
-seqs.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, details, forward_deltas, options))
-seqs.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, details, forward_deltas, options))
+seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['creep'], options))
+seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['creep'], options))
 
 
 # SAVE ALL TO DISK
@@ -337,12 +339,13 @@ for path in paths:
         print(f'Now reading: {path}')  # debug breakpoint
     seq = sequence.Sequence.read(path)
     print(seq,'\n')
-    if any('motortest' in s for s in seq[0].log_note):
+    if 'MOTORTEST' in path:
         axis = 0 if 'THETA' in seq.normalized_short_name else 1
         deltas = [getattr(move, f'target{axis}') for move in seq]
         cumsum = np.cumsum(deltas).tolist()
         print('num test points: '  + str(len(deltas)))
         print(f'min and max excursions: [{min(cumsum)} deg, {max(cumsum)} deg]')
+        print('\n')
         # print('delta sequence: ' + str(deltas))
         # print('running total: ' + str(cumsum))
     
