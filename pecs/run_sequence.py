@@ -63,6 +63,7 @@ is_subsequence = start_move != 0 or final_move != len(seq) - 1
 # set up a log file
 import logging
 import time
+import traceback # Log excepted exceptions
 try:
     import posconstants as pc
 except:
@@ -528,6 +529,8 @@ def park(park_option, is_prepark=True):
         
 # do the sequence
 logger.info('Beginning the move sequence\n')
+# storage for exceptions
+exception_here = None
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
@@ -647,7 +650,13 @@ except StopIteration:
     logger.info('Safely aborting the sequence.')
 except NoPosidsError:
     logger.error('All positioners have become disabled. Aborting the sequence.')
-logger.info(f'Sequence "{seq.short_name}" complete!')
+except Exception as e:
+    exception_here = e
+    logger.error('The sequence crashed! See traceback below:')
+    logger.critical(traceback.format_exc)
+    logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
+if exception_here is None:
+    logger.info(f'Sequence "{seq.short_name}" complete!')
 
 # cleanup after running sequence
 if pecs_on:
@@ -668,9 +677,8 @@ if pecs_on:
     # restore old phi limit angles
     if new_phi_limits != old_phi_limits:
         if isinstance(old_phi_limits, dict):
-            # 2020-07-13 [JHS] I'm unclear if the keys here are supposed to be role or
-            # pcid. Might be a bug, but hard for me to test at LBNL because only one petal.
-            # Frankly I'm not even 100% sure if it's a dict in the case of multiple petals.
+            # 2020-10-27 [KF] old_phi_limits will be a dict with rolename keys (PETALx)
+            # if the petals had different limits. Otherwise will be a single value.
             roles_angles = [(role, angle) for role, angle in old_phi_limits.items()]
         else:
             roles_angles = [(None, old_phi_limits)]
@@ -683,7 +691,13 @@ if pecs_on:
             logger.warning('Some error when restoring phi limits. Old limits were' +
                            f' {old_phi_limits} but restored values are different:' +
                            f' {restored_phi_limits}')
+    # Trigger FVCCollector to backup FVC images
+    pecs.fvc_collect()
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
 clear_loggers()
+
+# raise exception from loop if we have one
+if exception_here is not None:
+    raise(exception_here)
