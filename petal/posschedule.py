@@ -27,8 +27,8 @@ class PosSchedule(object):
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self._requests = {} # keys: posids, values: target request dictionaries
-        self.stage_order = ['direct','retract','rotate','extend','expert','final']
-        self.RRE_stage_order = ['retract','rotate','extend']
+        self.stage_order = ['direct', 'debounce_polygons', 'retract', 'rotate', 'extend', 'expert', 'final']
+        self.RRE_stage_order = ['retract', 'rotate', 'extend']
         self.stages = {name:posschedulestage.PosScheduleStage(
                                 collider         = self.collider,
                                 stats            = self.stats,
@@ -357,6 +357,18 @@ class PosSchedule(object):
         '''Returns set of any posids for which an "expert" table has been added.
         '''
         return {table.posid for table in self._expert_added_tables_sequence}
+    
+    def get_overlaps(self, posids):
+        '''Returns dict with keys=posids and values=sets of any neighbors with
+        overlapping polygons (in the current, initial configuration). Positioners
+        with no overlaps are excluded from the returned dict.'''
+        overlaps = {}
+        for posid in sorted(posids):
+            model = self.collider.posmodels[posid]
+            these = self._check_init_or_final_neighbor_interference(model, final_poslocTP=None)
+            if these:
+                overlaps[posid] = these
+        return overlaps
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -423,11 +435,47 @@ class PosSchedule(object):
             if self.stats.is_enabled() and adjustment_performed:
                 self.stats.add_to_num_adjustment_iters(1)
 
+    def _debounce_polygons(self):
+        '''Looks for cases where positioners have initial overlap with neighbors.
+        In cases where the polygons are just barely touching, this function attempts
+        to schedule initial small moves(s) to get the polygons free of one another.
+        These moves go into the 'debounce_polygons' stage.
+        '''
+        overlaps = self.get_overlaps(self._requests)
+        if not overlaps:
+            return
+        resolved = set()
+        start_posintTP = {}
+        dtdp = {}
+        delta0 = (0, 0)
+        delta1 = (pc.debounce_polys_distance, pc.debounce_polys_distance)
+        delta2 = (-pc.debounce_polys_distance, pc.debounce_polys_distance)
+        delta_options = [{'this': delta1, 'neighbor': delta0},
+                         {'this': delta1, 'neighbor': delta1},
+                         {'this': delta1, 'neighbor': delta2},
+                         {'this': delta2, 'neighbor': delta0},
+                         {'this': delta2, 'neighbor': delta1},
+                         {'this': delta2, 'neighbor': delta2},
+                         ]
+        for deltas in delta_options:
+            pass
+        # work in progress --- [jhs 2020-10-26]
+        # stage.initialize_move_tables(start_posintTP, dtdp)
+        # for posid in overlaps:
+        #     if posid in resolved:
+        #         continue
+        #     start = self._requests[posid]['start_posintTP']
+        #     for delta in delta_options:
+        # stage = self.stages['debounce_polygons']
+        # adjust_path(self, posid, freezing='on', use_debounce_methods=False)
+        # now need to update starting positions in requests
+
     def _schedule_requests_with_path_adjustments(self, should_anneal=True):
         """Gathers data from requests dictionary and populates the 'retract',
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
+        #self._debounce_polygons()
         stats_enabled = self.stats.is_enabled()
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
@@ -548,8 +596,8 @@ class PosSchedule(object):
         against whatever requested final neighbor positions already exist in the
         schedule.
         
-        Returns either empty set (no interference) or the posids of all
-        interfering neighbors.
+        Returns either empty set (no interference) or the posids (or boundary names)
+        of all interfering neighbors.
         """        
         use_final = final_poslocTP != None
         posid = posmodel.posid

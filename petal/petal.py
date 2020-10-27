@@ -1791,11 +1791,7 @@ class Petal(object):
         
         (Hint: also try "quick_plot posids=all" for graphical view.)
         '''
-        overlaps = {}
-        for posid in self.posids:
-            these = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
-            if these:
-                overlaps[posid] = these
+        overlaps = self.schedule.get_overlaps(self.posids)
         if as_dict:
             return overlaps
         listified = sorted(set(overlaps))

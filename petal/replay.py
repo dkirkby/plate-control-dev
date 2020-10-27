@@ -82,6 +82,7 @@ for key, func in required.items():
         mask_fills[key] = ''
 
 # read in the move data
+print(f'Reading {len(infiles)} infiles...')
 input_tables = []
 for path in infiles:
     if 'csv' not in path:
@@ -109,6 +110,8 @@ for path in infiles:
         input_tables.append(Table(new))
 t = vstack(input_tables)
 t.sort(keys=['POS_ID', 'DATE'])
+print('Read complete.')
+print('Setting up petal data...')
 
 # confirm only one petal
 petal_ids = set(t['PETAL_ID'])
@@ -225,6 +228,7 @@ def make_request(move_cmd_str):
 move_idxs = np.where(t['SHOULD_RUN'])[0]
 first_move_id = t['MOVE_ID'][move_idxs[0]]
 set_params(first_move_id, ptl=None, tp_update_mode='parked')
+print('Initializing petal instance...')
 ptl = petal.Petal(petal_id        = petal_id,
                   petal_loc       = 3,
                   posids          = all_posids,
@@ -324,3 +328,41 @@ if uargs.animate and not ptl.animator.is_empty():
     ptl.animator.filename_suffix = pc.filename_timestamp_str()
     ptl.animator.add_timestamp_prefix_to_filename = False
     ptl.generate_animation()
+
+
+'''
+De-overlap code test.
+[JHS 2020-10-26 --- this is *very* temporary stuff, to temporarily help me while implementing
+ de-overlap code in posschedule.py.]
+
+Expid 3363, iter 9, gets us to a state where ready to try out test moves.
+e.g.
+runfile('C:/Users/joe/Desktop/desi_svn/focalplane/plate_control/branches/lbl/petal/replay.py', wdir='C:/Users/joe/Desktop/desi_svn/focalplane/plate_control/branches/lbl/petal', args='-i C:/Users/joe/Desktop/anticollision_tests_sept2020/data_20201020/expid_3363/data_with_comma_replace/* -ms 3363.9 -mf 3363.9 -t')
+
+This should put the positioners at:
+
+>> print(ptl.quick_table(['M06243','M06632','M07779','M02019']))
+PETAL_ID 0 at LOCATION 3, (displaying 4 of 488 positioners):
+POSID  LOCID BUSID CANID ENABLED  OVERLAP   posintT posintP poslocT poslocP poslocX poslocY   obsX     obsY      Q        S    
+------ ----- ----- ----- ------- ---------- ------- ------- ------- ------- ------- ------- -------- -------- -------- --------
+M02019  251  can12  2019   True  {'M07779'}    50.0   126.0   -48.5   125.3   2.693   0.687  254.686  105.185   22.441  275.723
+M06243  503  can16  6243   True  {'M06632'}   -98.2   112.0    79.0   110.4  -2.420   2.472  386.017  106.854   15.473  401.084
+M06632  504  can16  6632   True  {'M06243'}   160.7   108.0   289.1   109.4   3.392  -0.906  386.530  112.528   16.232  403.136
+M07779  268  can22  7779   True  {'M02019'}   162.6    74.2   179.0    74.8  -3.935  -3.004  258.458  101.454   21.432  277.833
+
+Then run code snippets below.
+
+req = [{'M06243': {'command': 'posintTP', 'target': [   0, 100]}},
+       {'M06243': {'command': 'posintTP', 'target': [-190, 100]}},
+       {'M06632': {'command': 'posintTP', 'target': [ 100, 100]}},
+       {'M06632': {'command': 'posintTP', 'target': [ 190, 100]}},
+       ]
+req.append(req[0])
+req[-1].update(req[2])
+req.append(req[2])
+req[-1].update(req[3])
+for requests in req:
+    accepted = ptl.request_targets(requests.copy(), allow_initial_interference=False)
+    ptl.schedule_moves()
+    failed_posids = ptl.send_and_execute_moves()
+'''

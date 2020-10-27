@@ -357,6 +357,7 @@ class collision_case(object):
                       self.IV:  'circular keepout',
                       self.GFA: 'GFA',
                       self.PTL: 'PTL'}
+        self.fixed_case_names = {self.names[c] for c in self.fixed_cases}
 case = collision_case()
 
 # Collision resolution methods
@@ -368,7 +369,12 @@ nonfreeze_adjustment_methods = ['pause',
                                 'repel_ccw_A','repel_cw_A',
                                 'repel_ccw_B','repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
-num_timesteps_clearance_margin = 2 # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
+num_timesteps_clearance_margin = 2  # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
+
+# Initial polygon debouncing settings
+num_timesteps_ignore_overlap = 1
+debounce_polys_distance = 5 # deg, for attempts to slightly step one polygon off another when barely touching
+
 
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
