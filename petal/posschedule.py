@@ -441,34 +441,40 @@ class PosSchedule(object):
         to schedule initial small moves(s) to get the polygons free of one another.
         These moves go into the 'debounce_polygons' stage.
         '''
+        stage = self.stages['debounce_polygons']
         overlaps = self.get_overlaps(self._requests)
         if not overlaps:
             return
-        resolved = set()
         start_posintTP = {}
-        dtdp = {}
-        delta0 = (0, 0)
-        delta1 = (pc.debounce_polys_distance, pc.debounce_polys_distance)
-        delta2 = (-pc.debounce_polys_distance, pc.debounce_polys_distance)
-        delta_options = [{'this': delta1, 'neighbor': delta0},
-                         {'this': delta1, 'neighbor': delta1},
-                         {'this': delta1, 'neighbor': delta2},
-                         {'this': delta2, 'neighbor': delta0},
-                         {'this': delta2, 'neighbor': delta1},
-                         {'this': delta2, 'neighbor': delta2},
-                         ]
-        for deltas in delta_options:
-            pass
-        # work in progress --- [jhs 2020-10-26]
-        # stage.initialize_move_tables(start_posintTP, dtdp)
-        # for posid in overlaps:
-        #     if posid in resolved:
-        #         continue
-        #     start = self._requests[posid]['start_posintTP']
-        #     for delta in delta_options:
-        # stage = self.stages['debounce_polygons']
-        # adjust_path(self, posid, freezing='on', use_debounce_methods=False)
-        # now need to update starting positions in requests
+        chosen_dtdp = {}
+        db = pc.debounce_polys_distance
+        delta_options = [(0, db), (db, 0), (-db, 0), (db, db), (-db, db)]
+        proposed = [{'this': d, 'neighbor': None} for d in delta_options]
+        proposed += [{'this': None, 'neighbor': d} for d in delta_options]
+        proposed += [{'this': d, 'neighbor': d} for d in delta_options]
+        resolved = set()
+        for deltas in proposed:
+            test_dtdp = chosen_dtdp.copy()
+            remaining = set(overlaps) - resolved
+            if not remaining:
+                break
+            for posid in remaining:
+                if posid in test_dtdp:
+                    continue
+                if deltas['this']:
+                    test_dtdp[posid] = deltas['this']
+                if deltas['neighbor']:
+                    for neighbor in overlaps[posid]:
+                        should_use = neighbor not in test_dtdp and \
+                                     neighbor not in chosen_dtdp and \
+                                     neighbor not in pc.case.fixed_case_names
+                        if should_use:
+                            test_dtdp[neighbor] = deltas['neighbor']
+            # stage.initialize_move_tables(start_posintTP, test_dtdp)
+            # no anneals!
+            # do a collision check which skips first X timesteps
+            # store the good ones into chosen_dtdp
+            # and need to update starting positions in requests
 
     def _schedule_requests_with_path_adjustments(self, should_anneal=True):
         """Gathers data from requests dictionary and populates the 'retract',
