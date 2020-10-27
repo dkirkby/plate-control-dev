@@ -1540,6 +1540,7 @@ class Petal(object):
         coord_formats.update({key: '7.3f' for key in ['poslocXY']})
         coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
         coord_splits ={c: (c[:-1], c[:-2] + c[-1]) for c in coord_formats}
+        coord_formats.update({s[i]: coord_formats[c] for i in [0,1] for c, s in coord_splits.items()})
         id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID', 'ENABLED', 'OVERLAP']
         columns = id_columns.copy()
         for coord in coords:
@@ -1547,6 +1548,8 @@ class Petal(object):
         overlaps = self.get_overlaps(as_dict=True)
         overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
         data = {c:[] for c in columns}
+        floats = {c:[] for c in columns}
+        fmt_coord = lambda value, coord: format(value, coord_formats[coord])
         for posid in posids:
             model = self.posmodels[posid]
             data['POSID'].append(posid)
@@ -1561,33 +1564,35 @@ class Petal(object):
                     split_name = coord_splits[coord][i]
                     value = pos[coord][i]
                     if not as_table:
-                        value = format(value, coord_formats[coord])
+                        floats[split_name].append(value)
+                        value = fmt_coord(value, split_name)
                     data[split_name].append(value)
         t = AstropyTable(data)
         t.sort('POSID')
         if as_table:
             return t
-        # for c in t.columns:
-        #     t[c] = [str(x) for x in t[c]]
+        t_fmt = t.pformat_all(align='^')
         should_calc_stats = set(t.columns) - set(id_columns)
-        if len(t) > 0 and any(should_calc_stats):
-            stats_data = {c:[''] for c in t.columns}
-            for name, func in {'MAX': max, 'MIN': min}.items():                
-                for c in stats_data:
-                    if c == id_columns[-1]:
-                        stats_data[c].append(name)
-                    elif c in should_calc_stats:
-                        stats_data[c].append(func(t[c]))
+        stats_str = ''
+        if len(t) > 1 and any(should_calc_stats):
+            stats_str += '\n' + t_fmt[1]
+            col_widths = {list(t.columns)[i]: len(t_fmt[1].split(' ')[i]) for i in range(len(t.columns))}
+            for name, func in {'MIN': min, 'AVG': np.mean, 'MAX': max}.items():
+                stats_str += '\n'
+                for col, width in col_widths.items():
+                    fmt = lambda x: format(x, f'>{width}s')
+                    if col == id_columns[-1]:
+                        stats_str += fmt(name)
+                    elif col in should_calc_stats:
+                        value = func(floats[col])
+                        stats_str += fmt(fmt_coord(value, col))
                     else:
-                        stats_data[c].append('')
-            stats_tbl = AstropyTable(stats_data)
-            stats_str = '\n'.join(stats_tbl.pformat_all(align='^')[2:])
-        else:
-            stats_str = ''
+                        stats_str += fmt(' ')
+                    stats_str += ' '
         s = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
         s += f'(displaying {len(t)} of {len(self.posids)} positioners):\n'
-        s += '\n'.join(t.pformat_all(align='^'))
-        s += '\n' + stats_str
+        s += '\n'.join(t_fmt)
+        s += stats_str
         return s
     
     def quick_query(self, key=None, op='', value='', posids='all', mode='compact'):
