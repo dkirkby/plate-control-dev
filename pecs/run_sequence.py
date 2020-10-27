@@ -660,6 +660,8 @@ if exception_here is None:
 
 # cleanup after running sequence
 if pecs_on:
+    # Trigger FVCCollector to backup FVC images, should not wait for collection to finish
+    pecs.fvc_collect()
     # restore the original pos settings
     orig_settings = retrieve_cached_pos_settings(cache_path)
     logger.info(f'Retrieved original positioner settings from {cache_path}')
@@ -691,8 +693,6 @@ if pecs_on:
             logger.warning('Some error when restoring phi limits. Old limits were' +
                            f' {old_phi_limits} but restored values are different:' +
                            f' {restored_phi_limits}')
-    # Trigger FVCCollector to backup FVC images
-    pecs.fvc_collect()
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
