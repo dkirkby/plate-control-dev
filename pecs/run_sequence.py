@@ -653,7 +653,7 @@ except NoPosidsError:
 except Exception as e:
     exception_here = e
     logger.error('The sequence crashed! See traceback below:')
-    logger.critical(traceback.format_exc)
+    logger.critical(traceback.format_exc())
     logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
 if exception_here is None:
     logger.info(f'Sequence "{seq.short_name}" complete!')
