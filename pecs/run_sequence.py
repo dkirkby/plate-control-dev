@@ -558,7 +558,7 @@ try:
             logger.info(f'Correction move skipped ({reason})')
         n_corr = 0 if not_correctable else uargs.num_corr
         targ_errs = None
-        calc_errors = True
+        calc_errors = move.command not in sequence.abs_commands
         initial_request = None
         for submove_num in range(1 + n_corr):
             extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
