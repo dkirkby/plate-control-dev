@@ -319,6 +319,7 @@ class PECS:
         fvc_data = pd.concat([meapos,
                     exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
                     axis=1)
+        submeas = {}
         if num_meas > 1:
             submeas = self.summarize_submeasurements(meapos)
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
