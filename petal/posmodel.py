@@ -30,8 +30,10 @@ class PosModel(object):
         
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
-        self._abs_shaft_speed_cruise_T   = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
-        self._abs_shaft_speed_cruise_P   = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance))
+        self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
 
     def refresh_cache(self):
         """Reloads state parameters with cached values."""
@@ -181,6 +183,16 @@ class PosModel(object):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
         """
         return self._abs_shaft_speed_cruise_P
+    
+    @property
+    def abs_shaft_spinupdown_distance_T(self):
+        '''Acceleration / deceleration distance on theta axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_T
+
+    @property
+    def abs_shaft_spinupdown_distance_P(self):
+        '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_P
 
     def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the
