@@ -275,12 +275,13 @@ def is_constants_key(key):
     return key.upper() in constants_keys
 
 # state data fields associated with "late" committing to database
-late_commit_defaults = {'OBS_X':None,
-                        'OBS_Y':None,
-                        'PTL_X':None,
-                        'PTL_Y':None,
-                        'PTL_Z':None,
-                        'FLAGS':None}
+late_commit_defaults = {'OBS_X': None,
+                        'OBS_Y': None,
+                        'PTL_X': None,
+                        'PTL_Y': None,
+                        'PTL_Z': None,
+                        'FLAGS': None,
+                        'POSTSCRIPT': None}
 
 # ordered lists of motor parameters (in order that petalcontroller expects them)
 # interface is funky, for example the doubling in some cases for the two motors
