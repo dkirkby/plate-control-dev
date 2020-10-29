@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tp_tol', type=float, default=0.0, help='Minimum error in mm over which to update TP.')
     parser.add_argument('-f', '--tp_frac', type=float, default=1.0, help='Percentatge of error to apply in the TP update. Maximum 1.0.')
     uargs = parser.parse_args()
-    assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posintTP or offsetsTP!'
+    assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posTP or offsetsTP!'
     assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
     from pecs import PECS
     print(f'Running one point calibration for {uargs.mode}')
