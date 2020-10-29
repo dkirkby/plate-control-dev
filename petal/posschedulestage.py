@@ -68,6 +68,14 @@ class PosScheduleStage(object):
             self.move_tables[this_posid].extend(move_table)
         else:
             self.move_tables[this_posid] = move_table
+            
+    def del_table(self, posid):
+        '''Deletes a move table and associated sweep data. This may leave the
+        state of self.colliding out of date, until the next find_collisions() call.
+        '''
+        for d in [self.move_tables, self.start_posintTP, self.sweeps]:
+            if posid in d:
+                del d[posid]
 
     def anneal_tables(self, anneal_time=None):
         """Adjusts move table timing, to attempt to reduce peak power consumption
@@ -213,7 +221,7 @@ class PosScheduleStage(object):
             methods = pc.all_adjustment_methods
         for method in methods:        
             collision_neighbor = self.sweeps[posid].collision_neighbor
-            proposed_tables = self._propose_path_adjustment(posid,method)
+            proposed_tables = self._propose_path_adjustment(posid, method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             should_accept = not(colliding_sweeps) or freezing in {'forced','forced_recursive'}
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated
@@ -266,21 +274,22 @@ class PosScheduleStage(object):
                             if not self.move_tables[p].is_motionless: # does that table have any contents inside to be frozen?
                                 freeze_is_possible = True
                         if freeze_is_possible: 
-                            adjusted, recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
-                            adjusted.update(recursed_newly_frozen) 
+                            newly_adjusted, recursed_newly_frozen = self.adjust_path(p, freezing='forced_recursive') # recursively close out any side-effect new collisions
+                            adjusted.update(newly_adjusted) 
                             frozen.update(recursed_newly_frozen)
                         else:
                             self.printfunc(' --> no further freezing possible on ' + str(p) + ' --- already motionless')
                         verified = p not in self.colliding
-                        self.printfunc(' --> recursive forced freeze attempted on ' + str(p) + '. Verified now non-collidng? ' + str(verified))
+                        self.printfunc(' --> recursive forced freeze attempted on ' + str(p) + '. Verified now non-colliding? ' + str(verified))
                 break # note indentation level of this return statement is essential. it breaks out of the methods for loop. do not remove again!
         return adjusted, frozen
 
-    def find_collisions(self, move_tables):
+    def find_collisions(self, move_tables, skip=0):
         """Identifies any collisions that would be induced by executing a collection
         of move tables.
 
-            move_tables   ... dict with keys = posids, values = PosMoveTable instances.
+            move_tables ... dict with keys = posids, values = PosMoveTable instances.
+            skip ... integer number of initial timesteps for which to skip collision checks
 
         Two items are returned. They are both dicts with keys = posids, values = PosSweep
         instances (see poscollider.py).
@@ -318,7 +327,10 @@ class PosScheduleStage(object):
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
                     table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
-                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, table_A.init_poslocTP, table_A.for_collider(), neighbor, table_B.init_poslocTP, table_B.for_collider())
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(
+                                            posid, table_A.init_poslocTP, table_A.for_collider(),
+                                            neighbor, table_B.init_poslocTP, table_B.for_collider(),
+                                            skip=skip)
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
@@ -326,7 +338,9 @@ class PosScheduleStage(object):
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
-                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, table_A.init_poslocTP, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
+                posfix_sweep = self.collider.spacetime_collision_with_fixed(
+                                       posid, table_A.init_poslocTP, table_A.for_collider(),
+                                       skip=skip)[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep}) # don't worry --- if pospos colliding sweep takes precedence, this will be appropriately replaced again below
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
@@ -376,12 +390,6 @@ class PosScheduleStage(object):
                 discontinuous.add(p)
         return discontinuous
 
-    def get_frozen_posids(self):
-        '''Returns set of any posids whose move sweeps have been marked so far as frozen.
-        '''
-        frozen = {posid for posid, sweep in self.sweeps.items() if sweep.is_frozen}
-        return frozen                
-
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
         The alternate table is meant to attempt to avoid collision.
@@ -429,12 +437,27 @@ class PosScheduleStage(object):
         after receiving a new proposal, to re-check for collisions against all the
         neighbors of all the proposed new move tables.
         """
-        no_collision = self.sweeps[posid].collision_case == pc.case.I
+        # [JHS] 2020-10-29 Additional methods to consider implementing are *combined*
+        # rotation followed immediately by retraction or extension. It's a fancier
+        # move, which I believe may solve a few corner cases. Might significantly affect
+        # calculation time? Because once you get into combinations, you have a whole lot
+        # more possible path adjustment cases. I.e. 4 rot x 4 extension/retraction options
+        # --> 16 additional methods! If go this route, would be perhaps cleanest to
+        # generate them in code as combo of these options. (At initialization time ---
+        # one time.) Anyway, worth considering and doing a few timing tests. Really, most
+        # time is spent doing collision checks --- that's where the real cost of additional
+        # path adjustments has to be considered.
+        if self.sweeps[posid].collision_case == pc.case.I: # no collision
+            return {}
+        if self.sweeps[posid].is_frozen:
+            return {}  # can't do anything with an already-frozen positioner
+        if not self.collider.posmodels[posid].is_enabled:
+            return {}  # can't do anything with a disabled positioner
         fixed_collision = self.sweeps[posid].collision_case in pc.case.fixed_cases
-        already_frozen = self.sweeps[posid].is_frozen
-        not_enabled = not(self.collider.posmodels[posid].is_enabled)
+        if fixed_collision and method in pc.useless_with_fixed_boundary:
+            return {}
         unmoving_neighbor = self.sweeps[posid].collision_neighbor not in self.move_tables
-        if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled or (unmoving_neighbor and method != 'freeze'):
+        if unmoving_neighbor and method in pc.useless_with_unmoving_neighbor:
             return {}
         
         # table that will be adjusted
@@ -534,15 +557,20 @@ class PosScheduleStage(object):
                 else:
                     t.set_postpause(0, wait_for_posid_to_jog)
                 t.set_move(t.n_rows, axis, -jogs[p]) # note how this is happening in a new final row
-        else:
+        elif neighbor_can_move:
             tables[posid].insert_new_row(0)
             tables[posid].insert_new_row(0)
-            tables[posid].set_move(0,axis,jogs[posid])
-            tables[posid].set_postpause(0,neighbor_clearance_time)
-            tables[posid].set_move(1,axis,-jogs[posid])
+            tables[posid].set_move(0, axis, jogs[posid])
+            tables[posid].set_postpause(0, neighbor_clearance_time)
+            tables[posid].set_move(1, axis, -jogs[posid])
             if neighbor in tables:
                 tables[neighbor].insert_new_row(0)
-                tables[neighbor].set_prepause(0,jog_times[posid])   
+                tables[neighbor].set_prepause(0, jog_times[posid])
+        else:
+            tables[posid].insert_new_row(0)
+            tables[posid].set_move(0, axis, jogs[posid])
+            new_final_idx = tables[posid].n_rows
+            tables[posid].set_move(new_final_idx, axis, -jogs[posid])
         return tables
     
     @staticmethod
