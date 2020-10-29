@@ -142,26 +142,39 @@ class PosCollider(object):
                         self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
 
     def spacetime_collision_between_positioners(self, posid_A, init_poslocTP_A, tableA,
-                                                      posid_B, init_poslocTP_B, tableB):
+                                                      posid_B, init_poslocTP_B, tableB,
+                                                      skip=0):
         """Wrapper for spacetime_collision method, specifically for checking
         two positioners against each other."""
         return self.spacetime_collision(posid_A, init_poslocTP_A, tableA,
-                                        posid_B, init_poslocTP_B, tableB)
+                                        posid_B, init_poslocTP_B, tableB,
+                                        skip=skip)
 
-    def spacetime_collision_with_fixed(self, posid, init_poslocTP, table):
+    def spacetime_collision_with_fixed(self, posid, init_poslocTP, table, skip=0):
         """Wrapper for spacetime_collision method, specifically for checking
         one positioner against the fixed keepouts.
         """
-        return self.spacetime_collision(posid, init_poslocTP, table)
+        return self.spacetime_collision(posid, init_poslocTP, table, skip=skip)
 
     def spacetime_collision(self, posid_A, init_poslocTP_A, tableA,
-                                  posid_B=None, init_poslocTP_B=None, tableB=None):
+                                  posid_B=None, init_poslocTP_B=None, tableB=None,
+                                  skip=0):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
-            posid_A, posid_B            ...  posid strings of the two positioners to check against each other
-            init_poslocTP_A, init_poslocTP_B  ...  starting (theta,phi) positions, in the poslocTP coordinate systems
-            tableA, tableB              ...  dictionaries defining rotation schedules as described below
+            posid_A, posid_B ... posid strings of the two positioners to check against each other
+            init_poslocTP_A, init_poslocTP_B  ... starting (theta,phi) positions, in the poslocTP coordinate systems
+            tableA, table  ... dictionaries defining rotation schedules as described below
+            skip ... integer number of initial timesteps for which to skip collision check
+        
+        ** Subtlety regarding "skip" **
+            As of 2020-10-29, I *always* skip the first timestep, regardless of the
+            value of skip. In effect, arguing skip=0 is like saying skip=1. This is
+            due to some details of how I most efficiently process the quantized sweeps
+            (in particular, the "was_moving" flags). So far in practice, I believe this
+            is fine --- but it may not be what you expect at first glance. You can
+            still use "skip" to skip more than one timestep, although at present with
+            our timestep values of 0.02 sec there's no use case I can think of to do so.
 
         If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_poslocTP_B, tableB)
         then the method checks the "A" positioner against the fixed keepout envelopes.
@@ -201,7 +214,7 @@ class PosCollider(object):
         while any(steps_remaining):
             check_collision_this_loop = False
             for i in pos_range:
-                if sweeps[i].was_moving_cached[step[i]]:
+                if sweeps[i].was_moving_cached[step[i]] and step[i] >= skip:
                     check_collision_this_loop = True
             if check_collision_this_loop:
                 if pospos:
@@ -209,7 +222,7 @@ class PosCollider(object):
                 else:
                     collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[step[0]])
                 if collision_case != pc.case.I:
-                    for i,j in zip(pos_range, rev_pos_range):
+                    for i, j in zip(pos_range, rev_pos_range):
                         sweeps[i].collision_case = collision_case
                         if pospos:
                             sweeps[i].collision_neighbor = sweeps[j].posid
@@ -1018,7 +1031,7 @@ cpdef test2():
               'dP':[ 0,  0,-10,20,-10],
               'Tdot':[10,10,1,10,20],
               'Pdot':[5,5,5,5,5],
-              'prepause':[1,0,0,0,0],
+              'prepause':[0,1,0,0,0],
               'postpause':[0,0,0,0,1]}
     t['move_time'] = [max(abs(t['dT'][i]/t['Tdot'][i]), abs(t['dP'][i]/t['Pdot'][i])) for i in range(t['nrows'])]
     s = PosSweep('posid')
