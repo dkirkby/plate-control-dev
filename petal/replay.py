@@ -27,33 +27,21 @@ parser.add_argument('-f', '--focus', type=str, default=None, help='focus the ani
 parser.add_argument('-x', '--focus_expand', action='store_true', help='when focus option is specified, this causes not just neighbors, but also neighbors-of-neighbors to be animated')
 parser.add_argument('-v', '--verbose', action='store_true', help='turn on additional verbosity at console, may be helpful for debugging')
 parser.add_argument('-t', '--tp_update', action='store_true', help='for each move, force POS_T and POS_P to adopt values from data file (rather than using the simulated values from the previous move), thus any tp_updates done by the online system will be incorporated in sim')
-parser.add_argument('-d', '--display-posids', type=str, default='', help='one or more posids (comma-separated) for which you want extra information printed')
+parser.add_argument('-d', '--display_posids', type=str, default='', help='one or more posids (comma-separated) for which you want extra information printed')
+parser.add_argument('-c', '--reuse_cached_data', action='store_true', help='re-use cached data from previous run (faster to read from disk for repeat uses)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
 assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 
+import time
 import glob
 import petal
 import posconstants as pc
 import posstate
 from astropy.table import Table, vstack, MaskedColumn
 import numpy as np
-
-# paths
-infiles = []
-for s in uargs.infiles:
-    these = glob.glob(s)
-    for this in these:
-        if os.path.isdir(this):
-            contents = os.listdir(this)
-            contents = [os.path.join(this, file) for file in contents]
-            infiles.extend(contents)
-        else:
-            infiles.append(this)
-infiles = [os.path.realpath(p) for p in infiles]
-assert any(infiles), 'check path args, no valid input files detected'
 
 # data types / definitions
 nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
@@ -82,35 +70,66 @@ for key, func in required.items():
         mask_fills[key] = ''
 
 # read in the move data
-print(f'Reading {len(infiles)} infiles...')
-input_tables = []
-for path in infiles:
-    if 'csv' not in path:
-        continue  # i.e. skip non-data files
-    table = Table.read(path)
-    missing = set(required) - set(table.columns)
-    if any(missing):
-        print(f'Skipped data at {path} due to missing columns {missing}')
-        continue
-    new = {}
-    for key, typefunc in required.items():
-        if isinstance(table[key], MaskedColumn):
-            vec = []
-            for i in range(len(table)):
-                if table[key].mask[i]:
-                    x = mask_fills[key]
-                else:
-                    x = typefunc(table[key][i])
-                vec.append(x)
-        else:
-            vec = [typefunc(x) for x in table[key]]
-        new[key] = vec
-    new_table = Table(new)
-    if len(new_table) > 0:
-        input_tables.append(Table(new))
-t = vstack(input_tables)
-t.sort(keys=['POS_ID', 'DATE'])
-print('Read complete.')
+infiles = []
+cache_basename = 'replay_cache.ecsv'
+cache_path = os.path.join(pc.dirs['temp_files'], cache_basename)
+timer_start = time.perf_counter()
+print_read_complete = lambda: print(f'Read complete in {time.perf_counter() - timer_start:.2f} seconds.')
+if uargs.reuse_cached_data:
+    print(f'Reading data from cache at {cache_path}...')
+    t = Table.read(cache_path)
+    print_read_complete()
+    
+    # handling astropy masked columns
+    fill_values = {key: '' for key in ['MOVE_CMD', 'MOVE_VAL1', 'MOVE_VAL2']}
+    for key, fill in fill_values.items():
+        t[key].fill_value = fill
+        t[key] = t[key].filled()
+else:
+    print('Reading and parsing data from argued infiles...')
+    for s in uargs.infiles:
+        these = glob.glob(s)
+        for this in these:
+            if os.path.isdir(this):
+                contents = os.listdir(this)
+                contents = [os.path.join(this, file) for file in contents]
+                infiles.extend(contents)
+            else:
+                infiles.append(this)
+    infiles = [os.path.realpath(p) for p in infiles]
+    assert any(infiles), 'check path args, no valid input files detected'
+    print(f'{len(infiles)} infiles detected. Now reading data...')
+    input_tables = []
+    for path in infiles:
+        if 'csv' not in path:
+            continue  # i.e. skip non-data files
+        table = Table.read(path)
+        missing = set(required) - set(table.columns)
+        if any(missing):
+            print(f'Skipped data at {path} due to missing columns {missing}')
+            continue
+        new = {}
+        for key, typefunc in required.items():
+            if isinstance(table[key], MaskedColumn):
+                vec = []
+                for i in range(len(table)):
+                    if table[key].mask[i]:
+                        x = mask_fills[key]
+                    else:
+                        x = typefunc(table[key][i])
+                    vec.append(x)
+            else:
+                vec = [typefunc(x) for x in table[key]]
+            new[key] = vec
+        new_table = Table(new)
+        if len(new_table) > 0:
+            input_tables.append(Table(new))
+    t = vstack(input_tables)
+    t.sort(keys=['POS_ID', 'DATE'])
+    print_read_complete()
+    t.write(cache_path)
+    print(f'Wrote data to cache at {cache_path}. (For repeat runs with same data, you can use -c option to read this data from cache, which is much faster.)')
+
 print('Setting up petal data...')
 
 # confirm only one petal
@@ -352,17 +371,35 @@ M07779  268  can22  7779   True  {'M02019'}   162.6    74.2   179.0    74.8  -3.
 
 Then run code snippets below.
 
-req = [{'M06243': {'command': 'posintTP', 'target': [   0, 100]}},
-       {'M06243': {'command': 'posintTP', 'target': [-190, 100]}},
-       {'M06632': {'command': 'posintTP', 'target': [ 100, 100]}},
-       {'M06632': {'command': 'posintTP', 'target': [ 190, 100]}},
+req = [{'M06689': {'command': 'posintTP', 'target': [ 100,   0]}},
+       
+       {'M06243': {'command': 'posintTP', 'target': [   0, 100]},
+        'M06632': {'command': 'posintTP', 'target': [ 100, 100]}},
+       
+       {'M06243': {'command': 'posintTP', 'target': [-190, 100]},
+        'M06632': {'command': 'posintTP', 'target': [ 190, 100]}},
        ]
-req.append(req[0])
-req[-1].update(req[2])
-req.append(req[2])
-req[-1].update(req[3])
+posids = set()
+for r in req:
+    posids |= set(r.keys())
+start = {key: {p: ptl.get_posfid_val(p, key) for p in posids} for key in ['POS_T', 'POS_P']}
+
+# a tricky situation... since M06678 is disabled, *and* blocks retraction of M06689
+start['POS_T'].update({'M06678': 200, 'M06689': -86})
+start['POS_P'].update({'M06678': 0})
+
 for requests in req:
-    accepted = ptl.request_targets(requests.copy(), allow_initial_interference=False)
+    for key, start_vals in start.items():
+        for posid, value in start_vals.items():
+            ptl.set_posfid_val(posid, key, value)
+    print('')
+    print('')
+    print(ptl.quick_table(posids))
+    accepted = ptl.request_targets(requests.copy(), allow_initial_interference=True)
     ptl.schedule_moves()
     failed_posids = ptl.send_and_execute_moves()
+    print(ptl.quick_table(posids))
+    print('')
+    print('')
 '''
+    
