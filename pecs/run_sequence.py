@@ -172,7 +172,7 @@ except NoPosidsError:
     
 _loc2id_cache = {}  # reduces overhead for function below
 _id2loc_cache = {}  # reduces overhead for function below
-def get_map(key='loc', posids=[]):
+def get_map(key='loc', posids=None):
     '''Returns dict with containing positioner locations and corresponding ids.
     By default, positioners will be only those delivered dynamically by get_posids().
     

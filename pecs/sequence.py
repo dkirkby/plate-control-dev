@@ -336,7 +336,8 @@ class Move(object):
         Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
         or set both to home both axes.
     '''
-    def __init__(self, command, target0, target1, device_loc='any', log_note='', pos_settings={}, allow_corr=True):
+    def __init__(self, command, target0, target1, device_loc='any', log_note='', pos_settings=None, allow_corr=True):
+        pos_settings = {} if pos_settings is None else pos_settings
         if device_loc == 'any' or is_number(device_loc):
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
