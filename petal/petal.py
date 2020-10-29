@@ -310,7 +310,7 @@ class Petal(object):
 
     # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests, allow_initial_interference=False, _is_retry=False):
+    def request_targets(self, requests, allow_initial_interference=True, _is_retry=False):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
 
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -345,7 +345,7 @@ class Petal(object):
                                     ... gets stored in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
                                     
-            allow_initial_interference ... rarely used, only by experts, see comments in posschedule.py
+            allow_initial_interference ... rarely altered, only by experts, see comments in posschedule.py
             
             _is_retry ... boolean, internally used, whether this is a retry (e.g. cases where failed to send move_tables)
 
@@ -383,7 +383,7 @@ class Petal(object):
             if error:
                 marked_for_delete.add(posid)
                 error_str = f'{"move request retry: " if _is_retry else ""}{error}'
-                self._print_and_store_note(posid, error_str)
+                self.print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
         return requests
@@ -467,7 +467,7 @@ class Petal(object):
             error = self.schedule.expert_add_table(table)
             if error:
                 denied.add(posid)
-                self._print_and_store_note(posid, f'direct_dtdp: {error}')
+                self.print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
         return requests
@@ -514,7 +514,7 @@ class Petal(object):
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
             error = self.schedule.expert_add_table(table)
             if error:
-                self._print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
+                self.print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
 
     def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
@@ -645,7 +645,7 @@ class Petal(object):
             for posid in frozen:
                 self.pos_flags[posid] |= self.flags.get('FROZEN', self.missing_flag) # Mark as frozen by anticollision
             if any(frozen):
-                self.printfunc(f'frozen: {frozen}')
+                self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
             times = {tbl['total_time'] for tbl in hw_tables}
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
@@ -743,8 +743,7 @@ class Petal(object):
         assert all(np.isfinite(target)), f'{err_prefix} non-finite target {target}'
         for posid in posids:
             requests[posid] = {'command':cmd, 'target':target, 'log_note':log_note}
-        allow_initial_interference = anticollision == None
-        self.request_targets(requests, allow_initial_interference)
+        self.request_targets(requests)
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
         self.limit_angle = old_limit
 
@@ -2017,7 +2016,7 @@ class Petal(object):
                     for move_table in expert_tables_to_retry:
                         error = self.schedule.expert_add_table(move_table)
                         if error:
-                            self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
+                            self.print_and_store_note(move_table.posid, f'expert table retry: {error}')
                 else:
                     cleaned = {}
                     for posid, req in requests_to_retry.items():
@@ -2224,7 +2223,7 @@ class Petal(object):
         elif posid in self._posids_where_tables_were_just_sent:
             self._posids_where_tables_were_just_sent.remove(posid)
 
-    def _print_and_store_note(self, posid, msg):
+    def print_and_store_note(self, posid, msg):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
