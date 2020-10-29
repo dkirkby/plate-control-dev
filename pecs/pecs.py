@@ -319,12 +319,12 @@ class PECS:
         fvc_data = pd.concat([meapos,
                     exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
                     axis=1)
-        #Call handle fvc feedback
+        if num_meas > 1:
+            submeas = self.summarize_submeasurements(meapos)
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                       test_tp=test_tp, auto_update=True,
                                       err_thresh=self.max_err, up_tol=self.tp_tol,
-                                      up_frac=self.tp_frac)
-        
+                                      up_frac=self.tp_frac, postscript=submeas)
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request, match_radius=None, check_unmatched=False,
