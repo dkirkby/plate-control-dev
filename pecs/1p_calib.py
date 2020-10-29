@@ -59,3 +59,4 @@ if __name__ == '__main__':
     updates = updates['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']
     updates.sort_values('ERR_XY', inplace=True, ascending=False)
     print(updates)
+    pecs.fvc_collect()
