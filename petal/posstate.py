@@ -460,7 +460,7 @@ class PosState(object):
                                               'DEVICE_CLASSIFIED_NONFUNCTIONAL':False,
                                               }
         elif self.type == 'ptl':
-            possible_new_keys_and_defaults ={}
+            possible_new_keys_and_defaults = {}
 
         for key in possible_new_keys_and_defaults:
             if key not in self._val:

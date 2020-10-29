@@ -813,8 +813,9 @@ class PosSchedule(object):
                 table.display()
             table.append_log_note(log_note_addendum)
                 
-    def _schedule_moves_finish_logging(self, anim_tables={}):
+    def _schedule_moves_finish_logging(self, anim_tables=None):
         """Final logging and animation steps for the schedule_moves() function."""
+        anim_tables = {} if anim_tables is None else anim_tables
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
