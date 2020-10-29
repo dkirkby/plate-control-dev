@@ -57,52 +57,8 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
 
 if uargs.infile == None:
     # try to grab data from online db
-    import psycopg2, getpass
-    db_configs = [{'host': 'db.replicator.dev-cattle.stable.spin.nersc.org', 'port': 60042, 'password_required': False},
-                  {'host': 'beyonce.lbl.gov', 'port': 5432,  'password_required': True}]
-    max_rows = 10000
-    comm = None
-    for config in db_configs:
-        pw = ''
-        if config['password_required']:
-            pw = getpass.getpass(f'Enter read-access password for database at {config["host"]}: ')
-        try:
-            comm = psycopg2.connect(host=config['host'], port=config['port'], database='desi_dev', user='desi_reader', password=pw)
-            print(f'success connecting to database at {config["host"]}')
-            break
-        except:
-            print(f'failed to connect to database at {config["host"]}')
-            continue
-    assert comm != None, 'failed to connect to any database!'
-    def dbquery(comm, operation, parameters=None):
-        '''Cribbed from desimeter/dbutil.py'''
-        cx=comm.cursor()
-        cx.execute(operation,parameters)
-        names=[d.name for d in cx.description]
-        res=cx.fetchall()
-        cx.close()
-        results=dict()
-        for i,name in enumerate(names) :
-            results[name]=[r[i] for r in res]
-        return results
-    from_moves = f'from posmovedb.positioner_moves_p{uargs.petal_id}'
-    from_calib = f'from posmovedb.positioner_calibration_p{uargs.petal_id}'
-    cmd = f'select distinct pos_id {from_calib}'
-    data = dbquery(comm, cmd)
-    all_posids = sorted(set(data['pos_id']))
-    params_dict = {key: [] for key in required}
-    moves_keys = {'CTRL_ENABLED'}
-    calib_keys = required - moves_keys
-    query_config = [{'from': from_moves, 'keys': moves_keys},
-                    {'from': from_calib, 'keys': calib_keys}]
-    for posid in all_posids:
-        for config in query_config:
-            keys_str = str({key.lower() for key in config['keys']}).strip('{').strip('}').replace("'",'')
-            cmd = f"select {keys_str} {config['from']} where pos_id in ('{posid}') order by time_recorded desc limit 1"
-            data = dbquery(comm, cmd)
-            for key, value in data.items():
-                params_dict[key.upper()] += value  # note how value comes back as a single element list here
-    input_table = Table(params_dict)
+
+
     print('calibration parameters: database retrieval complete!')
 else:
     # read positioner parameter data from csv file

@@ -558,7 +558,7 @@ try:
             logger.info(f'Correction move skipped ({reason})')
         n_corr = 0 if not_correctable else uargs.num_corr
         targ_errs = None
-        calc_errors = move.command not in sequence.abs_commands
+        calc_errors = move.command not in sequence.delta_commands | sequence.homing_commands
         initial_request = None
         for submove_num in range(1 + n_corr):
             extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
@@ -596,7 +596,6 @@ try:
                     request = request.merge(pecs.posinfo, on='DEVICE_ID')
                 kwargs = {'request': request, 'num_meas': uargs.num_meas}
             elif move.command in sequence.homing_commands:
-                calc_errors = False
                 if pecs_on:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
