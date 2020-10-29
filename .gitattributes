@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+pecs/1p_calib.py -text
 pecs/arc_calibration.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text

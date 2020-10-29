@@ -51,6 +51,7 @@ class PECS:
         self.exptime = 1.
         self.start_time = pc.now()
         self.test_name = test_name
+        self.interactive = interactive
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
@@ -95,12 +96,12 @@ class PECS:
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
-        if interactive or (self.pcids is None):
+        if self.interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs)  # choose which petal to operate
-        elif interactive is False:
+        elif self.interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         # Do this after interactive_ptl_setup
-        if interactive:
+        if self.interactive:
             self.home_adc() #asks to home, not automatic
             self.turn_on_fids()
         #Setup exposure ID last incase aborted doing the above
