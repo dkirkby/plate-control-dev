@@ -281,13 +281,14 @@ class PECS:
         for i in range(num_meas):
             self.print(f'Calling FVC.measure with exptime = {self.exptime} s, '
                    f'expecting {len(exppos)} backlit positioners. Image {i+1} of {num_meas}.')
-            this_meapos = (pd.DataFrame(self.fvc.measure(
-                              expected_positions=exppos, seqid=seqid,
-                              exptime=self.exptime, match_radius=match_radius,
-                              matched_only=matched_only,
-                              all_fiducials=self.all_fiducials,centers=centers))
-                          .rename(columns={'id': 'DEVICE_ID'})
-                          .set_index('DEVICE_ID').sort_index())
+            positions =self.fvc.measure(expected_positions=exppos, seqid=seqid,
+                                        exptime=self.exptime, match_radius=match_radius,
+                                        matched_only=matched_only,
+                                        all_fiducials=self.all_fiducials,centers=centers)
+            # Positions is a dictionary (from np.rec_array). Is empty when no posiitoners are present
+            assert positions, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            this_meapos = pd.DataFrame(positions).rename(columns=
+                            {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
             if np.any(['P' in device_id for device_id in this_meapos.index]):
                 self.print('Measured positions of positioners by FVC '
                            'are contaminated by fiducials.')
