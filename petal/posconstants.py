@@ -317,6 +317,18 @@ grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 valid_move_commands = {'QS', 'dQdS', 'obsXY', 'obsdXdY', 'ptlXY', 'poslocXY',
                        'poslocdXdY', 'poslocTP', 'posintTP', 'dTdP'}
 
+# common formatting / split-up names
+coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
+coord_formats.update({key: '7.3f' for key in ['poslocXY']})
+coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
+coord_pair2single = {c: (c[:-1], c[:-2] + c[-1]) for c in coord_formats}
+coord_formats.update({s[i]: coord_formats[c] for i in [0,1] for c, s in coord_pair2single.items()})
+single_coords = set(coord_formats) - set(coord_pair2single)
+coord_single2pair = {}
+for pair_key, coord_tuple in coord_pair2single.items():
+    for single_key in coord_tuple:
+        coord_single2pair[single_key] = pair_key
+
 def decipher_posflags(flags, sep=';', verbose=True):
     '''translates posflag to readable reasons, bits taken from petal.py
     simple problem of locating the leftmost set bit, always 0b100 on the
@@ -584,7 +596,7 @@ def boolean(x):
     if is_collection(x):
         return len(x) > 0
     assert False, f'posconstants.boolean(): undefined interpretation for {x}'
-                         
+
 # style info for plotting positioners
 plot_styles = {
     'ferrule':

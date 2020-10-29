@@ -1523,32 +1523,29 @@ class Petal(object):
         positioners.
         
         INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
-                 coords ... specify one or more particular coordinate systems to display
+                 coords ... specify one or more particular coordinate systems to display. enter None for a listing of valid args
                             valid: 'posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS', 'flatXY', 'ptlXY'
                  as_table ... boolean to return astropy table, rather than printable string (default False)
         
         OUTPUTS: string for display
         '''
-        posids = self._validate_posids_arg(posids)
         if pc.is_string(coords):
+            if coords in {None, 'none', 'None', 'NONE'}:
+                return f'Valid quick_table coords: {sorted(pc.coord_pair2single)}'
             coords = [coords]
         else:
             assert pc.is_collection(coords)
             coords = list(coords)
-        coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
-        coord_formats.update({key: '7.3f' for key in ['poslocXY']})
-        coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
-        coord_splits ={c: (c[:-1], c[:-2] + c[-1]) for c in coord_formats}
-        coord_formats.update({s[i]: coord_formats[c] for i in [0,1] for c, s in coord_splits.items()})
+        posids = self._validate_posids_arg(posids)
         id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID', 'ENABLED', 'OVERLAP']
         columns = id_columns.copy()
         for coord in coords:
-            columns += list(coord_splits[coord])
+            columns += list(pc.coord_pair2single[coord])
         overlaps = self.get_overlaps(as_dict=True)
         overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
         data = {c:[] for c in columns}
         floats = {c:[] for c in columns}
-        fmt_coord = lambda value, coord: format(value, coord_formats[coord])
+        fmt_coord = lambda value, coord: format(value, pc.coord_formats[coord])
         for posid in posids:
             model = self.posmodels[posid]
             data['POSID'].append(posid)
@@ -1560,7 +1557,7 @@ class Petal(object):
             pos = self.posmodels[posid].expected_current_position
             for coord in coords:
                 for i in (0, 1):
-                    split_name = coord_splits[coord][i]
+                    split_name = pc.coord_pair2single[coord][i]
                     value = pos[coord][i]
                     if not as_table:
                         floats[split_name].append(value)
@@ -1615,9 +1612,7 @@ class Petal(object):
         POS_T, POS_P, and calibration params.
         '''
         import operator
-        position_keys = {'posintT', 'posintP', 'poslocT', 'poslocP', 'poslocX',
-                         'poslocY', 'flatX', 'flatY', 'ptlX', 'ptlY', 'obsX',
-                         'obsY', 'Q', 'S'}
+        position_keys = set(pc.single_coords)
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
         constants_keys = set(pc.constants_keys)
         id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
@@ -1655,16 +1650,16 @@ class Petal(object):
         if key in position_keys:
             def getter(posid):
                 expected = self.posmodels[posid].expected_current_position
-                if key in {'Q', 'S'}:
-                    return expected[key]
                 prefix = key[:-1]
                 suffix = key[-1]
                 if suffix in {'T', 'P'}:
                     pair_key = prefix + 'TP'
-                else:
+                elif suffix in {'X', 'Y'}:
                     pair_key = prefix + 'XY'
+                else:
+                    pair_key = 'QS'
                 pair = expected[pair_key]
-                if suffix in {'T', 'X'}:
+                if suffix in {'T', 'X', 'Q'}:
                     return pair[0]
                 return pair[1]
         else:
