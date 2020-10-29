@@ -362,18 +362,20 @@ case = collision_case()
 
 # Collision resolution methods
 nonfreeze_adjustment_methods = ['pause',
-                                'extend_A','retract_A',
-                                'extend_B','retract_B',
-                                'rot_ccw_A','rot_cw_A',
-                                'rot_ccw_B','rot_cw_B',
-                                'repel_ccw_A','repel_cw_A',
-                                'repel_ccw_B','repel_cw_B']
+                                'extend_A', 'retract_A',
+                                'extend_B', 'retract_B',
+                                'rot_ccw_A', 'rot_cw_A',
+                                'rot_ccw_B', 'rot_cw_B',
+                                'repel_ccw_A', 'repel_cw_A',
+                                'repel_ccw_B', 'repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
+useless_with_unmoving_neighbor = {'pause'} | {m for m in nonfreeze_adjustment_methods if 'repel' in m}
+useless_with_fixed_boundary = useless_with_unmoving_neighbor | {m for m in nonfreeze_adjustment_methods if 'extend' in m}
 num_timesteps_clearance_margin = 2  # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
 
 # Initial polygon debouncing settings
-num_timesteps_ignore_overlap = 1
-debounce_polys_distance = 5 # deg, for attempts to slightly step one polygon off another when barely touching
+num_timesteps_ignore_overlap = 1  # ignore collisions during these first few timesteps (just during debounce stage)
+debounce_polys_distance = 5  # deg, for attempts to slightly step one polygon off another when barely touching
 
 
 # Convenience methods
