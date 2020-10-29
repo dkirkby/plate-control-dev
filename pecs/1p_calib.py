@@ -48,6 +48,7 @@ if __name__ == '__main__':
     assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posintTP or offsetsTP!'
     assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
     from pecs import PECS
+    print(f'Running one point calibration for {uargs.mode}')
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac)
     if uargs.mode == 'posTP':
@@ -56,4 +57,4 @@ if __name__ == '__main__':
         key1, key2 = 'OFFSET_T', 'OFFSET_P'
     updates = updates['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']
     updates.sort_values('ERR_XY', inplace=True, ascending=False)
-    cs.printfunc(updates)
+    print(updates)
