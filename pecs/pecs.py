@@ -95,12 +95,14 @@ class PECS:
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
-        if interactive:
-            self.home_adc() #asks to home, not automatic
         if interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs)  # choose which petal to operate
         elif interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
+        # Do this after interactive_ptl_setup
+        if interactive:
+            self.home_adc() #asks to home, not automatic
+            self.turn_on_fids()
         #Setup exposure ID last incase aborted doing the above
         self._get_expid()
 
@@ -452,6 +454,14 @@ class PECS:
                 print(f'Exception homing ADC, {e}')
         else:
             return
+
+    def turn_on_fids(self):
+        if self._parse_yn(input('Turn on fiducials (y/n): ')):
+            responses = self.ptlm.set_fiducials(setting='on')
+        else:
+            responses = self.ptlm.get_fiducials()
+        self.print(f'Petals report fiducials in the following states: {responses}')
+
 
     def fvc_collect(self):
         destination = os.path.join(
