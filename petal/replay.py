@@ -243,6 +243,13 @@ def make_request(move_cmd_str):
     request = {'command':command, 'target':target, 'log_note':''}
     return request
 
+def print_positions(prefix, move_id, posids=display_posids):
+    '''Print out current positions for positioners.'''
+    if posids:
+        print(f'\n{prefix} MOVE_ID {move_id}...')
+        print(ptl.quick_table(posids))
+        print('\n')
+
 # initialize petal
 move_idxs = np.where(t['SHOULD_RUN'])[0]
 first_move_id = t['MOVE_ID'][move_idxs[0]]
@@ -308,6 +315,7 @@ for move_id in move_ids:
         if row['HAS_MOVE_CMD']:
             posid = row['POS_ID']
             requests[posid] = make_request(row['MOVE_CMD'])
+    print_positions('BEFORE', move_id)
     ptl.request_targets(requests)
     ptl.schedule_moves()
     for posid in display_posids:
@@ -322,6 +330,7 @@ for move_id in move_ids:
             ptl.schedule.move_tables[posid].display_for('hardware')
         print('\n')
     failed_posids = ptl.send_and_execute_moves()
+    print_positions('AFTER', move_id)
     if uargs.verbose:
         tab = '   '
         print(f'{"POSID":7}{tab}{"COORD":8}{tab}{"SIMULATED":20}{tab}{"FROM_FILE":20}{tab}{"ERROR":>6}')
