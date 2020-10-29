@@ -545,7 +545,7 @@ class PECS:
             return posids, posinfo
         return posids
     
-    def summarize_submeasurements(self, meapos, posids='sub'):
+    def summarize_submeasurements(self, meapos):
         '''Collects submeasurements (like from fvc_measure with num_meas > 1)
         by positioner ID into suitable strings for logging purposes.
         
@@ -559,10 +559,7 @@ class PECS:
         In cases where only the 0-th terms are found (i.e. we had num_meas==1)
         the strings in the return dict will be empty, ''.
         '''
-        included_posids = set(meapos.index)
-        enabled_posids = self.get_enabled_posids(posids=posids, include_posinfo=False)
-        missing_posids = set(enabled_posids) - set(included_posids)
-        assert len(missing_posids) == 0, f'{missing_posids} are missing from meapos data'
+        posids = set(meapos.index)
         num_meas = 0
         crazy_number_of_iterations = 100
         for i in range(crazy_number_of_iterations):
@@ -572,9 +569,9 @@ class PECS:
                 break
         assert num_meas != 0, 'meapos is missing columns "Q0" and/or "S0"'
         if num_meas == 1:
-            return {posid: '' for posid in enabled_posids}
+            return {posid: '' for posid in posids}
         out = {}
-        for posid in enabled_posids:
+        for posid in posids:
             data = meapos.loc[posid]
             this_dict = {'Q':[], 'S':[], 'obsX':[], 'obsY':[]}
             for key in this_dict:
