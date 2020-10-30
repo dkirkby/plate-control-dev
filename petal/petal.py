@@ -1594,6 +1594,9 @@ class Petal(object):
                             value = sum(booleans)
                             stats_str += fmt(str(value))
                             counted[col] = 'counted'
+                        elif counted[col] == 'counted':
+                            stats_str += fmt(f'of {len(t)}')
+                            counted[col] = 'totaled'
                     elif col == stat_name_col:
                         stats_str += fmt(name)
                     elif col in should_calc_stats:
@@ -1602,8 +1605,9 @@ class Petal(object):
                     else:
                         stats_str += fmt(' ')
                     stats_str += ' '
-        s = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
-        s += f'(displaying {len(t)} of {len(self.posids)} positioners):\n'
+        top = f'PETAL_ID {self.petal_id} at LOCATION {self.petal_loc}, '
+        top += f'(displaying {len(t)} of {len(self.posids)} positioners)'
+        s = top + ':\n'
         s += '\n'.join(t_fmt)
         s += stats_str
         return s
