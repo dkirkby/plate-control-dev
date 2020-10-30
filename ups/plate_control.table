@@ -1,6 +1,6 @@
 setupOptional(DOSlib)
 setupOptional(fp_settings)
-setupOptional(PositionerIndexTable)
+#setupOptional(PositionerIndexTable --keep)
 setupOptional(PosMoveDB)
 envSet(PETAL_PATH, ${PRODUCT_DIR}/petal)
 #Below now in SiteLite product
