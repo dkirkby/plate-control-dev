@@ -39,6 +39,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
                                            auto_update=commit, tp_updates_tol=tp_tol,
                                            tp_updates_fraction=tp_frac,
                                            log_note=f'1p_calib_{mode}', verbose=True)
+    updates = pd.concat([up in updates.values()]).reset_index(drop=True)
     return updates
 
 if __name__ == '__main__':
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
     assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
     from pecs import PECS
-    print(f'Running one point calibration for {uargs.mode}')
+    input(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac,
                        match_radius=uargs.match_radius, num_meas=uargs.num_meas)
@@ -66,7 +67,7 @@ if __name__ == '__main__':
         key1, key2 = 'POS_T', 'POS_P'
     else:
         key1, key2 = 'OFFSET_T', 'OFFSET_P'
-    updates = updates['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']
+    updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']]
     updates.sort_values('ERR_XY', inplace=True, ascending=False)
     print(updates)
     cs.fvc_collect()
