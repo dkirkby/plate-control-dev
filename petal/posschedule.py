@@ -468,6 +468,7 @@ class PosSchedule(object):
         overlapping = set(overlaps_dict)
         for overlapping_neighbors in overlaps_dict.values():
             overlapping |= overlapping_neighbors
+        overlapping -= pc.case.fixed_case_names
         stage = self.stages['debounce_polygons']
         skip = pc.num_timesteps_ignore_overlap
         db = pc.debounce_polys_distance
