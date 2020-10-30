@@ -6,7 +6,7 @@ Contains a function to perform a onepoint calibration on positioners.
 If executed standalone, main function will create a PECS instance to
 interactively run the onepoint calibration.
 '''
-
+import pandas as pd
 
 def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac=1.0,
              match_radius=None, num_meas=1):
@@ -39,7 +39,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
                                            auto_update=commit, tp_updates_tol=tp_tol,
                                            tp_updates_fraction=tp_frac,
                                            log_note=f'1p_calib_{mode}', verbose=True)
-    updates = pd.concat([up in updates.values()]).reset_index(drop=True)
+    updates = pd.concat([up for up in updates.values()]).reset_index(drop=True)
     return updates
 
 if __name__ == '__main__':
