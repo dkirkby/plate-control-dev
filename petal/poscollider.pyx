@@ -26,11 +26,11 @@ class PosCollider(object):
         self.printfunc = printfunc
         if not config:
             if not configfile:
-                filename = '_collision_settings_DEFAULT.conf'
+                filename = pc.default_collider_filename
             else:
                 filename = configfile
-            filepath = os.path.join(pc.dirs['collision_settings'],filename)
-            self.config = configobj.ConfigObj(filepath,unrepr=True)
+            filepath = os.path.join(pc.dirs['collision_settings'], filename)
+            self.config = configobj.ConfigObj(filepath, unrepr=True)
         else:
             self.config = config
         self.posids = set() # posid strings for all the positioners

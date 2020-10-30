@@ -61,6 +61,7 @@ for directory in dirs.values():
 # File locations
 positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v14.csv')
 small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
+default_collider_filename = '_collision_settings_DEFAULT.conf'
 def get_keepouts_cache_path(petal_id):
     filename = f'keepouts_cache_petal_id_{petal_id}.ecsv'
     return os.path.join(dirs['temp_files'], filename)
