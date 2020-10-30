@@ -1517,15 +1517,15 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
-    def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False):
+    def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False, sort='POSID'):
         '''Returns a printable string tabulating current position (in several 
         coordinate systems), overlap status, and enabled status for one or more
         positioners.
         
         INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
                  coords ... specify one or more particular coordinate systems to display. enter None for a listing of valid args
-                            valid: 'posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS', 'flatXY', 'ptlXY'
                  as_table ... boolean to return astropy table, rather than printable string (default False)
+                 sort ... sorts by the argued columns (default 'POSID')
         
         OUTPUTS: string for display
         '''
@@ -1568,7 +1568,7 @@ class Petal(object):
                         value = fmt_coord(value, split_name)
                     data[split_name].append(value)
         t = AstropyTable(data)
-        t.sort('POSID')
+        t.sort(sort)
         if as_table:
             return t
         t_fmt = t.pformat_all(align='^')
