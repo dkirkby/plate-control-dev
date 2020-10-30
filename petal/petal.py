@@ -1537,10 +1537,14 @@ class Petal(object):
             assert pc.is_collection(coords)
             coords = list(coords)
         posids = self._validate_posids_arg(posids)
-        id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID', 'ENABLED', 'OVERLAP']
+        id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID']
+        status_columns = ['ENABLED', 'OVERLAP']
+        stat_name_col = 'CANID'
+        n_rows_repeat_headers = 20
         columns = id_columns.copy()
         for coord in coords:
             columns += list(pc.coord_pair2single[coord])
+        columns += status_columns
         overlaps = self.get_overlaps(as_dict=True)
         overlap_strs = {posid: '' if not neighbors else str(neighbors) for posid, neighbors in overlaps.items()}
         data = {c:[] for c in columns}
@@ -1568,16 +1572,29 @@ class Petal(object):
         if as_table:
             return t
         t_fmt = t.pformat_all(align='^')
-        should_calc_stats = set(t.columns) - set(id_columns)
+        should_calc_stats = set(t.columns) - set(id_columns) - set(status_columns)
+        should_count = status_columns
         stats_str = ''
         if len(t) > 1 and any(should_calc_stats):
             stats_str += '\n' + t_fmt[1]
+            if len(t) >= n_rows_repeat_headers:
+                stats_str += '\n' + t_fmt[0] + '\n' + t_fmt[1] # re-label long columns at bottom
             col_widths = {list(t.columns)[i]: len(t_fmt[1].split(' ')[i]) for i in range(len(t.columns))}
+            counted = {}
             for name, func in {'MIN': min, 'AVG': np.mean, 'MAX': max}.items():
                 stats_str += '\n'
                 for col, width in col_widths.items():
                     fmt = lambda x: format(x, f'>{width}s')
-                    if col == id_columns[-1]:
+                    if col in should_count:
+                        if col not in counted:
+                            stats_str += fmt('COUNT')
+                            counted[col] = 'labeled'
+                        elif counted[col] == 'labeled':
+                            booleans = [pc.boolean(x) for x in t[col]]
+                            value = sum(booleans)
+                            stats_str += fmt(str(value))
+                            counted[col] = 'counted'
+                    elif col == stat_name_col:
                         stats_str += fmt(name)
                     elif col in should_calc_stats:
                         value = func(floats[col])

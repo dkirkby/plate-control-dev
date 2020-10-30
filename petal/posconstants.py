@@ -579,6 +579,9 @@ def is_string(x):
 def is_boolean(x):
     return x in [True, False, 0, 1] or str(x).lower() in ['true', 'false', '0', '1']
 
+def is_none(x):
+    return x in [None, 'None', 'none', 'NONE']
+
 def is_collection(x):
     if isinstance(x, (dict, list, tuple, set)):
         return True
