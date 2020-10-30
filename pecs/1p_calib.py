@@ -29,7 +29,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
         move = pecs._parse_yn(input('Move positioners to default parked position? (y/n): '))
         commit = pecs._parse_yn(input('Commit calibration results (y/n): '))
     pecs.ptlm.set_exposure_info(pecs.exp.id, pecs.iteration)
-    pecs.decorate_note(log_note=f'1p_calib_{mode}')
+    note = pecs.decorate_note(log_note=f'1p_calib_{mode}')
     if move:
         pecs.ptlm.park_positioners(pecs.posids, mode='normal', log_note=f'Moving for 1p_calib_{mode}')
     _, meas, matched, _ = pecs.fvc_measure(test_tp=False, check_unmatched=False,
@@ -38,7 +38,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
     updates = pecs.ptlm.test_and_update_TP(calib_pos.reset_index(), mode=mode,
                                            auto_update=commit, tp_updates_tol=tp_tol,
                                            tp_updates_fraction=tp_frac,
-                                           log_note=f'1p_calib_{mode}', verbose=True)
+                                           log_note=note, verbose=True)
     updates = pd.concat([up for up in updates.values()]).reset_index(drop=True)
     return updates
 
