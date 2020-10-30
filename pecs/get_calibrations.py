@@ -7,6 +7,26 @@ an astropy table (when run as an imported module) or save to disk as an ecsv.
 Must join_instance in current terminal before running this script.
 """
 
+# Note from slack discussion with Kevin, 2020-10-30
+# How to import petal such that I get all the same config data as normally occur
+# when starting up an instance. It's hella tricky, in the details. I think this
+# might be the simplest.
+#
+# Supposing I do:
+# from DOSlib.proxies import Petal
+# ptl = Petal(3, expert_sim=True)
+# Can you make it such that within PetalApp, the initialization args to petal include:
+# simulator_on = True,
+# db_commit_on = False,
+# but everything else is as normal?
+# I suspect that might give me everything I want. I promise I won't call any PetalApp functions, so I think it should be safe.
+# 
+# In this scenario, might just throw away all the psycopg2 code below, and instead
+# grab stuff with a bunch of get_posfid_val calls. Or perhaps generalize / use
+# quick_table. That gives me an astropy table straight-away, and is nice because
+# might have other re-uses at a later date.
+
+
 import os, sys
 path_to_petal = '../petal'
 sys.path.append(os.path.abspath(path_to_petal))
