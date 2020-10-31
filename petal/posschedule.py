@@ -486,19 +486,21 @@ class PosSchedule(object):
         for deltas in delta_options:
             if not unresolved:
                 break
-            start_tp = {posid: self._requests[posid]['start_posintTP'] for posid in unresolved & enabled}
-            dtdp = {posid: deltas for posid in unresolved}
+            posids_to_adjust = unresolved & enabled & overlapping
+            start_tp = {posid: self._requests[posid]['start_posintTP'] for posid in posids_to_adjust}
+            dtdp = {posid: deltas for posid in start_tp}
             
             # [JHS] Comments on use of stage here:
             # 1. Each time we initialize_move_tables, only updating the ones for which a new delta is proposed.
             # 2. No annealing allowed! (would mess up the "skip first x timesteps" during collision checking)
-            stage.initialize_move_tables(start_tp, dtdp)
+            stage.initialize_move_tables(start_tp, dtdp, update_only=True)
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, skip=skip)
             unresolved = set(colliding_sweeps)
-        if any(unresolved & enabled):
-            for posid in unresolved & enabled:
+        adjustments_failed = unresolved & enabled & overlapping
+        if any(adjustments_failed):
+            for posid in adjustments_failed:
                 stage.del_table(posid)
-                if posid in user_requests:
+                if posid in requested_posids & overlapping:
                     req = user_requests[posid]
                     target_str = f'{req["command"]}=({req["cmd_val1"]:.3f}, {req["cmd_val2"]:.3f})'
                     explanation = f'Interference at initial position with {overlaps_dict[posid]}. Could ' + \
@@ -506,7 +508,7 @@ class PosSchedule(object):
                                   f'sec) by debouncing polygons (jog distances = {db} deg).'
                     deny_msg = self._denied_str(target_str, explanation)
                     self.petal.print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
-                    del self._requests[posid]
+                del self._requests[posid]
             self._fill_enabled_but_nonmoving_with_dummy_requests()  # to repopulate deletions
         resolved = overlapping - set(colliding_sweeps)
         resolved_overlaps_dict = self.get_overlaps(resolved)
