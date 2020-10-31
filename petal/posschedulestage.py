@@ -29,12 +29,15 @@ class PosScheduleStage(object):
         self.verbose = verbose
         self.printfunc = printfunc
 
-    def initialize_move_tables(self, start_posintTP, dtdp):
+    def initialize_move_tables(self, start_posintTP, dtdp, update_only=False):
         """Generates basic move tables for each positioner, starting at position
         start_tp and going to a position a distance dtdp away.
 
             start_posintTP  ... dict of starting [theta,phi] positions, keys are posids
             dtdp            ... dict of [delta theta, delta phi] from the starting position. keys are posids
+            update_only     ... boolean, if True then only update existing start_posintTP and move_tables
+                                (The default is False, in which case all move_tables and associated data ---
+                                 start_posintTP, sweeps --- are wiped out and replaced with those argued here.
 
         The user should take care that dtdp vectors have been generated using the
         canonical delta_posintTP function provided by PosTransforms module, with
@@ -42,6 +45,9 @@ class PosScheduleStage(object):
         simple vector subtraction or the like, since this would not correctly handle
         physical range limits of the fiber positioner.)
         """
+        posids_to_delete = set(start_posintTP) if update_only else set(self.move_tables)
+        for posid in posids_to_delete:
+            self.del_table(posid)
         for posid in start_posintTP:
             posmodel = self.collider.posmodels[posid]
             final_posintTP = posmodel.trans.addto_posintTP(start_posintTP[posid], dtdp[posid], range_wrap_limits='targetable')
@@ -52,7 +58,7 @@ class PosScheduleStage(object):
             table.set_prepause(0, 0.0)
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
-        self.start_posintTP = start_posintTP.copy()
+            self.start_posintTP[posid] = tuple(start_posintTP[posid])
 
     def is_not_empty(self):
         """Returns boolean whether the stage is empty of move_tables.
