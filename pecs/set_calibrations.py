@@ -31,7 +31,7 @@ def dbkey_for_key(key):
 import argparse
 doc = f'{__doc__} Input CSV file must contain a POS_ID column. Input should'
 doc += f' contain all or any subset of the following parameter columns: {valid_keys}.'
-doc += f' For every parameter column there must be a corresponding boolean column'
+doc +=  ' For every parameter column there must be a corresponding boolean column'
 doc += f' prefixed with "{commit_prefix}", stating in each row whether that value is'
 doc += f' intended to be saved to the online db. {format_info}'
 parser = argparse.ArgumentParser(description=doc)
@@ -44,12 +44,11 @@ from astropy.table import Table
 table = Table.read(args.infile)
 
 # set up a log file
-import logging
-import time
+import simple_logger
 try:
     import posconstants as pc
 except:
-    import sys
+    import os, sys
     path_to_petal = '../petal'
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
@@ -59,45 +58,19 @@ except:
 # to be absolutely sure we have a record
 # can cut back to one, once we are confident of logs getting properly saved at KPNO
 log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
-
 log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
 log_paths = [os.path.join(d, log_name) for d in log_dirs]
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-[logger.removeHandler(h) for h in logger.handlers]
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
-formatter.converter = time.gmtime
-for p in log_paths:
-    fh = logging.FileHandler(filename=p, mode='a', encoding='utf-8')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-sh = logging.StreamHandler()
-sh.setFormatter(formatter)
-logger.addHandler(sh)
+logger = simple_logger.start_logger(log_paths)
 logger.info(f'Running {script_name} to set positioner calibration parameters.')
 logger.info(f'Input file is: {args.infile}')
-for path in log_paths:
-    logger.info(f'Logging to {path}')
 logger.info(f'Table contains {len(table)} rows')
 if args.simulate:
     logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
-    
-def assert2(test, message):
-    '''Like an assert, but cleaner handling of logging.'''
-    if not test:
-        logger.error(message)
-        logger.warning('Now quitting, so user can check inputs.')
-        assert False  # for ease of jumping back into the error state in ipython debugger
-        
-def input2(message):
-    '''Wrapper for input which will log the interaction.'''
-    logger.info(f'PROMPT: {message}')
-    user_input = input('>>> ')
-    logger.info(f'USER ENTERED >>> {user_input}')
-    return user_input
+assert2 = simple_logger.assert2
+input2 = simple_logger.input2
 
 # validate the table format
-assert 'POS_ID' in table.columns, 'No POS_ID column found in input table'
+assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
 for key in set(table.columns):  # set op provides a copy
     remapped_key = dbkey_for_key(key)
     if key != remapped_key:
@@ -158,7 +131,7 @@ try:
     pecs.ptl_setup(pecs.pcids, posids=posids)
     pecs_on = True
 except:
-    logger.warning(f'PECS initialization failed')
+    logger.warning('PECS initialization failed')
     pecs_on = False
 
 # gather some interactive information from the user

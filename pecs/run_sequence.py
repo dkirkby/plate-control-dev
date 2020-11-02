@@ -61,8 +61,7 @@ assert start_move <= final_move, f'start_move {start_move} > final_move {final_m
 is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
-import logging
-import time
+import simple_logger
 import traceback # Log excepted exceptions
 try:
     import posconstants as pc
@@ -76,32 +75,20 @@ log_dir = pc.dirs['sequence_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-def clear_loggers():
-    '''Mysteriously (to me) this doesn't seem to work on the second run of script in
-    the same ipython/debugger session, but does seem to work on the third... Weird,
-    not gonna bother trying to track it down --- just adds duplicate printouts.'''
-    for h in logger.handlers:
-        logger.removeHandler(h)
-clear_loggers()
-fh = logging.FileHandler(filename=log_path, mode='a', encoding='utf-8')
-sh = logging.StreamHandler()
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
-formatter.converter = time.gmtime
-fh.setFormatter(formatter)
-sh.setFormatter(formatter)
-logger.addHandler(fh)
-logger.addHandler(sh)
+logger = simple_logger.start_logger(log_path)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
-logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {uargs.infile}')
 subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
 logger.info(f'Contents:\n\n{seq}{subseq_str}')
+assert2 = simple_logger.assert2
+input2 = simple_logger.input2
 
+# other imports
 import sys
+import time
+
 def quit_query(question):
-    response = input(f'\n{question} (y/n) >> ')
+    response = input2(f'\n{question} (y/n) >> ')
     if 'n' in response.lower():
         logger.info('User rejected the sequence prior to running. Now quitting.')
         sys.exit(0)
@@ -110,13 +97,6 @@ quit_query('Does the sequence look correct?')
 logger.info(f'Number of correction submoves: {uargs.num_corr}')
 logger.info(f'Number of fvc images per measurement: {uargs.num_meas}')
 logger.info(f'Minimum move cycle time: {uargs.cycle_time} sec')
-
-def assert2(test, message):
-    '''Like an assert, but cleaner handling of logging.'''
-    if not test:
-        logger.error(message)
-        logger.warning('Now quitting, so user can check inputs.')
-        assert False  # for ease of jumping back into the error state in ipython debugger
 
 # set up PECS (online control system)
 try:
@@ -695,7 +675,7 @@ if pecs_on:
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
-clear_loggers()
+simple_logger.clear_loggers()
 
 # raise exception from loop if we have one
 if exception_here is not None:
