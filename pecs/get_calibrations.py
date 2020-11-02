@@ -2,76 +2,50 @@
 # -*- coding: utf-8 -*-
 """Retrieves calibration parameters from online database. Can return them as
 an astropy table (when run as an imported module) or save to disk as an ecsv.
-
-???
-Must join_instance in current terminal before running this script.
 """
 
-# Note from slack discussion with Kevin, 2020-10-30
-# How to import petal such that I get all the same config data as normally occur
-# when starting up an instance. It's hella tricky, in the details. I think this
-# might be the simplest.
-#
-# Supposing I do:
-# from DOSlib.proxies import Petal
-# ptl = Petal(3, expert_sim=True)
-# Can you make it such that within PetalApp, the initialization args to petal include:
-# simulator_on = True,
-# db_commit_on = False,
-# but everything else is as normal?
-# I suspect that might give me everything I want. I promise I won't call any PetalApp functions, so I think it should be safe.
-# 
-# In this scenario, might just throw away all the psycopg2 code below, and instead
-# grab stuff with a bunch of get_posfid_val calls. Or perhaps generalize / use
-# quick_table. That gives me an astropy table straight-away, and is nice because
-# might have other re-uses at a later date.
-
+def assert2_no_log(test, message):
+    assert test, message
 
 import os, sys
-path_to_petal = '../petal'
-sys.path.append(os.path.abspath(path_to_petal))
-import posconstants as pc
+try:
+    import posconstants as pc
+except:
+    path_to_petal = '../petal'
+    sys.path.append(os.path.abspath(path_to_petal))
+    print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
+    import posconstants as pc
 
-import argparse
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma-separated integers, specifying one or more PETAL_ID number(s) for which to retrieve data. Defaults to all known petals at kpno database. Alternately argue "lbnl" for all known petals in lbnl (beyonce) database.')
-parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
-parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
-parser.add_argument('-c', '--collider_settings', type=str, default=pc.default_collider_filename, help=f'Specify a different collider settings filename. Default is {pc.default_collider_filename}. This option is unlikely to ever be necessary --- as of 2020-10-30 it is *always* the same default file --- but this arg is to help future-proof in case of change.')
-uargs = parser.parse_args()
+default_petal_ids = {'kpno': {2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+                     'lbnl': {0, 1}}
+possible_petal_ids = set()
+for ids in default_petal_ids.values():
+    possible_petal_ids |= ids
 
-db_configs = {'kpno': {'petal_ids': {2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
-                       'host': 'db.replicator.dev-cattle.stable.spin.nersc.org',
-                       'port': 60042,
-                       'password_required': False},
-              'lbnl': {'petal_ids': {0, 1},
-                       'host': 'beyonce.lbl.gov',
-                       'port': 5432, 
-                       'password_required': True},
-              }
-
-import os
-save_dir = os.path.realpath(uargs.outdir)
-use_all_ptls = uargs.petal_ids in db_configs.keys()
-if use_all_ptls:
-    petal_ids = db_configs[uargs.petal_ids]['petal_ids']
-else:
-    petal_ids = uargs.petal_ids.split(',')
-    petal_ids = {int(i) for i in petal_ids}
-assert len(petal_ids) > 0
-
-# proceed with bulk of imports
-from astropy.table import Table
-import psycopg2, getpass
-import posstate
-import posmodel
+def validate_petal_ids(proposed_ids, assert2=None):
+    '''Validates collection of petal ids. Also see comments in help docstr of
+    "--petal-ids" command line arg for more detail. Returns a set.'''
+    assert2 = assert2 if assert2 else assert2_no_log
+    if pc.is_string(proposed_ids):
+        use_all_ptls = proposed_ids in default_petal_ids.keys()
+        if use_all_ptls:
+            petal_ids = default_petal_ids[proposed_ids]
+        else:
+            petal_ids = proposed_ids.split(',')
+            petal_ids = {int(i) for i in petal_ids}
+    else:
+        assert2(pc.is_collection(proposed_ids), 'proposed petal ids {proposed_ids} is not a collection')
+        petal_ids = set(proposed_ids)
+    assert2(len(petal_ids) > 0, 'no petal ids detected in {petal_ids}')
+    for petal_id in petal_ids:
+        assert2(petal_id in possible_petal_ids, f'petal id {petal_id} is unrecognized')
+    return petal_ids
 
 # keys and descriptions to retrieve
 keys = {
         'POS_ID': 'unique serial id number of fiber positioner',
         'PETAL_ID': 'unique serial id number of petal',
         'DEVICE_LOC': 'location number on petal, c.f. DESI-0530',
-        'CTRL_ENABLED': 'if True, move tables are allowed to be sent to the positioner',
         'LENGTH_R1': 'kinematic length between central axis and phi axis',
         'LENGTH_R2': 'kinematic length between phi axis and fiber',
         'OFFSET_T': 'mounting angle of positioner\'s x-axis (roughly halfway between theta hardstops) w.r.t. that of petal',
@@ -87,6 +61,9 @@ keys = {
         'KEEPOUT_EXPANSION_PHI_ANGULAR': 'angularly expands phi keepout polygon by + and - this amount',
         'KEEPOUT_EXPANSION_THETA_ANGULAR': 'angularly expands theta keepout polygon by + and - this amount',
         'CLASSIFIED_AS_RETRACTED': 'identifies positioner for travel only within a restricted radius',
+        'CTRL_ENABLED': 'if True, move tables are allowed to be sent to the positioner',
+        'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'if True, the focal plane team has determined this positioner cannot be operated',
+        'FIBER_INTACT': 'if False, the focal plane team has determined the positioner\'s fiber cannot be measured',
         }
 descriptions = {desc: key for key, desc in keys.items()}
 
@@ -96,29 +73,73 @@ mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'KEEPOUT_EXPANSION_
 units = {key: 'deg' for key in angular_keys}
 units.update({key: 'mm' for key in mm_keys})
 
-# initialize petals in simulation mode
+def initialize_petals(petal_ids):
+    '''Returns a dict with keys = petal_ids'''
+roles = {}
+apps = {}
+ptls = {}
+logger.info('Will attempt to get c')
+try:
+    from DOSlib.proxies import Petal
+    import threading
+    def run_petal(petal_id, role):
+        os.system(f'python PetalApp.py --device_mode True --sim True --petal_id {petal_id} --role {role}')
+    for petal_id in petal_ids:
+        role = f'PETALSIM{petal_id}'
+        ptl_app = threading.Thread(target=run_petal, name=f'PetalApp{petal_id}', args=(petal_id, role))
+        ptl_app.daemon = False
+        ptl_app.start()
+        roles[petal_id] = role
+        apps[petal_id] = ptl_app
+    for petal_id, role in roles.items():
+        ptl = Petal(petal_id, role=role)
+        ptls[petal_id] = ptl
+except:
+    import sys
+    path_to_petal = '../petal'
+    sys.path.append(os.path.abspath(path_to_petal))
+    import petal
+    for petal_id in petal_ids:
+        ptl = petal.Petal(petal_id        = petal_id,
+                      petal_loc       = 3,
+                      posids          = pos_params.keys(),
+                      fidids          = fidids,
+                      simulator_on    = True,
+                      db_commit_on    = False,
+                      local_commit_on = False,
+                      local_log_on    = False,
+                      collider_file   = None,
+                      sched_stats_on  = True, # minor speed-up if turn off
+                      anticollision   = 'adjust',
+                      verbose         = False,
+                      phi_limit_on    = False)
 
 
-# validate availability of data
-available_keys_dict = ptl.quick_query()
-available_keys = set()
-for group_name, keys in available_keys_dict.items():
-    if 'keys' in group_name:
-        available_keys |= set(keys)
-missing = set(keys) - available_keys
-assert not any(missing), f'some keys are not available: {missing}'
+# proceed with remainder of imports
+from astropy.table import Table
 
-# gather data and make table
-
-t = Table(params_dict)
-
+# gather data
+data = {key:[] for key in keys}
+for ptl in ptls:
+    this_data = {}
+    available_keys_dict = ptl.quick_query()
+    available_keys = set()
+    for group_name, keys in available_keys_dict.items():
+        if 'keys' in group_name:
+            available_keys |= set(keys)
+    missing = set(keys) - available_keys
+    assert not any(missing), f'some keys are not available for petal {ptl.petal_id}: {missing}'
+    posids_ordered = sorted(ptl.posids)
+    for key in keys:
+        this_dict = ptl.quick_query(key=key, mode='iterable')
+        this_list = [this_dict[p] for p in posids_ordered]
+        data[key].append(this_list)
+        
+t = Table(data)
 
 # add some metadata
 meta = {}
 meta['DATE_RETRIEVED'] = pc.timestamp_str()
-for key in [db_moves, db_calib]:
-    meta[f'{key}_KEYS'] = db_keys[key]
-    meta[f'{key}_KEYS_DESCRIPTION'] = 'Indicates fields which are stored in the "{key}" tables of the posmovedb.'
 meta['EO_RADIUS_WITH_MARGIN'] = None
 t.meta = meta
 
@@ -136,6 +157,8 @@ for posid in t['POS_ID']:
     state = posstate.PosState()
     model = posmodel.PosModel()
     posmodels[posid] = model
+    
+# shut down the threads
 
 # columns for desimodel
 'PETAL', 'DEVICE', 'PETAL_ID', 'DEVICE_ID', 'DEVICE_TYPE',
@@ -147,4 +170,21 @@ for posid in t['POS_ID']:
 
 
 if __name__ == '__main__':
-    print('hello')
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma-separated integers, specifying one or more PETAL_ID number(s) for which to retrieve data. Defaults to all known petals at kpno database. Alternately argue "lbnl" for all known petals in lbnl (beyonce) database.')
+    parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
+    parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
+    uargs = parser.parse_args()
+
+    # set up logger
+    import simple_logger
+    log_dir = pc.dirs['sequence_logs']
+    log_timestamp = pc.filename_timestamp_str()
+    log_name = log_timestamp + '_get_calibrations.log'
+    log_path = os.path.join(log_dir, log_name)
+    logger = simple_logger.start_logger(log_path)
+    assert2 = simple_logger.assert2
+    
+    save_dir = os.path.realpath(uargs.outdir)
+    petal_ids = validate_petal_ids(uargs.petal_ids, assert2)
