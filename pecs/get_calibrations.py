@@ -23,6 +23,7 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
+import poscollider
 
 # set up logger
 import simple_logger
@@ -30,14 +31,11 @@ import traceback
 if uargs.disable_logger:
     log_path = None
 else:
-    # yes, as of 2020-11-02, I'm saving it in two places
-    # to be absolutely sure we have a record
-    # can cut back to one, once we are confident of logs getting properly saved at KPNO
-    log_dirs = [uargs.outdir, pc.dirs['calib_logs']]  
+    log_dir = pc.dirs['calib_logs']
     log_timestamp = pc.filename_timestamp_str()
     log_name = log_timestamp + '_get_calibrations.log'
-    log_paths = [os.path.join(d, log_name) for d in log_dirs]
-logger = simple_logger.start_logger(log_paths)
+    log_path = os.path.join(log_dir, log_name)
+logger = simple_logger.start_logger(log_path)
 assert2 = simple_logger.assert2
 
 # validate petal ids
@@ -112,7 +110,7 @@ offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' fo
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'min'] for c in ['T', 'P']}
 
-# summarize all keys, units, and descriptions (where applicable)
+# summarize all keys and units (where applicable)
 all_pos_keys = {}
 all_pos_keys.update(pos_petal_keys)
 all_pos_keys.update(query_keys)
@@ -125,7 +123,9 @@ mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'KEEPOUT_EXPANSION_
 mm_keys |= set(offset_variant_keys)
 units = {key: 'deg' for key in angular_keys}
 units.update({key: 'mm' for key in mm_keys})
-descriptions = {desc: key for key, desc in all_pos_keys.items()}
+
+# identifying fields with polygon data
+polygons = 'KEEPOUT_T', 'KEEPOUT_P', 'general_keepout_T', 'general_keepout_P'
 
 # initialize petals
 roles = {}
@@ -176,6 +176,7 @@ logger.info(f'{len(ptls)} petals initialized')
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
+exception_during_run = None
 try:
     # gather data
     data = {key:[] for key in all_pos_keys}
@@ -192,7 +193,7 @@ try:
         missing = set(query_keys) - set(valid_keys)
         assert2(not(any(missing)), f'some keys are not available for petal {ptl.petal_id}: {missing}')
         posids_ordered = sorted(ptl.posids)
-        logger.info('Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
+        logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values
         for key in set(query_keys) | set(pos_collider_keys):
@@ -203,6 +204,9 @@ try:
                 this_dict = getattr(ptl.collider, attr_key)
                 if 'fixed' in attr_key.lower():
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
+                sample = this_dict[posids_ordered[0]]
+                if isinstance(sample, poscollider.PosPoly):
+                    this_dict = {posid: str(poly.points) for posid, poly in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
     
@@ -217,14 +221,17 @@ try:
                     xy_new = model.trans.flatXY_to_ptlXY(flat_offset_xy)
                 else:
                     assert2(False, f'unexpected destination coordinates {coord}')
-                data[f'OFFSET_X_{suffix}'].append(xy_new[0])
-                data[f'OFFSET_Y_{suffix}'].append(xy_new[1])
+                data[f'OFFSET_X_{suffix}'].append(float(xy_new[0]))
+                data[f'OFFSET_Y_{suffix}'].append(float(xy_new[1]))
             for key in range_keys:
                 func = max if 'MAX' in key else min
                 rng = model.targetable_range_posintT if 'T' in key else model.targetable_range_posintP
                 data[key].append(func(rng))
         
         # petal-wide values
+        for key, attr in pos_petal_attr_map.items():
+            value = getattr(ptl, attr)
+            data[key].extend([value] * len(posids_ordered))
         meta['PETAL_ALIGNMENTS'][petal_id] = ptl.trans.petal_alignment
             
     # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
@@ -232,6 +239,8 @@ try:
     meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
     for key in general_collider_keys:
         meta[key] = getattr(ptl.collider, key)
+        if isinstance(meta[key], poscollider.PosPoly):
+            meta[key] = str(meta[key].points)
         
     logger.info('All data gathered, generating table format...')
     t = Table(data)
@@ -239,8 +248,7 @@ try:
     
     # add units and descriptions
     for key in t.columns:
-        if key in descriptions:
-            t[key].description = descriptions[key]
+        t[key].description = all_pos_keys[key]
         if key in units:
             t[key].unit = units[key]
         
@@ -259,7 +267,7 @@ try:
     logger.info(f'File path cached at standard location: {ref_path}')
     
 except Exception as e:
-    exception_here = e
+    exception_during_run = e
     logger.error('get_calibrations crashed! See traceback below:')
     logger.critical(traceback.format_exc())
     logger.info('Attempting to clean up lingering PetalApp instances prior to exiting...')
@@ -271,5 +279,5 @@ for petal_id in apps.keys():
     ptl.shutdown_event.set()
 
 # re-raise exception from above if we have one
-if exception_here is not None:
-    raise(exception_here)
+if exception_during_run:
+    raise(exception_during_run)
