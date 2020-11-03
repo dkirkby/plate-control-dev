@@ -1120,8 +1120,8 @@ class Petal(object):
         '''
         assert mode in {'move', 'calib', 'both'}, f'invalid mode {mode} for commit()'
         if mode == 'both':
-            self._commit(mode='move', log_note=log_note)
-            self._commit(mode='calib', calib_note=calib_note)
+            self._commit(mode='move', note=log_note)
+            self._commit(mode='calib', note=calib_note)
             return
         note = log_note if mode == 'move' else calib_note
         self._commit(mode=mode, note=note)
