@@ -293,7 +293,7 @@ except Exception as e:
 for petal_id in apps.keys():
     logger.info(f'Sending shutdown command for petal {petal_id}...')
     ptl = ptls[petal_id]
-    ptl.shutdown_event.set()
+    ptl.kill()
 
 # re-raise exception from above if we have one
 if exception_during_run:
