@@ -72,9 +72,9 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'KEEPOUT_EXPANSION_PHI_ANGULAR': 'angularly expands phi keepout polygon by + and - this amount',
               'KEEPOUT_EXPANSION_THETA_ANGULAR': 'angularly expands theta keepout polygon by + and - this amount',
               'CLASSIFIED_AS_RETRACTED': 'identifies positioner for travel only within a restricted radius',
-              'CTRL_ENABLED': 'if True, move tables are allowed to be sent to the positioner',
-              'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'if True, the focal plane team has determined this positioner cannot be operated',
-              'FIBER_INTACT': 'if False, the focal plane team has determined the positioner\'s fiber cannot be measured',
+              'CTRL_ENABLED': 'if True, move tables are allowed to be sent to the positioner (may vary from night to night)',
+              'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'if True, the focal plane team has determined this positioner cannot be operated (stable from night to night)',
+              'FIBER_INTACT': 'if False, the focal plane team has determined the positioner\'s fiber cannot be measured (stable from night to night)',
               'POS_T': 'current value of internally-tracked theta angle, a.k.a. "posintT" or t_int',
               'POS_P': 'current value of internally-tracked phi angle, a.k.a. "posintP" or p_int',
               'PTL_X': 'current x position in petal coordinates, as transformed from (POS_T, POS_P)',
@@ -101,7 +101,8 @@ flat_note = '["flat" coordinates]'
 keepout_T_note = f'central body (theta) polygon {flat_note}'
 keepout_P_note = f'eccentric body (phi) keepout polygon {flat_note}'
 general_collider_keys = {'timestep': '[sec] quantization when sweeping polygons through rotation schedules, to check for collisions',
-                         'Eo_radius_with_margin': '[mm] radius within which a polygon is considered "retracted"',
+                         'Eo_phi': '[deg] poslocP angle (poslocP = POS_P + OFFSET_P) above which phi is defined to be within envelope "Eo" (i.e. retracted)',
+                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle',
                          'general_keepout_T': f'basic {keepout_T_note}',
                          'general_keepout_P': f'basic {keepout_P_note}',
                          'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
@@ -129,9 +130,11 @@ all_pos_keys.update(query_keys)
 all_pos_keys.update(pos_collider_keys)
 all_pos_keys.update(offset_variant_keys)
 all_pos_keys.update(range_keys)
-angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P', 'KEEPOUT_EXPANSION_PHI_ANGULAR', 'KEEPOUT_EXPANSION_THETA_ANGULAR'}
+angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
+                'KEEPOUT_EXPANSION_PHI_ANGULAR', 'KEEPOUT_EXPANSION_THETA_ANGULAR'}
 angular_keys |= set(range_keys)
-mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_THETA_RADIAL'}
+mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'OBS_X', 'OBS_Y', 'PTL_X', 'PTL_Y',
+           'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_THETA_RADIAL'}
 mm_keys |= set(offset_variant_keys)
 units = {key: 'deg' for key in angular_keys}
 units.update({key: 'mm' for key in mm_keys})
