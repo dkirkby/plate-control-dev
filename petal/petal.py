@@ -1646,9 +1646,7 @@ class Petal(object):
                      '!=': operator.ne,
                      '': None}
         if not any([key, op, value]):
-            valids = {'state_keys': sorted(state_keys),
-                      'position_keys': sorted(position_keys),
-                      'constants_keys': sorted(constants_keys),
+            valids = {'valid_keys': sorted(valid_keys),
                       'valid_ops': sorted(valid_ops)}
             return valids
         if value != '' and op == '':
