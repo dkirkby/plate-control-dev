@@ -1380,10 +1380,10 @@ class Petal(object):
         
         INPUTS:
             posids ... 'all', an id string, or an iterable
-            angT ... new value for 'KEEPOUT_EXPANSION_THETA_RADIAL'
-            radT ... new value for 'KEEPOUT_EXPANSION_PHI_RADIAL'
-            angP ... new value for 'KEEPOUT_EXPANSION_THETA_ANGULAR'
-            radP ... new value for 'KEEPOUT_EXPANSION_PHI_ANGULAR'
+            radT ... [mm] new value for 'KEEPOUT_EXPANSION_THETA_RADIAL'
+            radP ... [mm] new value for 'KEEPOUT_EXPANSION_PHI_RADIAL'
+            angT ... [deg] new value for 'KEEPOUT_EXPANSION_THETA_ANGULAR'
+            angP ... [deg] new value for 'KEEPOUT_EXPANSION_PHI_ANGULAR'
             classify_retracted ... new value for 'CLASSIFIED_AS_RETRACTED'
             comment ... string stating your rationale for the change (enclose in "" at Console)
         '''
