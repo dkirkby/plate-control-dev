@@ -75,7 +75,17 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'CTRL_ENABLED': 'if True, move tables are allowed to be sent to the positioner',
               'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'if True, the focal plane team has determined this positioner cannot be operated',
               'FIBER_INTACT': 'if False, the focal plane team has determined the positioner\'s fiber cannot be measured',
+              'POS_T': 'current value of internally-tracked theta angle, a.k.a. "posintT" or t_int',
+              'POS_P': 'current value of internally-tracked phi angle, a.k.a. "posintP" or p_int',
+              'PTL_X': 'current position in petal coordinates, as transformed from (POS_T, POS_P)',
+              'PTL_Y': 'current position in petal coordinates, as transformed from (POS_T, POS_P)',
+              'OBS_X': 'current position in global coordinates (a.k.a. "CS5" or "x_fp") as transformed from (POS_T, POS_P)',
+              'OBS_Y': 'current position in global coordinates (a.k.a. "CS5" or "x_fp") as transformed from (POS_T, POS_P)',
               }
+query_keys_map = {'PTL_X': 'ptlX',
+                  'PTL_Y': 'ptlY',
+                  'OBS_X': 'obsX',
+                  'OBS_Y': 'obsY'}
 
 # petal-wide keys for storage in positioner data rows
 pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal',
@@ -192,7 +202,8 @@ try:
     for petal_id, ptl in ptls.items():
         this_data = {}
         valid_keys = ptl.quick_query()['valid_keys']
-        missing = set(query_keys) - set(valid_keys)
+        mapped_query_keys = {query_keys_map[key] if key in query_keys_map else key for key in query_keys}
+        missing = set(mapped_query_keys) - set(valid_keys)
         assert2(not(any(missing)), f'some keys are not available for petal {ptl.petal_id}: {missing}')
         posids_ordered = sorted(ptl.posids)
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
@@ -200,7 +211,8 @@ try:
         # queryable values
         for key in set(query_keys) | set(pos_collider_keys):
             if key in query_keys:
-                this_dict = ptl.quick_query(key=key, mode='iterable')
+                query_key = query_keys_map[key] if key in query_keys_map else key
+                this_dict = ptl.quick_query(key=query_key, mode='iterable')
             else:
                 attr_key = pos_collider_attr_map[key]
                 this_dict = getattr(ptl.collider, attr_key)
