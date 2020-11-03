@@ -40,11 +40,12 @@ def clear_logger():
     for h in logger.handlers:
         logger.removeHandler(h)
     
-def assert2(test, message):
+def assert2(test, message, show_quit_msg=True):
     '''Like an assert, but cleaner handling of logging.'''
     if not test:
         logger.error(message)
-        logger.warning('Now quitting, so user can check inputs.')
+        if show_quit_msg:
+            logger.warning('Now quitting, so user can check inputs.')
         assert False  # for ease of jumping back into the error state in ipython debugger
         
 def input2(message):
