@@ -87,18 +87,17 @@ class Petal(object):
         self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         # petal setup
-        if None in [petal_id, petalbox_id, fidids, posids, shape] or \
-                not hasattr(self, 'alignment'):
+        if None in [petalbox_id, petal_loc, fidids, posids, shape] or not hasattr(self, 'alignment'):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
                 unit_id=petal_id, device_type='ptl', logging=True,
                 printfunc=self.printfunc)
-            if petal_id is None:
-                self.printfunc('Reading Petal_ID from petal_state')
-                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
             if petalbox_id is None:
                 self.printfunc('Reading petalbox_ID from petal_state')
                 petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+            if petal_loc is None:
+                self.printfunc('Reading petal location from petal_state')
+                petal_loc = self.petal_state.conf['PETAL_LOCATION_ID']
             if posids is None:
                 self.printfunc('posids not given, read from ptl_settings file')
                 posids = self.petal_state.conf['POS_IDS']
@@ -118,8 +117,7 @@ class Petal(object):
 
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
-        if petal_loc:
-            self.petal_loc = int(petal_loc)  # within conditional because I don't know details of init args [JHS]
+        self.petal_loc = int(petal_loc)
         self.shape = shape
         self._last_state = None
         self._posids_where_tables_were_just_sent = set()
