@@ -1270,7 +1270,7 @@ class Petal(object):
                     log_note += f' {key}'
                 if any(accepted):
                     self.set_posfid_val(posid, 'LOG_NOTE', log_note)
-            self._commit(mode='move', log_note='')  # no need for extra log note info
+            self._commit(mode='move', note='')  # no need for extra log note info
         self._clear_late_commit_data()
     
     def _clear_late_commit_data(self):
