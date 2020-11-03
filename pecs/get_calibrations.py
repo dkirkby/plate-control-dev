@@ -56,7 +56,7 @@ for petal_id in petal_ids:
 
 # data keys retreivable from quick_query(), along with human-readable descriptions
 query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
-              'DEVICE_LOC': 'location number on petal, c.f. DESI-0530',
+              'DEVICE_LOC': 'location number of device on petal (c.f. DESI-0530)',
               'LENGTH_R1': 'kinematic length between central axis and phi axis',
               'LENGTH_R2': 'kinematic length between phi axis and fiber',
               'OFFSET_T': 'mounting angle of positioner\'s x-axis (roughly halfway between theta hardstops) w.r.t. that of petal',
@@ -78,8 +78,10 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               }
 
 # petal-wide keys for storage in positioner data rows
-pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal'}
-pos_petal_attr_map = {'PETAL_ID': 'petal_id'}
+pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal',
+                  'PETAL_LOC': 'location number of petal on focal plane (c.f. DESI-3596)'}
+pos_petal_attr_map = {'PETAL_ID': 'petal_id',
+                      'PETAL_LOC': 'petal_loc'}
 
 # petal-wide keys for storage in meta-data
 other_petal_keys = {'PETAL_ALIGNMENTS': '6 DOF transformation parameters from "PTL" local coordinates to "OBS" a.k.a. "CS5" a.k.a. "FP" global coordinates'}
