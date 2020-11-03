@@ -150,7 +150,7 @@ logger.info(f'Attempting to retrieve data for {len(petal_ids)} petals: {petal_id
 try:
     import PetalApp
     from DOSlib.proxies import Petal
-    ptlapp_dir = PetalApp.__file__
+    ptlapp_dir = PetalApp.__path__._path[0]
     ptlapp_path = os.path.join(ptlapp_dir, 'PetalApp.py')
     assert2(os.path.exists(ptlapp_path), f'No PetalApp found at path {ptlapp_path}', show_quit_msg=False)
     logger.info('Online system is available, will use PetalApp')
