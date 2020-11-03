@@ -230,7 +230,8 @@ keepout_keys = keepout_expansion_keys + ['CLASSIFIED_AS_RETRACTED']
 # other "calib" keys, meaning keys that for whatever historical reason, were
 # separated into the calib tables in the online db
 extra_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
-                        'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P'}
+                        'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
+                        'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
 
 # test for whether certain posstate keys are classified as "calibration" vals
@@ -252,8 +253,6 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
                   "CURR_CRUISE": 70,
                   "CURR_HOLD": 0,
                   "CURR_SPIN_UP_DOWN": 70,
-                  "DEVICE_CLASSIFIED_NONFUNCTIONAL": False,
-                  "FIBER_INTACT": True,
                   "FINAL_CREEP_ON": True,
                   "GEAR_TYPE_P": "namiki",
                   "GEAR_TYPE_T": "namiki",
