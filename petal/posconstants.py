@@ -227,15 +227,15 @@ keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_ANGULAR']
 keepout_keys = keepout_expansion_keys + ['CLASSIFIED_AS_RETRACTED']
 
-# other "calib" keys, meaning keys that for whatever historical reason, were
-# separated into the calib tables in the online db
-extra_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
+# other "calib" keys, meaning keys that for whatever historical or other reason,
+# are kept in the "calib" tables in the online db rather than "moves"
+other_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
                         'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
-                        'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
+                        'CALIB_NOTE', 'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
 
 # test for whether certain posstate keys are classified as "calibration" vals
-calib_keys = set(nominals.keys()) | set(keepout_keys) | extra_pos_calib_keys | fiducial_calib_keys
+calib_keys = set(nominals.keys()) | set(keepout_keys) | other_pos_calib_keys | fiducial_calib_keys
 def is_calib_key(key):
     return key.upper() in calib_keys
 

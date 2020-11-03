@@ -277,7 +277,7 @@ class PosModel(object):
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
         self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
-        self.state.append_log_note(cleanup_table['log_note'])
+        self.state.store('LOG_NOTE', cleanup_table['log_note'])
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.

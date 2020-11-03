@@ -1106,36 +1106,42 @@ class Petal(object):
         """
         return self.comm.pbget(key)
 
-    def commit(self, mode='move', log_note=''):
+    def commit(self, mode='move', log_note='', calib_note=''):
         '''Commit move data or calibration data to DB and/or local config and
-        log files. A note string may optionally be included to go along with
-        this entry. mode can be: 'move', 'calib', 'both'
+        log files.
+        
+        INPUTS:  mode ... 'move', 'calib', or 'both', says which DB tables to commit to
+        
+                 log_note ... optional string to append to LOG_NOTE field prior to commit
+                              ignored if mode='calib'
+                              
+                 calib_note ... optional string to append to CALIB_NOTE field prior to commit
+                                ignored if mode='move'
         '''
+        assert mode in {'move', 'calib', 'both'}, f'invalid mode {mode} for commit()'
         if mode == 'both':
             self._commit(mode='move', log_note=log_note)
-            self._commit(mode='calib', log_note=log_note)
+            self._commit(mode='calib', calib_note=calib_note)
             return
-        elif mode not in {'move', 'calib'}:
-            self.printfunc(f'Error: mode {mode} not recognized in commit()')
-            return
-        self._commit(mode=mode, log_note=log_note)
+        note = log_note if mode == 'move' else calib_note
+        self._commit(mode=mode, note=note)
 
-    def _commit(self, mode, log_note):
+    def _commit(self, mode, note):
         '''Underlying implemetation for commit().'''
+        assert mode in {'move', 'calib'}, f'invalid mode {mode} for _commit()'
         if not self._commit_pending(mode):
             return
-        if mode == 'move':
+        is_move = mode == 'move'
+        if is_move:
             states = self.altered_states
-            if log_note:
-                for state in states:
-                    state.append_log_note(log_note)
-        elif mode == 'calib':
+        else:
             states = self.altered_calib_states
-            # As of 2020-06-04, no field exists in calib db for log_notes,
-            # hence they are ignored in this case.
+        if note:
+            for state in states:
+                state._append_log_note(note, is_calib_note=not(is_move))
         self._send_to_db_as_necessary(states, mode)
         self._write_local_logs_as_necessary(states)
-        if mode == 'move':
+        if is_move:
             self.altered_states = set()
             if self.schedule_stats.is_enabled():
                 stats_path = self.sched_stats_path
@@ -1143,7 +1149,7 @@ class Petal(object):
                 if new_path != stats_path:
                     self.sched_stats_path = new_path
                     self.printfunc(f'Updated schedule stats path from {stats_path} to {new_path}')
-        elif mode == 'calib':
+        else:
             self.altered_calib_states = set()
         
         # 2020-06-29 [JHS] This step is a simple way to guarantee freshness of
@@ -1155,10 +1161,12 @@ class Petal(object):
         '''Saves state data to posmove database, if that behavior is currently
         turned on.
         '''
+        assert mode in {'move', 'calib'}, f'invalid mode {mode} for _send_to_db_as_necessary'
         if self.db_commit_on and not self.simulator_on:
-            if mode == 'move':
+            is_move = mode == 'move'
+            if is_move:
                 type1, type2 = 'pos_move', 'fid_data'
-            elif mode == 'calib':
+            else:
                 type1, type2 = 'pos_calib', 'fid_calib'
             pos_commit_list = [st for st in states if st.type == 'pos']
             fid_commit_list = [st for st in states if st.type == 'fid']
@@ -1169,7 +1177,7 @@ class Petal(object):
                 self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
             if len(fid_commit_list) > 0:
                 self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
-            if mode == 'move':
+            if is_move:
                 if self._currently_in_an_exposure():
                     committed_posids = {state.unit_id for state in pos_commit_list}
                     overlapping_commits = committed_posids & self._devids_committed_this_exposure
@@ -1178,9 +1186,12 @@ class Petal(object):
                                        f'commit requests for expid {self._exposure_id}, iteration ' +
                                        f'{self._exposure_iter}. These have the potential to overwrite data.')
                     self._devids_committed_this_exposure |= committed_posids
-        if mode == 'move':
-            for state in self.altered_states:
-                state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
+        
+        # known minor issue: if local_log_on simultaneously with DB, these may clear the note field
+        for state in self.altered_states:
+            state.clear_log_notes()
+        for state in self.altered_calib_states:
+            state.clear_calib_notes()
             
     def _write_local_logs_as_necessary(self, states):
         '''Saves state data to disk, if those behaviors are currently turned on.'''
@@ -1362,7 +1373,7 @@ class Petal(object):
             pos_flags = {posid: pc.decipher_posflags(flag)[0] for posid, flag in pos_flags.items()}
         return pos_flags
     
-    def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False):
+    def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False, comment=None):
         '''Convenience function to set parameters affecting positioner collision
         envelope(s). One or more posids may be argued. The other args will be
         uniformly applied to ALL argued posids.
@@ -1374,6 +1385,7 @@ class Petal(object):
             angP ... new value for 'KEEPOUT_EXPANSION_THETA_ANGULAR'
             radP ... new value for 'KEEPOUT_EXPANSION_PHI_ANGULAR'
             classify_retracted ... new value for 'CLASSIFIED_AS_RETRACTED'
+            comment ... string stating your rationale for the change (enclose in "" at Console)
         '''
         if posids == 'all':
             posids = self.posids
@@ -1413,7 +1425,8 @@ class Petal(object):
             changed |= changed_this_key
         if changed:
             self.printfunc(f'{msg_prefix} Committing new values for {len(changed)} positioner(s)')
-            self.commit(mode='calib')  # as of 2020-06-29, all valid args here are stored in calib table of DB
+            note = str(comment) if comment else ''
+            self.commit(mode='calib', calib_note=note)  # as of 2020-06-29, all valid args here are stored in calib table of DB
         else:
             self.printfunc(f'{msg_prefix} No positioners found requiring parameter update(s)')
             
@@ -1466,7 +1479,7 @@ class Petal(object):
             self.printfunc(f'{msg_prefix} {len(skipped)} skipped. The skipped positioners are: {skipped}')
         if any(changed):
             self.printfunc(f'{msg_prefix} Committing restored values for {len(changed)} positioners.')
-            self.commit(mode='calib')
+            self.commit(mode='calib', calib_note=f'restored keepouts from cache file: {path_to_use}')
             
     def get_collision_params(self, posid):
         '''Returns a formatted string describing the current parameters known to
@@ -2220,7 +2233,7 @@ class Petal(object):
         self._apply_all_state_enable_settings()
         self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
-        self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB
+        self.commit(mode='both', log_note='auto-commit lingering data during petal configure') # commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
 

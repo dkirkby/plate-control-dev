@@ -175,17 +175,17 @@ for row in table:
             else:
                 logger.error(f'set_posfid_val(posid={posid}, key={key}, value={value}')
     if stored:
-        # [JHS] Would be nice to include analysis metadata fields in the log_note, drawn
+        # [JHS] Would be nice to include analysis metadata fields in the note, drawn
         # from the input table. Presumably when that table is in ecsv format.
-        log_note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
+        note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
                                  f'input_file {args.infile}', f'archive_ref {archive_ref}',
                                  f'params {stored}')
         for key in fit_err_keys:
             if key in row.columns:
-                log_note = pc.join_notes(log_note, f'{key.lower()} {row[key]}')
+                note = pc.join_notes(note, f'{key.lower()} {row[key]}')
             
         if not args.simulate:
-            pecs.ptlm.set_posfid_val(posid, 'LOG_NOTE', log_note)
+            pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note)
         logger.info(f'{posid}: {stored}')
         any_stored = True
         
@@ -193,7 +193,7 @@ for row in table:
 if any_stored:
     logger.info('Committing the data set to online database.')
     if not args.simulate:
-        pecs.ptlm.commit(mode='both', log_note='')  # mode 'both' since LOG_NOTE goes in "moves" db. and blank log_note since done positioner-by-positioner above
+        pecs.ptlm.commit(mode='calib', calib_note='')
     logger.info('Commit complete.')
 else:
     logger.warning('No data found to commit. Nothing will be changed in the online db.')

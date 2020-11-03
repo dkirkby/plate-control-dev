@@ -25,7 +25,6 @@ DEVICE_ID, PETAL_LOC, DEVICE_LOC, old and new calibration vals, with
 MODE for updates and old values.
 '''
 import os
-import numpy as np
 import pandas as pd
 import posconstants as pc
 from petaltransforms import PetalTransforms
@@ -50,7 +49,7 @@ for posid, row in seed.posinfo.iterrows():
     update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     updates.append(update)
-seed.ptlm.commit(mode='calib', log_note='seed_offsets_xy')
+seed.ptlm.commit(mode='calib', calib_note='seed_offsets_xy')
 updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
 path = os.path.join(pc.dirs['calib_logs'],
                     f'{pc.filename_timestamp_str()}-seed_offsets_xy.csv')

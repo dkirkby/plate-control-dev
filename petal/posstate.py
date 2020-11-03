@@ -141,7 +141,7 @@ class PosState(object):
             # list of fieldnames we save to the log file.
             self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys()))
             # used for storing specific notes in the next row written to log
-            self.append_log_note('software initialization')
+            self._append_log_note('software initialization')
             # used for one time check whether need to make a new log file,
             # or whether log file headers have changed since last run
             self.log_unit_called_yet = False
@@ -158,6 +158,7 @@ class PosState(object):
             self._val['MOVE_VAL2'] = ''
         self._clear_last_meas_entries()
         self.clear_log_notes()
+        self.clear_calib_notes()
         self.clear_late_commit_entries()
 
     def set_ptlid_from_pi(self, unit_id):
@@ -205,6 +206,7 @@ class PosState(object):
         #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
         self.clear_log_notes() # used here to initialize
+        self.clear_calib_notes() # used here to initialize
 
     def load_from_cfg(self, unit_id=None):
         # do this here because used in 2 different places below
@@ -247,6 +249,7 @@ class PosState(object):
             self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
         self._val = self.conf.dict()
         self.clear_log_notes() # used here to initialize
+        self.clear_calib_notes() # used here to initialize
 
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
@@ -286,7 +289,9 @@ class PosState(object):
                 return False
         old_val = self._val[key]
         if key == 'LOG_NOTE':
-            self.append_log_note(val)
+            self._append_log_note(val, is_calib_note=False)
+        elif key == 'CALIB_NOTE':
+            self._append_log_note(val, is_calib_note=True)
         else:
             self._val[key] = val  # set value if all checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
@@ -341,6 +346,7 @@ class PosState(object):
                 writer.writerow(row)
             self.curr_log_length += 1
             self.clear_log_notes()
+            self.clear_calib_notes()
             self.log_unit_called_yet = True # only need to check this the first time through
 
     @property
@@ -362,19 +368,25 @@ class PosState(object):
     def log_basename(self, name):
         self._val['CURRENT_LOG_BASENAME'] = name
         
-    def append_log_note(self, note):
+    def _append_log_note(self, note, is_calib_note=False):
         '''Adds a log note to the existing note data that will be written to
-        log upon commit or writetodb.
+        log upon commit or writetodb. Arg calib operates on CALIB_NOTE field
+        rather than LOG_NOTE.
         '''
-        if 'LOG_NOTE' not in self._val:
-            self._val['LOG_NOTE'] = str(note)
+        key = 'CALIB_NOTE' if is_calib_note else 'LOG_NOTE'
+        if key not in self._val:
+            self._val[key] = str(note)
         else:
-            self._val['LOG_NOTE'] = pc.join_notes(self._val['LOG_NOTE'], note)
-        
+            self._val[key] = pc.join_notes(self._val[key], note)
+            
     def clear_log_notes(self):
         '''Re-initializes the stored log notes. Can be used as an initiializer
         if no LOG_NOTE field yet established.'''
         self._val['LOG_NOTE'] = ''
+        
+    def clear_calib_notes(self):
+        '''Like clear_log_notes, but for CALIB_NOTE field.'''
+        self._val['CALIB_NOTE'] = ''
                 
     def clear_late_commit_entries(self):
         '''Clears the "late commit" data fields.'''
@@ -443,14 +455,17 @@ class PosState(object):
                 
         # also insert any missing entirely new keys
         if self.type == 'pos':
-            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None,
-                                              'KEEPOUT_EXPANSION_PHI_RADIAL':0.0,
-                                              'KEEPOUT_EXPANSION_PHI_ANGULAR':0.0,
-                                              'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
-                                              'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0,
-                                              'CLASSIFIED_AS_RETRACTED':False,
-                                              'EXPOSURE_ID':None,
-                                              'EXPOSURE_ITER':None,
+            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM': None,
+                                              'KEEPOUT_EXPANSION_PHI_RADIAL': 0.0,
+                                              'KEEPOUT_EXPANSION_PHI_ANGULAR': 0.0,
+                                              'KEEPOUT_EXPANSION_THETA_RADIAL': 0.0,
+                                              'KEEPOUT_EXPANSION_THETA_ANGULAR': 0.0,
+                                              'CLASSIFIED_AS_RETRACTED': False,
+                                              'EXPOSURE_ID': None,
+                                              'EXPOSURE_ITER': None,
+                                              'DEVICE_CLASSIFIED_NONFUNCTIONAL': False,
+                                              'FIBER_INTACT': True,
+                                              'CALIB_NOTE': '',
                                               }
             possible_new_keys_and_defaults.update(pc.late_commit_defaults)
         elif self.type == 'fid':

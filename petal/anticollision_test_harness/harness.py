@@ -196,6 +196,9 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     mtot = len(move_request_sequence)
     for move_requests_id, move_request_data in move_request_sequence.items():
         m += 1
+        ptl.set_posfid_val('M06389', 'POS_T', -160)
+
+        ptl.set_posfid_val('M06389', 'POS_P', 0)
         if ptl.schedule_stats.is_enabled():
             ptl.schedule_stats.add_note('MOVE_REQUESTS_ID: ' + str(move_requests_id))
         for n in range(n_corrections + 1):
