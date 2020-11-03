@@ -148,10 +148,11 @@ apps = {}
 ptls = {}
 logger.info(f'Attempting to retrieve data for {len(petal_ids)} petals: {petal_ids}')
 try:
+    import PetalApp
     from DOSlib.proxies import Petal
-    PetalApp_path = 'PetalApp.py' # 2020-11-02: needs directory
-    assert2(os.path.exists(PetalApp_path), f'No PetalApp found at path {PetalApp_path}', show_quit_msg=False)
-    # any other / more robust check possible here?
+    ptlapp_dir = PetalApp.__file__
+    ptlapp_path = os.path.join(ptlapp_dir, 'PetalApp.py')
+    assert2(os.path.exists(ptlapp_path), f'No PetalApp found at path {ptlapp_path}', show_quit_msg=False)
     logger.info('Online system is available, will use PetalApp')
     online = True
 except:
@@ -161,7 +162,7 @@ except:
 if online:
     import threading
     def run_petal(petal_id, role):
-        os.system(f'python {PetalApp_path} --device_mode True --sim True --petal_id {petal_id} --role {role}')
+        os.system(f'python {ptlapp_path} --device_mode True --sim True --petal_id {petal_id} --role {role}')
     for petal_id in petal_ids:
         name = f'PetalApp{petal_id}'
         role = f'PETALSIM{petal_id}'
