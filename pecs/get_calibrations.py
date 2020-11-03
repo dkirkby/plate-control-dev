@@ -30,11 +30,14 @@ import traceback
 if uargs.disable_logger:
     log_path = None
 else:
-    log_dir = pc.dirs['sequence_logs']
+    # yes, as of 2020-11-02, I'm saving it in two places
+    # to be absolutely sure we have a record
+    # can cut back to one, once we are confident of logs getting properly saved at KPNO
+    log_dirs = [uargs.outdir, pc.dirs['calib_logs']]  
     log_timestamp = pc.filename_timestamp_str()
     log_name = log_timestamp + '_get_calibrations.log'
-    log_path = os.path.join(log_dir, log_name)
-logger = simple_logger.start_logger(log_path)
+    log_paths = [os.path.join(d, log_name) for d in log_dirs]
+logger = simple_logger.start_logger(log_paths)
 assert2 = simple_logger.assert2
 
 # validate petal ids
@@ -55,7 +58,6 @@ for petal_id in petal_ids:
 
 # data keys retreivable from quick_query(), along with human-readable descriptions
 query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
-              'PETAL_ID': 'unique serial id number of petal',
               'DEVICE_LOC': 'location number on petal, c.f. DESI-0530',
               'LENGTH_R1': 'kinematic length between central axis and phi axis',
               'LENGTH_R2': 'kinematic length between phi axis and fiber',
@@ -76,6 +78,13 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'if True, the focal plane team has determined this positioner cannot be operated',
               'FIBER_INTACT': 'if False, the focal plane team has determined the positioner\'s fiber cannot be measured',
               }
+
+# petal-wide keys for storage in positioner data rows
+pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal'}
+pos_petal_attr_map = {'PETAL_ID': 'petal_id'}
+
+# petal-wide keys for storage in meta-data
+other_petal_keys = {'PETAL_ALIGNMENTS': '6 DOF transformation parameters from "PTL" local coordinates to "OBS" a.k.a. "CS5" a.k.a. "FP" global coordinates'}
 
 # general and positioner-specific data keys from the collider
 flat_note = '["flat" coordinates]'
@@ -104,18 +113,19 @@ range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if 
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'min'] for c in ['T', 'P']}
 
 # summarize all keys, units, and descriptions (where applicable)
-all_keys = {}
-all_keys.update(query_keys)
-all_keys.update(pos_collider_keys)
-all_keys.update(offset_variant_keys)
-all_keys.update(range_keys)
+all_pos_keys = {}
+all_pos_keys.update(pos_petal_keys)
+all_pos_keys.update(query_keys)
+all_pos_keys.update(pos_collider_keys)
+all_pos_keys.update(offset_variant_keys)
+all_pos_keys.update(range_keys)
 angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P', 'KEEPOUT_EXPANSION_PHI_ANGULAR', 'KEEPOUT_EXPANSION_THETA_ANGULAR'}
 angular_keys |= set(range_keys)
 mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_THETA_RADIAL'}
 mm_keys |= set(offset_variant_keys)
 units = {key: 'deg' for key in angular_keys}
 units.update({key: 'mm' for key in mm_keys})
-descriptions = {desc: key for key, desc in all_keys.items()}
+descriptions = {desc: key for key, desc in all_pos_keys.items()}
 
 # initialize petals
 roles = {}
@@ -124,6 +134,9 @@ ptls = {}
 logger.info(f'Attempting to retrieve data for {len(petal_ids)} petals: {petal_ids}')
 try:
     from DOSlib.proxies import Petal
+    PetalApp_path = 'PetalApp.py' # 2020-11-02: needs directory
+    assert2(os.path.exists(PetalApp_path), f'No PetalApp found at path {PetalApp_path}', show_quit_msg=False)
+    # any other / more robust check possible here?
     logger.info('Online system is available, will use PetalApp')
     online = True
 except:
@@ -133,7 +146,7 @@ except:
 if online:
     import threading
     def run_petal(petal_id, role):
-        os.system(f'python PetalApp.py --device_mode True --sim True --petal_id {petal_id} --role {role}')
+        os.system(f'python {PetalApp_path} --device_mode True --sim True --petal_id {petal_id} --role {role}')
     for petal_id in petal_ids:
         name = f'PetalApp{petal_id}'
         role = f'PETALSIM{petal_id}'
@@ -156,6 +169,7 @@ else:
                           local_log_on=False,
                           collider_file=None,
                           sched_stats_on=False,
+                          printfunc=logger.info,
                           )
         ptls[petal_id] = ptl
 logger.info(f'{len(ptls)} petals initialized')
@@ -164,12 +178,13 @@ logger.info(f'{len(ptls)} petals initialized')
 # at the end, even if a crash occurs before that.
 try:
     # gather data
-    data = {key:[] for key in all_keys}
+    data = {key:[] for key in all_pos_keys}
     meta = {}
     meta['DATE_RETRIEVED'] = pc.timestamp_str()
     meta['COMMENT'] = uargs.comment
     for key in ['DATE_RETRIEVED', 'COMMENT']:        
         logger.info(f'metadata {key} = {meta[key]}')
+    meta['PETAL_ATTRIBUTES'] = other_petal_keys
     meta['PETAL_ALIGNMENTS'] = {}
     for petal_id, ptl in ptls.items():
         this_data = {}
@@ -187,7 +202,7 @@ try:
                 attr_key = pos_collider_attr_map[key]
                 this_dict = getattr(ptl.collider, attr_key)
                 if 'fixed' in attr_key.lower():
-                    this_dict = {posid: pc.case.names[enum] for posid, enum in this_dict.items()}
+                    this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
     
@@ -195,9 +210,13 @@ try:
         for posid in posids_ordered:
             model = ptl.posmodels[posid]
             flat_offset_xy = (ptl.collider.x0[posid], ptl.collider.y0[posid])
-            for suffix, coord in offset_variants.keys():
-                transform = model.trans.construct('flatXY', coord)
-                xy_new = transform(flat_offset_xy)
+            for suffix, coord in offset_variants.items():
+                if coord == 'obsXY':   
+                    xy_new = model.trans.flatXY_to_obsXY(flat_offset_xy, cast=True)
+                elif coord == 'ptlXY':
+                    xy_new = model.trans.flatXY_to_ptlXY(flat_offset_xy)
+                else:
+                    assert2(False, f'unexpected destination coordinates {coord}')
                 data[f'OFFSET_X_{suffix}'].append(xy_new[0])
                 data[f'OFFSET_Y_{suffix}'].append(xy_new[1])
             for key in range_keys:
@@ -239,7 +258,8 @@ try:
         file.write(save_path)
     logger.info(f'File path cached at standard location: {ref_path}')
     
-except Exception:
+except Exception as e:
+    exception_here = e
     logger.error('get_calibrations crashed! See traceback below:')
     logger.critical(traceback.format_exc())
     logger.info('Attempting to clean up lingering PetalApp instances prior to exiting...')
@@ -249,3 +269,7 @@ for petal_id in apps.keys():
     logger.info(f'Sending shutdown command for petal {petal_id}...')
     ptl = ptls[petal_id]
     ptl.shutdown_event.set()
+
+# re-raise exception from above if we have one
+if exception_here is not None:
+    raise(exception_here)
