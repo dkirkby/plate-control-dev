@@ -6,11 +6,13 @@ Some logging boilerplate code.
 import logging
 import time
 
-def start_logger(paths):
+def start_logger(paths=None):
     '''Initializes a logger which will output log files to one or more paths.
-    Returns a logger instance.'''
+    Returns a logger instance. If no paths argument, then logs only to shell.'''
     clear_logger()
     global logger
+    if not paths:
+        paths = []
     if isinstance(paths, str):
         paths = [paths]
     logger = logging.getLogger(__name__)
