@@ -1384,7 +1384,7 @@ class Petal(object):
             radP ... [mm] new value for 'KEEPOUT_EXPANSION_PHI_RADIAL'
             angT ... [deg] new value for 'KEEPOUT_EXPANSION_THETA_ANGULAR'
             angP ... [deg] new value for 'KEEPOUT_EXPANSION_PHI_ANGULAR'
-            classify_retracted ... new value for 'CLASSIFIED_AS_RETRACTED'
+            classify_retracted ... [boolean] new value for 'CLASSIFIED_AS_RETRACTED'
             comment ... string stating your rationale for the change (enclose in "" at Console)
         '''
         if posids == 'all':
