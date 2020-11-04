@@ -180,11 +180,6 @@ if online:
         ptl_app = subprocess.Popen(run_petal(petal_id, role))
         roles[petal_id] = role
         apps[petal_id] = ptl_app
-    def check_petals(ptls):
-        statuses = []
-        for ptl in ptls:
-            statuses.append(ptl.get('status'))
-        return set(statuses) == {'INITIALIZED'}
     for petal_id, role in roles.items():
         ptl = Petal(petal_id, role=role)
         ptls[petal_id] = ptl
@@ -206,6 +201,11 @@ else:
 # at the end, even if a crash occurs before that.
 exception_during_run = None
 try:
+    def check_petals(ptls):
+        statuses = []
+        for ptl in ptls.values():
+            statuses.append(ptl.get('status'))
+        return set(statuses) == {'INITIALIZED'}
     timeout = 40
     logger.info(f'Waiting a maximum of {timeout} seconds for petals to initialize.')
     timeend = time.time() + timeout
