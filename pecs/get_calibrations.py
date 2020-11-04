@@ -15,6 +15,7 @@ uargs = parser.parse_args()
 # general imports
 import os
 import sys
+import time
 from astropy.table import Table
 try:
     import posconstants as pc
@@ -160,16 +161,23 @@ except:
     logger.warning('Online system is not available. Falling back to dummy data + petal.py instances (may be useful for other debugging).')
     online = False
 if online:
-    import threading
+    import subprocess
+    import signal
+    # First check for Pyro Name Server
+    import Pyro4
+    try:
+        Pyro4.locateNS()
+    except:
+        ns_thread = subprocess.Popen(['pyro4-ns'])
+    else:
+        ns_thread = None
     def run_petal(petal_id, role):
-        os.system(f'python {ptlapp_path} --device_mode True --sim True --petal_id {petal_id} --role {role}')
+        return ['python', f'{ptlapp_path}', '--device_mode', 'True', '--sim', 'True', '--petal_id', f'{petal_id}', '--role', f'{role}']
     for petal_id in petal_ids:
         name = f'PetalApp{petal_id}'
         role = f'PETALSIM{petal_id}'
         logger.info(f'Initializing threaded PetalApp with name {name} and role {role}...')
-        ptl_app = threading.Thread(target=run_petal, name=name, args=(petal_id, role))
-        ptl_app.daemon = False
-        ptl_app.start()
+        ptl_app = subprocess.Popen(run_petal(petal_id, role))
         roles[petal_id] = role
         apps[petal_id] = ptl_app
     for petal_id, role in roles.items():
@@ -295,6 +303,27 @@ for petal_id in apps.keys():
     logger.info(f'Sending shutdown command for petal {petal_id}...')
     ptl = ptls[petal_id]
     ptl.kill()
+if ns_thread is not None:
+    # This cleanly ends pyro-ns
+    ns_thread.send_signal(signal.SIGINT)
+
+timeout = 30
+timeend = time.time() + timeout
+logger.info(f'Waiting maximum of {timeout} seconds for processes to terminate.')
+while time.time() < timeend:
+    process_status = [ns_thread.poll()]
+    for app in apps.values():
+        process_status.append(app.poll())
+    if set(process_status) == {None}:
+        logger.info(f'Processes terminated')
+        break
+    else:
+        time.sleep(1)
+if set(process_status) != {None}:
+    logger.error(f'Timeout expired, issuing kills.')
+    ns_thread.kill()
+    for app in apps.values():
+        app.kill()
 
 # re-raise exception from above if we have one
 if exception_during_run:
