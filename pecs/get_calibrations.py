@@ -181,8 +181,9 @@ if online:
         roles[petal_id] = role
         apps[petal_id] = ptl_app
     for petal_id, role in roles.items():
-        ptl = Petal(petal_id, role=role)
+        ptl = Petal(petal_id, role=role, device_mode=True)
         ptls[petal_id] = ptl
+    #time.sleep(5) # wait at least 5 seconds to let some init run
 else:
     for petal_id in petal_ids:
         logger.info(f'Initializing petal instance for petal id {petal_id}...')
@@ -214,7 +215,7 @@ try:
             logger.info(f'{len(ptls)} petals initialized')
             break
         else:
-            time.sleep()
+            time.sleep(1)
     assert check_petals(ptls), 'Timed out waiting for petals to initialize.'
     # gather data
     data = {key:[] for key in all_pos_keys}
@@ -325,7 +326,7 @@ timeout = 30
 timeend = time.time() + timeout
 logger.info(f'Waiting maximum of {timeout} seconds for processes to terminate.')
 while time.time() < timeend:
-    process_status = [ns_thread.poll()]
+    process_status = [ns_thread.poll()] if ns_thread is not None else []
     for app in apps.values():
         process_status.append(app.poll())
     if set(process_status) == {None}:
