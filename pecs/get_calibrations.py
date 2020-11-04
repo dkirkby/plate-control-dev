@@ -167,7 +167,7 @@ if online:
     import Pyro4
     try:
         Pyro4.locateNS()
-    except:
+    except Pyro4.errors.NamingError:
         ns_thread = subprocess.Popen(['pyro4-ns'])
     else:
         ns_thread = None
