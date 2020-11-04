@@ -180,6 +180,11 @@ if online:
         ptl_app = subprocess.Popen(run_petal(petal_id, role))
         roles[petal_id] = role
         apps[petal_id] = ptl_app
+    def check_petals(ptls):
+        statuses = []
+        for ptl in ptls:
+            statuses.append(ptl.get('status'))
+        return set(statuses) == {'INITIALIZED'}
     for petal_id, role in roles.items():
         ptl = Petal(petal_id, role=role)
         ptls[petal_id] = ptl
@@ -196,12 +201,21 @@ else:
                           printfunc=logger.info,
                           )
         ptls[petal_id] = ptl
-logger.info(f'{len(ptls)} petals initialized')
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
 exception_during_run = None
 try:
+    timeout = 40
+    logger.info(f'Waiting a maximum of {timeout} seconds for petals to initialize.')
+    timeend = time.time() + timeout
+    while time.time() < timeend:
+        if check_petals(ptls):
+            logger.info(f'{len(ptls)} petals initialized')
+            break
+        else:
+            time.sleep()
+    assert check_petals(ptls), 'Timed out waiting for petals to initialize.'
     # gather data
     data = {key:[] for key in all_pos_keys}
     meta = {}
