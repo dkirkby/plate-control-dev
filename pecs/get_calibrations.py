@@ -286,7 +286,7 @@ try:
     
         # dependent values
         for posid in posids_ordered:
-            flat_offset_xy = (ptl.collider.x0[posid], ptl.collider.y0[posid])
+            flat_offset_xy = tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y'])
             for suffix, coord in offset_variants.items():
                 kwargs = {'cast': True} if coord in {'obsXY'} else {}
                 if online:
