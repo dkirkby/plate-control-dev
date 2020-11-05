@@ -197,12 +197,22 @@ else:
                           printfunc=logger.info,
                           )
         ptls[petal_id] = ptl
+        
+def getattr_collider(ptl, attr):
+    '''Wrapper around getattr. Specifically for getting a property from the
+    collider sub-module of petal. When online this is behind the DOS proxy wall
+    and so requires app_get(). Whereas offline it uses normal getattr().'''
+    if online:
+        return ptl.app_get(f'collider.{attr}')
+    return getattr(ptl.collider, attr)
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
 exception_during_run = None
 try:
     def check_petals(ptls):
+        if not online:
+            return True
         statuses = []
         for ptl in ptls.values():
             statuses.append(ptl.get('status'))
@@ -242,7 +252,7 @@ try:
                 this_dict = ptl.quick_query(key=query_key, mode='iterable')
             else:
                 attr_key = pos_collider_attr_map[key]
-                this_dict = getattr(ptl.collider, attr_key)
+                this_dict = getattr_collider(ptl, attr_key)
                 if 'fixed' in attr_key.lower():
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
                 sample = this_dict[posids_ordered[0]]
@@ -279,7 +289,7 @@ try:
     # any petal. Here, I simply use the last ptl instance from the for loop above.
     meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
     for key in general_collider_keys:
-        meta[key] = getattr(ptl.collider, key)
+        meta[key] = getattr_collider(ptl, key)
         if isinstance(meta[key], poscollider.PosPoly):
             meta[key] = str(meta[key].points)
         
@@ -314,31 +324,31 @@ except Exception as e:
     logger.info('Attempting to clean up lingering PetalApp instances prior to exiting...')
 
 # shut down the threads
-for petal_id in apps.keys():
-    logger.info(f'Sending shutdown command for petal {petal_id}...')
-    ptl = ptls[petal_id]
-    ptl.kill()
-if ns_thread is not None:
-    # This cleanly ends pyro-ns
-    ns_thread.send_signal(signal.SIGINT)
-
-timeout = 30
-timeend = time.time() + timeout
-logger.info(f'Waiting maximum of {timeout} seconds for processes to terminate.')
-while time.time() < timeend:
-    process_status = [ns_thread.poll()] if ns_thread is not None else []
-    for app in apps.values():
-        process_status.append(app.poll())
-    if set(process_status) == {None}:
-        logger.info(f'Processes terminated')
-        break
-    else:
-        time.sleep(1)
-if set(process_status) != {None}:
-    logger.error(f'Timeout expired, issuing kills.')
-    ns_thread.kill()
-    for app in apps.values():
-        app.kill()
+if online:
+    for petal_id in apps.keys():
+        logger.info(f'Sending shutdown command for petal {petal_id}...')
+        ptl = ptls[petal_id]
+        ptl.kill()
+    if ns_thread is not None:
+        # This cleanly ends pyro-ns
+        ns_thread.send_signal(signal.SIGINT)
+    timeout = 30
+    timeend = time.time() + timeout
+    logger.info(f'Waiting maximum of {timeout} seconds for processes to terminate.')
+    while time.time() < timeend:
+        process_status = [ns_thread.poll()] if ns_thread is not None else []
+        for app in apps.values():
+            process_status.append(app.poll())
+        if set(process_status) == {None}:
+            logger.info('Processes terminated')
+            break
+        else:
+            time.sleep(1)
+    if set(process_status) != {None}:
+        logger.error('Timeout expired, issuing kills.')
+        ns_thread.kill()
+        for app in apps.values():
+            app.kill()
 
 # re-raise exception from above if we have one
 if exception_during_run:
