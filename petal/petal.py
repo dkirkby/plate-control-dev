@@ -1852,6 +1852,13 @@ class Petal(object):
         s = f'num pos with overlapping polygons = {len(listified)}'
         s += f'\n{listified}'
         return s
+    
+    def get_disabled_by_relay(self):
+        '''Returns list of posids which the petalcontroller reports as being
+        disabled by relay.
+        '''
+        conf_data = self.comm.pbget('conf_file')
+        return conf_data['disabled_by_relay']
              
     def _validate_posids_arg(self, posids):
         '''Handles / validates a user argument of posids. Returns a set.'''
