@@ -213,7 +213,7 @@ def getattr2(ptl, module_name, attr):
     that choice.'''
     if online:
         return ptl.app_get(f'{module_name}.{attr}')
-    module = getattr(ptl, module_name)
+    module = getattr(ptl, module_name) if module_name else ptl
     return getattr(module, attr)
     
 
@@ -314,7 +314,7 @@ try:
         
         # petal-wide values
         for key, attr in pos_petal_attr_map.items():
-            value = getattr(ptl, attr)
+            value = getattr2(ptl, None, attr)
             data[key].extend([value] * len(posids_ordered))
         meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
                     
