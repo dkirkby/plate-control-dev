@@ -507,7 +507,7 @@ class PosSchedule(object):
                                   f'not resolve within {skip} timestep{"s" if skip != 1 else ""} ({skip*self.collider.timestep:.3f} ' + \
                                   f'sec) by debouncing polygons (jog distances = {db} deg).'
                     deny_msg = self._denied_str(target_str, explanation)
-                    self.petal.print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
+                    self.petal._print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
                 del self._requests[posid]
             self._fill_enabled_but_nonmoving_with_dummy_requests()  # to repopulate deletions
         resolved = overlapping - set(colliding_sweeps)

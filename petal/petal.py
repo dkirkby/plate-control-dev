@@ -381,7 +381,7 @@ class Petal(object):
             if error:
                 marked_for_delete.add(posid)
                 error_str = f'{"move request retry: " if _is_retry else ""}{error}'
-                self.print_and_store_note(posid, error_str)
+                self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
         return requests
@@ -465,7 +465,7 @@ class Petal(object):
             error = self.schedule.expert_add_table(table)
             if error:
                 denied.add(posid)
-                self.print_and_store_note(posid, f'direct_dtdp: {error}')
+                self._print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
         return requests
@@ -512,7 +512,7 @@ class Petal(object):
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
             error = self.schedule.expert_add_table(table)
             if error:
-                self.print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
+                self._print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
 
     def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
@@ -2041,7 +2041,7 @@ class Petal(object):
                     for move_table in expert_tables_to_retry:
                         error = self.schedule.expert_add_table(move_table)
                         if error:
-                            self.print_and_store_note(move_table.posid, f'expert table retry: {error}')
+                            self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
                 else:
                     cleaned = {}
                     for posid, req in requests_to_retry.items():
@@ -2248,13 +2248,36 @@ class Petal(object):
         elif posid in self._posids_where_tables_were_just_sent:
             self._posids_where_tables_were_just_sent.remove(posid)
 
-    def print_and_store_note(self, posid, msg):
+    def _print_and_store_note(self, posid, msg):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
         self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
-
+        
+    def _get_collider_polygons(self):
+        '''Gets the point data for all polygons known to the collider as 2xN
+        python lists (i.e. not PosPoly objects, which have trouble pickling their
+        way through a DOS proxy interface).
+        
+        INPUTS:  none
+        OUTPUTS: dict with ...
+                   ... keys = 'keepouts_T', 'keepouts_P', 'keepout_PTL', 'keepout_GFA', 'general_keepout_T', 'general_keepout_P'
+                   ... values = point data for the corresponding polys in self.collider (but as 2xN python lists, rather than PosPoly instances)
+        '''
+        keys = ['keepouts_T', 'keepouts_P', 'keepout_PTL', 'keepout_GFA', 'general_keepout_T', 'general_keepout_P']
+        out = {}
+        for key in keys:
+            this = getattr(self.collider, key)
+            if isinstance(this, poscollider.PosPoly):
+                out[key] = this.points
+            elif isinstance(this, dict):
+                out[key] = {subkey: poly.points for subkey, poly in this.items()}
+            else:
+                assert False, f'unrecognized type {type(this)} for key {key}'
+        return out
+        
+        
 if __name__ == '__main__':
     '''
     python -m cProfile -s cumtime petal.py
