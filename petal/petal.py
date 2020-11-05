@@ -9,6 +9,14 @@ from petaltransforms import PetalTransforms
 import time
 import os
 import random
+
+# For using simulated petals at KPNO (PETAL90x)
+# Set KPNO_SIM to True
+KPNO_SIM = True
+
+if KPNO_SIM:
+    from DOSlib.positioner_index import PositionerIndex
+
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
     from DBSingleton import DBSingleton
@@ -111,10 +119,6 @@ class Petal(object):
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         
-        # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
-        self.sim_fail_freq = {'send_tables': 0.0,
-                              'clear_move_tables': 0.0} 
-        
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
@@ -157,8 +161,12 @@ class Petal(object):
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
-            self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+            try:
+                self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
+                self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+            except Exception as e:
+                self.printfunc('Fidid %r. Exception: %s' % (fidid, str(e)))
+                continue
 
         # pos flags setup
         self.pos_bit = 1<<2
@@ -234,6 +242,8 @@ class Petal(object):
                                      gamma=self.alignment['gamma'])
 
     def init_posmodels(self, posids=None):
+        if KPNO_SIM:
+            posindex = PositionerIndex()
         # positioners setup
         if posids is None:  # posids are not supplied, only alingment changed
             assert hasattr(self, 'posids')  # re-use self.posids
@@ -251,6 +261,10 @@ class Petal(object):
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
+            if KPNO_SIM:
+                pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
+                self.posmodels[posid].state.store('BUS_ID', 'can%d' % pos[0]['BUS_ID'])
+                self.posmodels[posid].state.store('CAN_ID', pos[0]['CAN_ID'])
         self.posids = set(self.posmodels.keys())
         self.canids = {posid:self.posmodels[posid].canid for posid in self.posids}
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
@@ -267,9 +281,12 @@ class Petal(object):
         '''
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(config=self.anticol_settings, printfunc=self.printfunc)
+            if isinstance(self.anticol_settings, str):
+                self.collider = poscollider.PosCollider(configfile=self.anticol_settings)
+            else:
+                self.collider = poscollider.PosCollider(config=self.anticol_settings)
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file, printfunc=self.printfunc)
+            self.collider = poscollider.PosCollider(configfile=collider_file)
             self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
