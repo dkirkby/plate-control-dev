@@ -155,7 +155,7 @@ polygons = 'KEEPOUT_T', 'KEEPOUT_P', 'general_keepout_T', 'general_keepout_P'
 roles = {}
 apps = {}
 ptls = {}
-logger.info(f'Attempting to retrieve data for {len(petal_ids)} petals: {petal_ids}')
+logger.info(f'Attempting to retrieve data for {len(petal_ids)} petal{"s" if len(petal_ids) > 1 else ""}: {petal_ids}')
 try:
     import PetalApp
     from DOSlib.proxies import Petal
@@ -306,7 +306,7 @@ try:
                 rng_key = range_keys_map[key]
                 rng = model_data[rng_key]
                 data[key].append(func(rng))
-        logger.info(f' ...calculated in {time.perf_counter() - start} sec')
+        logger.info(f' ...calculated in {time.perf_counter() - start:.3f} sec')
         
         logger.info(' ...collecting petal-wide values...')        
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
