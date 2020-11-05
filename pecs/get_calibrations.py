@@ -24,7 +24,6 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
-import poscollider
 
 # set up logger
 import simple_logger
@@ -86,13 +85,16 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
 query_keys_map = {'PTL_X': 'ptlX',
                   'PTL_Y': 'ptlY',
                   'OBS_X': 'obsX',
-                  'OBS_Y': 'obsY'}
+                  'OBS_Y': 'obsY',
+                  }
 
 # petal-wide keys for storage in positioner data rows
 pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal',
-                  'PETAL_LOC': 'location number of petal on focal plane (c.f. DESI-3596)'}
+                  'PETAL_LOC': 'location number of petal on focal plane (c.f. DESI-3596)',
+                  }
 pos_petal_attr_map = {'PETAL_ID': 'petal_id',
-                      'PETAL_LOC': 'petal_loc'}
+                      'PETAL_LOC': 'petal_loc',
+                      }
 
 # petal-wide keys for storage in meta-data
 other_petal_keys = {'PETAL_ALIGNMENTS': '6 DOF transformation parameters from "PTL" local coordinates to "OBS" a.k.a. "CS5" a.k.a. "FP" global coordinates'}
@@ -103,20 +105,24 @@ keepout_T_note = f'central body (theta) polygon {flat_note}'
 keepout_P_note = f'eccentric body (phi) keepout polygon {flat_note}'
 general_collider_keys = {'timestep': '[sec] quantization when sweeping polygons through rotation schedules, to check for collisions',
                          'Eo_phi': '[deg] poslocP angle (poslocP = POS_P + OFFSET_P) above which phi is defined to be within envelope "Eo" (i.e. retracted)',
-                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle',
-                         'general_keepout_T': f'basic {keepout_T_note}',
-                         'general_keepout_P': f'basic {keepout_P_note}',
-                         'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
-                         'keepout_GFA': f'GFA boundary keepout polygon {flat_note}', 
+                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle', 
                          }
-pos_collider_keys = {'KEEPOUT_T': keepout_T_note,
-                     'KEEPOUT_P': keepout_P_note,
-                     'POS_NEIGHBORS': 'neighboring positioners',
-                     'FIXED_NEIGHBORS': 'neighboring fixed boundaries'}
-pos_collider_attr_map = {'KEEPOUT_T': 'keepouts_T',
+collider_general_poly_keys = {'general_keepout_T': f'basic {keepout_T_note}',
+                              'general_keepout_P': f'basic {keepout_P_note}',
+                              'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
+                              'keepout_GFA': f'GFA boundary keepout polygon {flat_note}',
+                              }
+collider_query_keys = {'POS_NEIGHBORS': 'neighboring positioners',
+                       'FIXED_NEIGHBORS': 'neighboring fixed boundaries',
+                       }
+collider_pos_poly_keys = {'KEEPOUT_T': keepout_T_note,
+                         'KEEPOUT_P': keepout_P_note,
+                         }
+collider_pos_attr_map = {'KEEPOUT_T': 'keepouts_T',
                          'KEEPOUT_P': 'keepouts_P',
                          'POS_NEIGHBORS': 'pos_neighbors',
-                         'FIXED_NEIGHBORS': 'fixed_neighbor_cases'}
+                         'FIXED_NEIGHBORS': 'fixed_neighbor_cases',
+                         }
 
 # dependently-calculated fields
 offset_variants = {'PTL': 'ptlXY', 'CS5': 'obsXY'}
@@ -128,7 +134,8 @@ range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'mi
 all_pos_keys = {}
 all_pos_keys.update(pos_petal_keys)
 all_pos_keys.update(query_keys)
-all_pos_keys.update(pos_collider_keys)
+all_pos_keys.update(collider_query_keys)
+all_pos_keys.update(collider_pos_poly_keys)
 all_pos_keys.update(offset_variant_keys)
 all_pos_keys.update(range_keys)
 angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
@@ -246,20 +253,35 @@ try:
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values
-        for key in set(query_keys) | set(pos_collider_keys):
+        for key in set(query_keys) | set(collider_query_keys):
             if key in query_keys:
                 query_key = query_keys_map[key] if key in query_keys_map else key
                 this_dict = ptl.quick_query(key=query_key, mode='iterable')
             else:
-                attr_key = pos_collider_attr_map[key]
+                attr_key = collider_pos_attr_map[key]
                 this_dict = getattr_collider(ptl, attr_key)
                 if 'fixed' in attr_key.lower():
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
-                sample = this_dict[posids_ordered[0]]
-                if isinstance(sample, poscollider.PosPoly):
-                    this_dict = {posid: str(poly.points) for posid, poly in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
+
+        # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
+        # any petal. Here, I simply use the last ptl instance from the for loop above.
+        meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
+        for key in general_collider_keys:
+            meta[key] = getattr_collider(ptl, key)
+            
+        # polygons from collider
+        polys = ptl._get_collider_polygons()
+        collider_pos_attr_map_inverted = {v:k for k,v in collider_pos_attr_map.items()}
+        for key, val in polys.items():
+            if key in collider_general_poly_keys:
+                meta[key] = str(polys[key])
+            else:
+                data_key = collider_pos_attr_map_inverted[key]
+                this_dict = polys[key]
+                this_list = [str(this_dict[p]) for p in posids_ordered]
+                data[data_key].extend(this_list)
     
         # dependent values
         for posid in posids_ordered:
@@ -285,13 +307,7 @@ try:
             data[key].extend([value] * len(posids_ordered))
         meta['PETAL_ALIGNMENTS'][petal_id] = ptl.trans.petal_alignment
             
-    # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
-    # any petal. Here, I simply use the last ptl instance from the for loop above.
-    meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
-    for key in general_collider_keys:
-        meta[key] = getattr_collider(ptl, key)
-        if isinstance(meta[key], poscollider.PosPoly):
-            meta[key] = str(meta[key].points)
+
         
     logger.info('All data gathered, generating table format...')
     t = Table(data)
