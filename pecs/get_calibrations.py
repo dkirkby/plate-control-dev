@@ -206,13 +206,16 @@ else:
                           )
         ptls[petal_id] = ptl
         
-def getattr_collider(ptl, attr):
-    '''Wrapper around getattr. Specifically for getting a property from the
-    collider sub-module of petal. When online this is behind the DOS proxy wall
-    and so requires app_get(). Whereas offline it uses normal getattr().'''
+def getattr2(ptl, module_name, attr):
+    '''Wrapper around getattr. Specifically for getting a property from submodules
+    petal. Because when online this is behind the DOS proxy wall and so requires
+    app_get(). Whereas offline it uses normal getattr(). So this function wraps
+    that choice.'''
     if online:
-        return ptl.app_get(f'collider.{attr}')
-    return getattr(ptl.collider, attr)
+        return ptl.app_get(f'{module_name}.{attr}')
+    module = getattr(ptl, module_name)
+    return getattr(module, attr)
+    
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
@@ -260,7 +263,7 @@ try:
                 this_dict = ptl.quick_query(key=query_key, mode='iterable')
             else:
                 attr_key = collider_pos_attr_map[key]
-                this_dict = getattr_collider(ptl, attr_key)
+                this_dict = getattr2(ptl, 'collider', attr_key)
                 if 'fixed' in attr_key.lower():
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
@@ -270,7 +273,7 @@ try:
         # any petal. Here, I simply use the last ptl instance from the for loop above.
         meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
         for key in general_collider_keys:
-            meta[key] = getattr_collider(ptl, key)
+            meta[key] = getattr2(ptl, 'collider', key)
             
         # polygons from collider
         polys = ptl.get_collider_polygons()
@@ -308,7 +311,7 @@ try:
         for key, attr in pos_petal_attr_map.items():
             value = getattr(ptl, attr)
             data[key].extend([value] * len(posids_ordered))
-        meta['PETAL_ALIGNMENTS'][petal_id] = ptl.trans.petal_alignment
+        meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
             
 
         
