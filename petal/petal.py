@@ -1502,12 +1502,13 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
-    def get_posmodel_params(self, posid):
+    def get_posmodel_params(self, posid, as_dict=False):
         '''Returns a formatted string describing the current parameters known to
         the posmodel instance for a given positioner.
         
         INPUTS:
             posid ... string identifying the positioner
+            as_dict ... boolean, returns a dict rather than formatted string (default=False)
         '''
         properties = ['canid', 'busid', 'deviceloc', 'is_enabled', 'expected_current_position',
                       'full_range_posintT', 'full_range_posintP',
@@ -1516,16 +1517,19 @@ class Petal(object):
         def formatter(key, value):
             return f'\n {key:12s} : {value}'
         if posid in self.posmodels:
-            out = f'{posid}:'
+            out = {} if as_dict else f'{posid}:'
             for name in properties:
                 prop = getattr(self.posmodels[posid], name)
+                if as_dict:
+                    out[name] = prop
+                    continue
                 if isinstance(prop, dict):
                     for k, v in prop.items():
                         out += formatter(k,v)
                 else:
                     out += formatter(name, prop)
         else:
-            out = f'No posid {posid} found'
+            out = {} if as_dict else f'No posid {posid} found'
         return out
     
     def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False, sort='POSID'):
