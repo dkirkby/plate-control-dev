@@ -257,7 +257,9 @@ try:
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values
-        for key in set(query_keys) | set(collider_query_keys):
+        keys = set(query_keys) | set(collider_query_keys)
+        logger.info(f' ...collecting calib data for {len(keys)} queryable fields...')
+        for key in keys:
             if key in query_keys:
                 query_key = query_keys_map[key] if key in query_keys_map else key
                 this_dict = ptl.quick_query(key=query_key, mode='iterable')
@@ -268,14 +270,9 @@ try:
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
-
-        # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
-        # any petal. Here, I simply use the last ptl instance from the for loop above.
-        meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
-        for key in general_collider_keys:
-            meta[key] = getattr2(ptl, 'collider', key)
             
         # polygons from collider
+        logger.info(' ...collecting polygon data...')
         polys = ptl.get_collider_polygons()
         collider_pos_attr_map_inverted = {v:k for k,v in collider_pos_attr_map.items()}
         for key, val in polys.items():
@@ -288,6 +285,7 @@ try:
                 data[data_key].extend(this_list)
     
         # dependent values
+        logger.info(' ...collecting calculated values...')
         for posid in posids_ordered:
             flat_offset_xy = tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y'])
             for suffix, coord in offset_variants.items():
@@ -306,6 +304,13 @@ try:
                 rng_key = range_keys_map[key]
                 rng = model_data[rng_key]
                 data[key].append(func(rng))
+        
+        logger.info(' ...collecting petal-wide values...')        
+        # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
+        # any petal. Here, I simply use the last ptl instance from the for loop above.
+        meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
+        for key in general_collider_keys:
+            meta[key] = getattr2(ptl, 'collider', key)
         
         # petal-wide values
         for key, attr in pos_petal_attr_map.items():
