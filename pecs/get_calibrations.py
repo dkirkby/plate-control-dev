@@ -312,9 +312,7 @@ try:
             value = getattr(ptl, attr)
             data[key].extend([value] * len(posids_ordered))
         meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
-            
-
-        
+                    
     logger.info('All data gathered, generating table format...')
     t = Table(data)
     t.meta = meta
