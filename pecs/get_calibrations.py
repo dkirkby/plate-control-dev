@@ -272,7 +272,7 @@ try:
             meta[key] = getattr_collider(ptl, key)
             
         # polygons from collider
-        polys = ptl._get_collider_polygons()
+        polys = ptl.get_collider_polygons()
         collider_pos_attr_map_inverted = {v:k for k,v in collider_pos_attr_map.items()}
         for key, val in polys.items():
             if key in collider_general_poly_keys:

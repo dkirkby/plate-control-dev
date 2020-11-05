@@ -2255,7 +2255,7 @@ class Petal(object):
         self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
         
-    def _get_collider_polygons(self):
+    def get_collider_polygons(self):
         '''Gets the point data for all polygons known to the collider as 2xN
         python lists (i.e. not PosPoly objects, which have trouble pickling their
         way through a DOS proxy interface).
