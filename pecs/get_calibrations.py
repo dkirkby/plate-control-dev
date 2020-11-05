@@ -287,6 +287,7 @@ try:
     
         # dependent values
         logger.info(' ...collecting calculated values...')
+        start = time.perf_counter()
         for posid in posids_ordered:
             flat_offset_xy = tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y'])
             for suffix, coord in offset_variants.items():
@@ -305,6 +306,7 @@ try:
                 rng_key = range_keys_map[key]
                 rng = model_data[rng_key]
                 data[key].append(func(rng))
+        logger.info(' ...calculated in {time.perf_counter() - start} sec')
         
         logger.info(' ...collecting petal-wide values...')        
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for

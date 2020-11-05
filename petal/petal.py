@@ -2288,6 +2288,17 @@ class Petal(object):
                 assert False, f'unrecognized type {type(this)} for key {key}'
         return out
         
+    
+    def postrans2(self, posid, method, *args, **kwarg):
+        '''coordinate_pair is a list or tuple of two components
+        method is the string name of the transform method in PosTransforms
+        some transforms may require more input than just the coordinates
+        '''
+        self.debug('postrans: called postrans method %s, posid %s, args %s, kwargs %s' % (method, posid, args, kwarg))
+        if posid in self.posids:
+            return getattr(self.posmodels[posid].trans, method)(*args, **kwarg)
+        else:
+            return 'Not in petal'
         
 if __name__ == '__main__':
     '''
