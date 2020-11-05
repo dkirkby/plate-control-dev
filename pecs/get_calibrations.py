@@ -129,6 +129,7 @@ offset_variants = {'PTL': 'ptlXY', 'CS5': 'obsXY'}
 offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' for coord in ['OFFSET_X', 'OFFSET_Y'] for var, system in offset_variants.items()}
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'min'] for c in ['T', 'P']}
+range_keys_map = {key: f'targetable_range_posint{key[-1]}' for key in range_keys}
 
 # summarize all keys and units (where applicable)
 all_pos_keys = {}
@@ -285,20 +286,22 @@ try:
     
         # dependent values
         for posid in posids_ordered:
-            model = ptl.posmodels[posid]
             flat_offset_xy = (ptl.collider.x0[posid], ptl.collider.y0[posid])
             for suffix, coord in offset_variants.items():
-                if coord == 'obsXY':   
-                    xy_new = model.trans.flatXY_to_obsXY(flat_offset_xy, cast=True)
-                elif coord == 'ptlXY':
-                    xy_new = model.trans.flatXY_to_ptlXY(flat_offset_xy)
+                kwargs = {'cast': True} if coord in {'obsXY'} else {}
+                if online:
+                    func_name = f'flatXY_to_{coord}'
+                    xy_new = ptl.postrans(posid, func_name, flat_offset_xy, **kwargs)
                 else:
-                    assert2(False, f'unexpected destination coordinates {coord}')
+                    transform_func = ptl.posmodels[posid].trans.construct('flatXY', coord)
+                    xy_new = transform_func(flat_offset_xy, **kwargs)
                 data[f'OFFSET_X_{suffix}'].append(float(xy_new[0]))
                 data[f'OFFSET_Y_{suffix}'].append(float(xy_new[1]))
+            model_data = ptl.get_posmodel_params(posid, as_dict=True) # can't directly pull posmodel instance through doslib proxy
             for key in range_keys:
                 func = max if 'MAX' in key else min
-                rng = model.targetable_range_posintT if 'T' in key else model.targetable_range_posintP
+                rng_key = range_keys_map[key]
+                rng = model_data[rng_key]
                 data[key].append(func(rng))
         
         # petal-wide values
