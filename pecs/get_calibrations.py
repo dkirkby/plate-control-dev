@@ -212,7 +212,8 @@ def getattr2(ptl, module_name, attr):
     app_get(). Whereas offline it uses normal getattr(). So this function wraps
     that choice.'''
     if online:
-        return ptl.app_get(f'{module_name}.{attr}')
+        s = f'{module_name}.{attr}' if module_name else f'{attr}'
+        return ptl.app_get(s)
     module = getattr(ptl, module_name) if module_name else ptl
     return getattr(module, attr)
     
