@@ -306,7 +306,7 @@ try:
                 rng_key = range_keys_map[key]
                 rng = model_data[rng_key]
                 data[key].append(func(rng))
-        logger.info(' ...calculated in {time.perf_counter() - start} sec')
+        logger.info(f' ...calculated in {time.perf_counter() - start} sec')
         
         logger.info(' ...collecting petal-wide values...')        
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
