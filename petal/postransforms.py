@@ -2,6 +2,7 @@ import sys
 import math
 import posconstants as pc
 import petaltransforms
+import xy2tp
 
 class PosTransforms(petaltransforms.PetalTransforms):
     """This class provides transformations between positioner coordinate systems.
@@ -93,6 +94,8 @@ class PosTransforms(petaltransforms.PetalTransforms):
     
     alt_keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X', 'OFFSET_Y']
     alt = {key:pc.nominals[key]['value'] for key in alt_keys}
+    stateless_range_limits = [[-179.999999999, 180.0], [-20.0, 200.0]]
+    exact_range_limits = [[-179.999999999, 180.0], [0.0, 180.0]]
 
     def __init__(self, this_posmodel=None, petal_alignment=None, stateless=False):
         if petal_alignment is None:
@@ -132,36 +135,65 @@ class PosTransforms(petaltransforms.PetalTransforms):
                             backlash clearance zones near the hardstops
             'exact':        means theta range of [-179.999999999,180] and phi
                             range of [0,180]
+        For debugging purposes, once can alternatively argue specific numeric
+        values of the form [[minT, maxT], [minP,maxP]]
         """
+        if isinstance(range_limits, (list, tuple)):
+            return range_limits
         if self.stateless:
-            return [[-179.999999999, 180.0], [-20.0, 200.0]]
-        elif range_limits == 'exact':
-            return [[-179.999999999, 180.0], [0.0, 180.0]]
-        elif range_limits == 'full':
-            return [self.posmodel.full_range_T, self.posmodel.full_range_P]
-        elif range_limits == 'targetable':
-            return [self.posmodel.targetable_range_T, self.posmodel.targetable_range_P]
-        else:
-            print(f'bad range_limits argument: {range_limits}')
+            return self.stateless_range_limits
+        if range_limits == 'full':
+            return [self.posmodel.full_range_posintT, self.posmodel.full_range_posintP]
+        if range_limits == 'targetable':
+            return [self.posmodel.targetable_range_posintT, self.posmodel.targetable_range_posintP]
+        if range_limits == 'exact':
+            return self.exact_range_limits
+        print(f'bad range_limits argument: {range_limits}')
+        return None
+        
+    def construct(self, coord_in, coord_out):
+        '''Utility to construct a transform function using strings describing
+        the coordinates in and out.'''
+        try:
+            for coord in [coord_in, coord_out]:
+                assert coord in {'posintTP', 'poslocTP', 'poslocXY', 'flatXY', 'obsXY', 'QS', 'ptlXY'}
+            assert coord_in != coord_out
+            func_name = f'{coord_in}_to_{coord_out}'
+            assert hasattr(self, func_name)
+            handle = eval(f'self.{func_name}')
+            return handle
+        except:
             return None
 
     # LOWEST LEVEL CALIBRATED XY <--> TP CONVERSIONS
     # These two methods grab calibration values and then call the fundametnal
-    # xy2tp() and tp2xy() static methods.
+    # xy2tp() and tp2xy() methods.
     def poslocTP_to_poslocXY(self, poslocTP):
         ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return PosTransforms.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
+        return xy2tp.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
 
-    def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
-        ''' input is list or tuple or 1D array '''
+    def poslocXY_to_poslocTP(self, poslocXY, range_limits='full',
+                             t_guess=None, t_guess_tol=pc.default_t_guess_tol):
+        '''Converts a poslocXY coordinate pair to poslocTP.
+        
+        INPUTS:  poslocXY ... 1x2 list or tuple or array
+                 range_limits ... see definitions in shaft_ranges()
+                 t_guess ... optional theta guess, in poslocTP system
+                 t_guess_tol ... optional tol value on theta guess
+        
+        OUTPUTS: (poslocTP, unreachable)
+                   
+        Regarding behavior of t_guess and t_guess_tol, as well as meaning of the
+        "unreachable" output boolean, see detailed comments in the xy2tp module.
+        '''
         posintT_range, posintP_range = self.shaft_ranges(range_limits)
         poslocTP_min = self.posintTP_to_poslocTP([posintT_range[0], posintP_range[0]])
         poslocTP_max = self.posintTP_to_poslocTP([posintT_range[1], posintP_range[1]])
         posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
                          [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return PosTransforms.xy2tp(poslocXY, r, posloc_ranges)
+        return xy2tp.xy2tp(poslocXY, r, posloc_ranges, t_guess, t_guess_tol)
 
     # OFFSET TRANSFORMATIONS
     def posintTP_to_poslocTP(self, posintTP):
@@ -204,13 +236,16 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocTP = self.posintTP_to_poslocTP(posintTP)
         return self.poslocTP_to_poslocXY(poslocTP)  # (poslocX, poslocY)
 
-    def poslocXY_to_posintTP(self, poslocXY, range_limits='full'):
+    def poslocXY_to_posintTP(self, poslocXY, range_limits='full',
+                             t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         ''' Composite transformation, performs poslocXY --> poslocTP --> posintTP.
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
-        poslocTP, unreachable = self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits)
+        poslocTP, unreachable = self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits,
+                                                          t_guess=t_guess, t_guess_tol=t_guess_tol)
         return self.poslocTP_to_posintTP(poslocTP), unreachable  # (t, p), unr
 
     def obsXY_to_poslocXY(self, obsXY):
@@ -233,14 +268,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocXY = self.posintTP_to_poslocXY(posintTP)  # (poslocX, poslocY)
         return self.poslocXY_to_flatXY(poslocXY)  # return (flatX, flatY)
 
-    def flatXY_to_posintTP(self, flatXY, range_limits='full'):
+    def flatXY_to_posintTP(self, flatXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         """Composite transformation, performs obsXY --> posXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         """
         poslocXY = self.flatXY_to_poslocXY(flatXY)  # (poslocX, poslocY)
-        return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
+        return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
 
     def ptlXY_to_flatXY(self, ptlXY):
         '''Direct transformation from ptlXY to flatXY coordinates.
@@ -269,14 +307,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         flatXY = self.ptlXY_to_flatXY(ptlXY)
         return self.flatXY_to_poslocXY(flatXY)
         
-    def ptlXY_to_posintTP(self, ptlXY, range_limits='full'):
+    def ptlXY_to_posintTP(self, ptlXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         '''Composite transformation, performs ptlXY --> flatXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
         flatXY = self.ptlXY_to_flatXY(ptlXY)
-        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
     
     def poslocXY_to_ptlXY(self, poslocXY):
         ''' input is 2-element list or tuple like [x,y] '''
@@ -294,23 +335,29 @@ class PosTransforms(petaltransforms.PetalTransforms):
         QS = self.flatXY_to_QS(flatXY, cast=True).flatten()  # 1D array
         return tuple(QS)
 
-    def QS_to_posintTP(self, QS, range_limits='full'):
+    def QS_to_posintTP(self, QS, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         '''Composite transformation, performs QS --> flatXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         '''
         flatXY = self.QS_to_flatXY(QS, cast=True).flatten()  # 1D array
-        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits,
+                                       t_guess=t_guess, t_guess_tol=t_guess_tol)
 
-    def obsXY_to_posintTP(self, obsXY, range_limits='full'):
+    def obsXY_to_posintTP(self, obsXY, range_limits='full',
+                       t_guess=None, t_guess_tol=pc.default_t_guess_tol):
         """Composite transformation, performs obsXY --> ptlXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
+        Note: t_guess is *always* defined in the poslocTP coordinate system.
         """
         ptlXY = self.obsXY_to_ptlXY(obsXY)
-        return self.ptlXY_to_posintTP(ptlXY, range_limits=range_limits)
+        return self.ptlXY_to_posintTP(ptlXY, range_limits=range_limits,
+                                      t_guess=t_guess, t_guess_tol=t_guess_tol)
 
     def posintTP_to_obsXY(self, posintTP):
         """Composite transformation, performs posintTP --> ptlXY --> obsXY"""
@@ -465,98 +512,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
             return try_plus
         else:
             return try_minus
-
-    # FUNDAMENTAL CONVERSIONS BETWEEN MOTOR SHAFT ANGLES AND CARTESIAN SPACE
-    # I.E. TP --> XY AND XY --> TP
-    @staticmethod
-    def tp2xy(tp, r):
-        """Converts TP angles into XY cartesian coordinates, where arm lengths
-        associated with angles theta and phi are respectively r[1] and r[2].
-        INPUTS:  tp ... [theta,phi], unit degrees
-                  r ... [central arm length, eccentric arm length]
-        OUTPUT:  xy ... [x,y]
-        """
-        t = math.radians(tp[0])
-        t_plus_p = t + math.radians(tp[1])
-        x = r[0] * math.cos(t) + r[1] * math.cos(t_plus_p)
-        y = r[0] * math.sin(t) + r[1] * math.sin(t_plus_p)
-        return x, y
-
-    @staticmethod
-    def xy2tp(xy, r, ranges):
-        """Converts XY cartesian coordinates into TP angles, where arm lengths
-         associated with angles theta and phi are respectively r[1] and r[2].
-
-        INPUTS:   xy ... [x,y]
-                   r ... [central arm length, eccentric arm length]
-              ranges ... [[min(theta), max(theta)], [min(phi), max(phi)]]
-
-        OUTPUTS:  tp ... [theta,phi], unit degrees
-         unreachable ... boolean, True if the requested xy cannot be reached
-                         by any tp
-
-        In cases where unreachable == True, the returned tp value will be a
-        closest possible approach to the unreachable point requested at xy.
-        """
-        theta_centralizing_err_tol = 1e-4 # within this much xy error allowance, adjust theta toward center of its range
-        n_theta_centralizing_iters = 3 # number of points to try when attempting to centralize theta
-        numeric_contraction = sys.float_info.epsilon*10 # slight contraction to avoid numeric divide-by-zero type of errors
-        x, y, r1, r2 = xy[0], xy[1], r[0], r[1]
-        unreachable = False
-        
-        # adjust targets within reachable annulus
-        hypot = (x**2.0 + y**2.0)**0.5
-        angle = math.atan2(y, x)
-        outer = r[0] + r[1]
-        inner = abs(r[0] - r[1])
-        if hypot > outer or hypot < inner:
-            unreachable = True
-        inner += numeric_contraction
-        outer -= numeric_contraction
-        HYPOT = hypot
-        if hypot >= outer:
-            HYPOT = outer
-        elif hypot <= inner:
-            HYPOT = inner
-        X = HYPOT*math.cos(angle)
-        Y = HYPOT*math.sin(angle)
-        
-        # transform from cartesian XY to angles TP
-        arccos_arg = (X**2.0 + Y**2.0 - (r1**2.0 + r2**2.0)) / (2.0 * r1 * r2)
-        arccos_arg = max(arccos_arg, -1.0) # deal with slight numeric errors where arccos_arg comes back like -1.0000000000000002
-        arccos_arg = min(arccos_arg, +1.0) # deal with slight numeric errors where arccos_arg comes back like +1.0000000000000002
-        P = math.acos(arccos_arg)
-        T = angle - math.atan2(r2*math.sin(P), r1 + r2*math.cos(P))
-        TP = [math.degrees(T), math.degrees(P)]
-        
-        # wrap angles into travel ranges
-        for i in [0, 1]:
-            range_min, range_max = min(ranges[i]), max(ranges[i])
-            if TP[i] < range_min: # try +360 phase wrap
-                TP[i] += math.floor((range_max - TP[i])/360.0)*360.0 
-                if TP[i] < range_min:
-                    TP[i] = range_min
-                    unreachable = True
-            elif TP[i] > range_max: # try -360 phase wrap
-                TP[i] -= math.floor((TP[i] - range_min)/360.0)*360.0
-                if TP[i] > range_max:
-                    TP[i] = range_max
-                    unreachable = True
-                    
-        # centralize theta
-        T_ctr = (ranges[0][0] + ranges[0][1])/2.0
-        T_options = pc.linspace(TP[0], T_ctr, n_theta_centralizing_iters)
-        for T_try in T_options:
-            xy_try = PosTransforms.tp2xy([T_try, TP[1]], r)
-            x_err = xy_try[0] - X
-            y_err = xy_try[1] - Y
-            vector_err = (x_err**2.0 + y_err**2.0)**0.5
-            if vector_err <= theta_centralizing_err_tol:
-                TP[0] = T_try
-                break
-            
-        return tuple(TP), unreachable
-
 
 if __name__ == '__main__':
     '''

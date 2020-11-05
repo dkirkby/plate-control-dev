@@ -1,14 +1,9 @@
+# see SiteLite product for other relevant environment setups
 setupOptional(DOSlib)
 setupOptional(fp_settings)
 #setupOptional(PositionerIndexTable --keep)
 setupOptional(PosMoveDB)
 envSet(PETAL_PATH, ${PRODUCT_DIR}/petal)
-#Below now in SiteLite product
-#envSet(POSITIONER_LOGS_PATH, /home/msdos/logs/petal)
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petal)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petalbox)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/posfidfvc)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/xytest)
-
-
+pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/pecs)

@@ -24,7 +24,7 @@ for posid, row in seed.posinfo.iterrows():
     update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     updates.append(update)
-seed.ptlm.commit(mode='calib', log_note='seed_armlengths')
+seed.ptlm.commit(mode='calib', calib_note='seed_armlengths')
 updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
 path = os.path.join(pc.dirs['calib_logs'],
                     f'{pc.filename_timestamp_str()}-seed_armlengths.csv')

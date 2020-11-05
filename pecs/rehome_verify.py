@@ -45,8 +45,10 @@ class RehomeVerify(PECS):
             raise Exception('Expected positions of positioners by PetalApp '
                             'are contaminated by fiducials.')
         self.printfunc('Taking FVC exposure to confirm home positions...')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
-                                                              match_radius=50)
+                                                              match_radius=self.match_radius)
+        self.ptlm.clear_exposure_info()
         unmatched = unmatched & (set(self.posids))
         matched = matched & (set(self.posids))
         if len(unmatched) > 0:
@@ -75,10 +77,10 @@ class RehomeVerify(PECS):
         exppos = exppos.join(df_info[cols])
         # overwrite flags with focalplane flags and add status
         flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
-                     flags_dict, orient='index', columns=['FLAG'])
+                     flags_dict, orient='index', columns=['FLAGS'])
                  for flags_dict in self.ptlm.get_pos_flags().values()]
-        exppos['FLAG'] = pd.concat(flags)
-        exppos['STATUS'] = pc.decipher_posflags(exppos['FLAG'])
+        exppos['FLAGS'] = pd.concat(flags)
+        exppos['STATUS'] = pc.decipher_posflags(exppos['FLAGS'])
         tol = 1
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)

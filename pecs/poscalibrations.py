@@ -13,6 +13,7 @@ from pecs import PECS
 from fptestdata import CalibrationData
 from poscalibrationfits import PosCalibrationFits
 from postransforms import PosTransforms
+import xy_targets_generator
 
 
 class PosCalibrations(PECS):
@@ -26,7 +27,7 @@ class PosCalibrations(PECS):
     def __init__(self, mode, n_pts_TP=None, fvc=None, ptlm=None,
                  pcid=None, posids=None, interactive=False):
         # first determine what test we are running, set test params/cfg
-        n_pts_TP_default = {'arc': (6, 6), 'grid': (7, 5)}
+        n_pts_TP_default = {'arc': (12, 12), 'grid': (6, 6)}
         cfg = {'pcids': PECS().pcids, 'anticollision': None,
                'online_fitting': True, 'poslocP': 135, 'mode': mode}
         if mode in ['arc', 'grid']:
@@ -42,7 +43,6 @@ class PosCalibrations(PECS):
         self.data.pcids = self.pcids
         self.exp_setup()  # set up exposure ID and product directory
         self.home_adc()
-        self.set_schedule_stats(enabled=self.schedule_stats)
         self.data.petal_alignments = pd.DataFrame(self.petal_alignments).T
         self.data.petal_alignments.index.name = 'petal_loc'
 
@@ -79,6 +79,8 @@ class PosCalibrations(PECS):
                    f'poslocTP = {poslocTP}, do_move = {do_move}, '
                    f'commit = {commit}')
         rows = []
+        log_note = self.decorate_note(f'{self.data.mode}')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
@@ -87,7 +89,7 @@ class PosCalibrations(PECS):
                                               participating_petals=role)
                 row = {'DEVICE_ID': posid, 'COMMAND': 'posintTP',
                        'X1': posintTP[0], 'X2': posintTP[1],
-                       'LOG_NOTE': f'{self.data.mode}; expid {self.exp.id}'}
+                       'LOG_NOTE': log_note}
                 row.update(self.posinfo.loc[posid].to_dict())
                 rows.append(row)
             req = pd.DataFrame(rows)
@@ -99,6 +101,7 @@ class PosCalibrations(PECS):
             req = req[req['DEVICE_ID'].isin(self.posids)]
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=self.match_radius)
+        self.ptlm.clear_exposure_info()
         used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
         unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
         if len(used_pos) == 0:  # at least got some positioners back, update
@@ -112,12 +115,12 @@ class PosCalibrations(PECS):
             update_mode = 'posTP'
         updates = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=update_mode, auto_update=commit,
-                tp_updates_tol=0, tp_updates_fraction=1)
+                tp_updates_tol=0, tp_updates_fraction=1, log_note=log_note)
         if partial:  # skip the following as this is part of arc/grid cal
             return
         updates = (pd.concat(list(updates.values())).set_index('DEVICE_ID')
                    .sort_index()).rename(
-                columns={'FLAGS': 'FLAG',
+                columns={'FLAG': 'FLAGS',
                          'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
         cols = [f'OLD_{key}' for key in self.keys_collect]
@@ -125,25 +128,27 @@ class PosCalibrations(PECS):
         for df in [used_pos, unused_pos]:
             df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
-                               'FLAGS': 'FLAG'}, inplace=True)
+                               'FLAG': 'FLAGS'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
-        used_pos.drop('FLAG', axis=1, inplace=True)
+        used_pos.drop('FLAGS', axis=1, inplace=True)
         calib_fit = used_pos.join(updates).append(unused_pos, sort=True)
         calib_fit.sort_index(inplace=True)
         # overwrite flags with focalplane flags and add status
         flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
-                     flags_dict, orient='index', columns=['FLAG'])
+                     flags_dict, orient='index', columns=['FLAGS'])
                  for flags_dict in self.ptlm.get_pos_flags().values()]
-        calib_fit['FLAG'] = pd.concat(flags)
-        calib_fit['STATUS'] = pc.decipher_posflags(calib_fit['FLAG'])
+        calib_fit['FLAGS'] = pd.concat(flags)
+        calib_fit['STATUS'] = pc.decipher_posflags(calib_fit['FLAGS'])
         # clean up and record additional entries in updates
         calib_fit['tgt_posintT'] = req.set_index('DEVICE_ID')['X1']
         calib_fit['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']
         for posid, row in calib_fit.iterrows():
             role = self.ptl_role_lookup(posid)
+            exp_poslocTP = self.ptlm.expected_current_position(posid, 'poslocTP', participating_petals=role)
             mea_posintTP, _ = self.ptlm.postrans(
                 posid, 'QS_to_posintTP',
                 row[['mea_Q', 'mea_S']].values.astype(float),
+                t_guess=exp_poslocTP[0],
                 participating_petals=role)
             tgt_flatXY = self.ptlm.postrans(
                 posid, 'posintTP_to_flatXY',
@@ -168,12 +173,13 @@ class PosCalibrations(PECS):
         self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                 self.data.calib_new)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         self.data.generate_data_products()
 
-    def run_arc_calibration(self):
-        '''err columns are interally tracked - measured'''
+    def run_arc_calibration(self, extra_pts_num=24, extra_pts_max_radius=3.3):
+        '''err columns are interally tracked - measured
+        if extra_pts_num==0, it is not performed.
+        '''
         # if interactive:
         #     commit = self._parse_yn(input(
         #                 'Automatically update calibration? (y/n): '))
@@ -190,16 +196,14 @@ class PosCalibrations(PECS):
         for i in range(self.data.n_pts_T):
             dfs = [df[0][i] for df in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('arc calibration theta axis '
-                              'point {i+1} of {self.data.n_pts_T}; '
-                              'expid {self.exp.id}')
+            common_note = self.decorate_note(f'arc calibration theta axis point {i+1} of {self.data.n_pts_T}')
+            df['LOG_NOTE'] = common_note
             req_list_T.append(df)
         for j in range(self.data.n_pts_P):
             dfs = [df[1][j] for df in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('arc calibration phi axis '
-                              'point {i+1} of {self.data.n_pts_T}; '
-                              'expid {self.exp.id}')
+            common_note = self.decorate_note(f'arc calibration phi axis point {j+1} of {self.data.n_pts_P}')
+            df['LOG_NOTE'] = common_note
             req_list_P.append(df)
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
@@ -225,9 +229,9 @@ class PosCalibrations(PECS):
             names=['axis', 'target_no', 'DEVICE_ID'])
         self.data.data_arc.to_pickle(
             os.path.join(self.data.dir, 'data_arc.pkl.gz'), compression='gzip')
-        self.run_extra_points()
+        if extra_pts_num:
+            self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
@@ -245,7 +249,9 @@ class PosCalibrations(PECS):
             print(e)
             self.data.dump_as_one_pickle()
 
-    def run_grid_calibration(self):
+    def run_grid_calibration(self, extra_pts_num=24, extra_pts_max_radius=3.3):
+        '''if extra_pts_num==0, it is not performed.
+        '''
         self.data.calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
@@ -256,8 +262,8 @@ class PosCalibrations(PECS):
         for i in range(npts):
             dfs = [dfs[i] for dfs in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('grid calibration point {i+1} of {npts}; '
-                              'expid {self.exp.id}')
+            common_note = self.decorate_note(f'grid calibration point {i+1} of {npts}')
+            df['LOG_NOTE'] = common_note
             req_list.append(df)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
@@ -270,9 +276,9 @@ class PosCalibrations(PECS):
                                         names=['target_no', 'DEVICE_ID'])
         self.data.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
-        self.run_extra_points()
+        if extra_pts_num:
+            self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
@@ -295,34 +301,7 @@ class PosCalibrations(PECS):
         return {self._role2pcid(role): alignment
                 for role, alignment in self.ptlm.alignment.items()}
 
-    def move_measure(self, request, match_radius=50):
-        '''
-        Wrapper for often repeated moving and measuring sequence.
-        Returns data merged with request
-        '''
-        self.logger.info('Moving positioners...')
-        self.ptlm.prepare_move(request, anticollision=None)
-        self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
-        _, meapos, matched, _ = self.fvc_measure(
-            exppos=None, matched_only=True, match_radius=match_radius)
-        # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        merged = matched_df.merge(request, how='outer',
-                                  left_index=True, right_index=True)
-        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
-                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
-                      inplace=True)
-        mask = merged['FLAG'].notnull()
-        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
-            merged.loc[mask, 'FLAG'])
-        # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
-                                          participating_petals=self.ptl_roles)
-                  .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
-        return merged.join(exppos)
-
-    def run_extra_points(self, max_radius=3.3, grid_width=5):
+    def run_extra_points(self, max_radius=3.0, n_points=24):
         '''This function will move to and measure a grid of points, without
         any special calibration analysis performed. The purpose is to have an
         independent measurement of internally-tracked (t,p) vs measured (x,y),
@@ -333,21 +312,18 @@ class PosCalibrations(PECS):
             max_radius ... target points shall be no further out than this
                            from nominal device center
             
-            grid_width ... points will lie on a square grid of size
-                           grid_width x grid_width
+            n_points   ... grid will be spaced to include this many points
+                           (in some cases a slightly)
         '''
-        self.logger.info('Performing one-point posintTP update before taking '
-                         'extra points for calibration verification...')
-        self.run_1p_calibration(tp_target=None, commit=True, partial=True)
-        max_x = max_radius / np.sqrt(2)
-        x = np.linspace(-max_x, max_x, grid_width)
-        y = x.copy()
-        xg, yg = np.meshgrid(x, y)
+        tgt_xy = xy_targets_generator.filled_circle(n_points=n_points, radius=max_radius)
+        self.logger.info(f'Starting run_extra_points(), with n_points={len(tgt_xy)} and max_radius={max_radius}')
         trans = PosTransforms(stateless=True)
         targets = []
-        for poslocXY in zip(xg.flatten(), yg.flatten()):
-            posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY)
-            assert not unreachable, (f'Unreachable: poslocXY = {poslocXY}', f'posintTP = {posintTP}')
+        t_guess = None  # thus phi targets will always be selected within [0,180]
+        for poslocXY in tgt_xy:
+            posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY, t_guess=t_guess)
+            # Ignore "unreachable" here, since really we're just interested in
+            # making a set of (theta, phi).
             targets.append(posintTP)
         req_temp = self.posinfo[['PETAL_LOC', 'DEVICE_LOC']].copy()
         req_temp['COMMAND'] = 'posintTP'
@@ -355,8 +331,8 @@ class PosCalibrations(PECS):
         def gen_req(i):
             req = req_temp.copy()
             req['X1'], req['X2'] = targets[i][0], targets[i][1]
-            req['LOG_NOTE'] = (f'extra point {i+1} of {len(targets)} for '
-                               f'{self.data.mode}; expid {self.exp.id}')
+            common_note = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
+            req['LOG_NOTE'] = common_note
             return req
 
         requests = [gen_req(i) for i in range(len(targets))]
@@ -370,7 +346,6 @@ class PosCalibrations(PECS):
                                          names=['target_no', 'DEVICE_ID'])
         self.data.data_extra.to_pickle(os.path.join(
             self.data.dir, 'data_extra.pkl.gz'), compression='gzip')
-
 
 if __name__ == '__main__':
     expids = [37927, 37928, 37930, 37933]  # arcs

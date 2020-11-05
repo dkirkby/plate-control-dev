@@ -11,7 +11,7 @@ from poscalibrations import PosCalibrations
 import pandas as pd
 idx = pd.IndexSlice
 test = PosCalibrations('1p_posintTP', interactive=True)
-test.run_1p_calibration(commit=False, interactive=True)
+test.run_1p_calibration(commit=True, interactive=True)
 if hasattr(test.data, 'calibdf'):
     print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
         'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P']]])

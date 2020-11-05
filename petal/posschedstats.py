@@ -25,7 +25,7 @@ class PosSchedStats(object):
         self.disable() # called here in all cases, to ensure consistent initialization of state
         if enabled:
             self.enable()
-        self.clear_cache_after_save_by_append = True
+        self.clear_cache_after_save = True
         self.filename_suffix = ''
     
     def is_enabled(self):
@@ -89,6 +89,7 @@ class PosSchedStats(object):
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
                         }
+        self.avoidances = {}
         self._latest_saved_row = None
         dummy_id = pc.timestamp_str() + ' (' + _unregistered_schedule_str + ')'
         self.register_new_schedule(schedule_id=dummy_id, num_pos=num_pos)
@@ -111,6 +112,7 @@ class PosSchedStats(object):
             val = None if key == final_checks_str else 0
             self.numbers[key].append(val)
         self.numbers['n pos'][-1] = num_pos
+        self.avoidances[self.latest] = {}
 
     def set_num_move_tables(self, n):
         """Record number of move tables in the current schedule."""
@@ -123,15 +125,61 @@ class PosSchedStats(object):
         these_collisions = self.collisions[self.latest]
         these_collisions['found'] = these_collisions['found'].union(collision_pair_ids)
         
-    def add_collisions_resolved(self, method, collision_pair_ids):
+    def add_collisions_resolved(self, posid, method, collision_pair_ids):
         """Add collisions that have been resolved in the current schedule.
+            posid ... string, the positioner that was adjusted
             method ... string, collision resolution method
             collision_pair_ids ... set of collision_pair_ids resolved by method
         """
-        this_dict = self.collisions[self.latest]['resolved']
+        latest = self.latest
+        this_dict = self.collisions[latest]['resolved']
         if method not in this_dict:
             this_dict[method] = set()
         this_dict[method] = this_dict[method].union(collision_pair_ids)
+        for pair in collision_pair_ids:
+            split = set(pair.split('-'))
+            assert posid in split, f'posschedstats: {posid} not found in collision pair {pair}!'
+            other = (split - {posid}).pop()
+            if posid not in self.avoidances[latest]:
+                self.avoidances[latest][posid] = []
+            self.avoidances[latest][posid] += [f'{method}/{other}']
+        
+    def get_collisions_resolved_by(self, method='freeze'):
+        '''Returns set of all collisions resolved by method in the latest
+        schedule.'''
+        this_dict = self.collisions[self.latest]['resolved']
+        if method in this_dict:
+            return this_dict[method].copy()
+        return {}
+    
+    def get_avoidances(self, posid):
+        '''Returns collection of all collision avoidances for that positioner
+        in the latest schedule. Will be empty if none found.'''
+        latest = self.latest
+        out = []
+        if posid in self.avoidances[latest]:
+            out = self.avoidances[latest][posid]
+        return out
+    
+    @property
+    def total_unresolved(self):
+        '''Returns count of how many collisions were recorded as unresolved after
+        final collision check. For the latest schedule_id.
+        '''
+        value = self.numbers[final_checks_str][-1]
+        if value == None:
+            return 0
+        return value
+    
+    @property
+    def total_resolved(self):
+        '''Returns count of how many collisions were recorded as resolved.
+        '''
+        this_dict = self.collisions[self.latest]['resolved']
+        count = 0
+        for collision_pairs in this_dict.values():
+            count += len(collision_pairs)
+        return count
         
     def add_request(self):
         """Increment requests count."""
@@ -163,14 +211,18 @@ class PosSchedStats(object):
         """Set scheduling method (a string) for the current schedule."""
         self.strings['method'][-1] = str(method)
     
-    def add_note(self, note, separator='; '):
+    def add_note(self, note):
         """Add a note string for the current schedule. If one already exists,
-        then the argued note will be appended to it, separated by the arg
-        separator."""
-        if not self.strings['note'][-1] or self.strings['note'][-1] == _blank_str:
-            self.strings['note'][-1] = str(note)
+        then the argued note will be appended to it, with a standard separator.
+        """
+        if not note:
+            return
+        old = self.strings['note'][-1]
+        if old == _blank_str:
+            new = note
         else:
-            self.strings['note'][-1] += str(separator) + str(note)
+            new = pc.join_notes(old, note)
+        self.strings['note'][-1] = new
         
     def set_max_table_time(self, time):
         """Set the maximum move table time in the current schedule."""
@@ -322,19 +374,19 @@ class PosSchedStats(object):
         else:
             return 0
 
-    def generate_table(self, append_footers=False):
+    def generate_table(self, footers=False):
         """Returns a pandas dataframe representing a complete report table of
         the current stats.
         
-        If the argument append_footers=True, then a number of extra rows will
-        be added to the bottom of the returned table. These extra rows will
+        If the argument footers=True, then a number of rows will be returned
+        instead, which match up to the normal table. These special rows will
         give max, min, mean, rms, and median for each data column, collated by
-        anticollision  method (e.g. 'adjust' vs 'freeze'). That's no new
+        anticollision method (e.g. 'adjust' vs 'freeze'). That's no new
         information --- just a convenience when for example evaluating sims of
         hundreds of targets in a row.
         """
         data, nrows = self.summarize_all()
-        if append_footers:
+        if footers:
             blank_row = {'method':''}
             rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
             unique_methods = sorted(set(data['method']) - {_blank_str})
@@ -363,10 +415,11 @@ class PosSchedStats(object):
         file = io.StringIO(newline='\n')
         writer = csv.DictWriter(file, fieldnames=data.keys())
         writer.writeheader()
-        for i in range(nrows):
-            row = {key: val[i] for key, val in data.items()}
-            writer.writerow(row)
-        if append_footers:
+        if not footers:
+            for i in range(nrows):
+                row = {key: val[i] for key, val in data.items()}
+                writer.writerow(row)
+        else:
             for category in categories:
                 writer.writerow(blank_row)
                 for calc in calcs:
@@ -374,26 +427,49 @@ class PosSchedStats(object):
         file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None, mode='w'):
-        """Saves stats results to disk.
+    def save(self, path=None, footers=False):
+        """Saves stats results to disk. If no path was specified, the return
+        value is the path that was generated. If path is specified, it should
+        have '.csv' file extension. Repeated calls to save() with the same path
+        will generally append rows to that csv file.
+        
+        Boolean argument "footers" instead appends some extra summary statistics
+        to the bottom of the output table. These are helpful for  debugging ---
+        saves time processing the table --- but may look weird if you are going
+        to keep appending new results after them. In other words, this option is
+        best applied only when you know you're about to stop appending new data
+        to the file at the current path. N.B. Footers will only really work
+        right if the clear_cache_after_save property is set to False at the
+        beginning of the statistics collection. (Otherwise, the data in memory
+        will be flushed after every save to disk.)
         """
-        if path is None:
+        dir_name = os.path.dirname(str(path))
+        dir_exists = os.path.isdir(dir_name)
+        if not dir_exists:
+            parent_dir = os.path.dirname(dir_name)
+            parent_dir_exists = os.path.isdir(parent_dir)
+            if parent_dir_exists:
+                os.mkdir(dir_name)
+                dir_exists = os.path.isdir(dir_name)
+        if path is None or not dir_exists:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
-        include_headers = True if mode == 'w' or not os.path.exists(path) else False
-        include_footers = False if mode == 'a' else True
-        pd = self.generate_table(append_footers=include_footers)
-        if mode == 'a':
+        include_headers = os.path.exists(path) == False
+        frame = self.generate_table(footers=footers)
+        if footers:
+            save_frame = frame
+        else:
             start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
-            n_rows_to_save = len(pd) - start_row
-            self._latest_saved_row = len(pd) - 1 # placed intentionally before the tail operation
-            pd = pd.tail(n_rows_to_save)
-        pd.to_csv(path, mode=mode, header=include_headers, index=False)
-        if mode == 'a' and self.clear_cache_after_save_by_append:
+            n_rows_to_save = len(frame) - start_row
+            save_frame = frame.tail(n_rows_to_save)
+            self._latest_saved_row = len(frame) - 1
+        save_frame.to_csv(path, mode='a', header=include_headers, index=False)
+        if self.clear_cache_after_save:
             self._init_data_structures()
-
+        return path
+    
     @staticmethod
     def found_but_not_resolved(found, resolved):
         """Searches through the dictionary of resolved collision pairs, and

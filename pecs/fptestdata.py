@@ -127,7 +127,6 @@ class FPTestData:
         self._init_loggers()
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
-        self.schedstats = {}
 
     def set_dirs(self, expid):  # does not need to know about expid
         self.filename = (
@@ -378,7 +377,7 @@ class FPTestData:
                 continue  # skip a df if it doesn't exist
             getattr(self, attr).to_pickle(
                 os.path.join(self.dir, f'{attr}.pkl.gz'), compression='gzip')
-            # getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
+            getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
             self.print(f'Positioner {attr} written to: {self.dir}')
         for pcid in self.pcids:
             self.log_paths[pcid] = os.path.join(self.dirs[pcid],
@@ -386,9 +385,6 @@ class FPTestData:
             with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            if pcid in self.schedstats:
-                self.schedstats[pcid].to_csv(os.path.join(
-                    self.dirs[pcid], 'schedstats.csv'))
             self.print(f'PC{pcid:02} data written to: '
                        f'{self.dirs[pcid]}', pcid=pcid)
 
@@ -535,7 +531,7 @@ class XYTestData(FPTestData):
         row = self.posdf.loc[posid]  # row containing calibration values
         offX, offY = 0, 0
         pcid, r1, r2, posintT = row[
-            ['PCID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_T']]
+            ['PCID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_posintT']]
         rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[pcid],
@@ -715,11 +711,7 @@ class XYTestData(FPTestData):
 
     def plot_error_heatmaps(self, pcid, outliers=None):
         # load nominal theta centres for plotting in local ptlXYZ
-        path = os.path.join(
-            os.getenv('PLATE_CONTROL_DIR',
-                      '/software/products/plate_control-trunk'),
-            'petal', 'positioner_locations_0530v14.csv')
-        ptlXYZ_df = pd.read_csv(path,
+        ptlXYZ_df = pd.read_csv(pc.positioner_locations_file,
                                 usecols=['device_location_id', 'X', 'Y', 'Z'],
                                 index_col='device_location_id')
         ptlXYZ_df.index.rename('device_loc', inplace=True)

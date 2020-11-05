@@ -132,7 +132,7 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def ready_for_tables(self, bus_ids=[], can_ids=[]):
+    def ready_for_tables(self, bus_ids=None, can_ids=None):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
 
@@ -144,6 +144,8 @@ class PetalComm(object):
         Returns either True or False (True if all listed can_ids are done executing
         their movements.
         """
+        bus_ids = [] if bus_ids is None else bus_ids
+        can_ids = [] if can_ids is None else can_ids
         try:
             retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
             if type(retcode) != bool:
@@ -154,7 +156,7 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_tables(self, move_tables):
+    def send_tables(self, move_tables, pc_cmd='send_tables_ex'):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
@@ -162,30 +164,23 @@ class PetalComm(object):
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
             
+            pc_cmd ... optional override of the function name to use when sending
+                       to petalcontroller.py. After 2020-06-08 (tag v4.18 and up),
+                       use 'send_tables_ex'. For petalcontroller.py versions prior
+                       to that, use 'send_tables'.
+            
         OUTPUT:
-            tuple ... 1st element: 'SUCCESS' or 'FAILED'
-                      2nd element: set of canids for any failed cases
+            tuple ... 1st element: string with first token being 'SUCCESS' or 'FAILED'
+                  ... 2nd element: dict with keys = busid and values = list of canids,
+                      for any failed cases. The dict will not necessarily contain
+                      entries for all possible busids.
         """
+        valid_cmds = {'send_tables', 'send_tables_ex'}
         try:
-            return self._call_device('send_tables',move_tables)
+            assert pc_cmd in valid_cmds, f'pc_cmd {pc_cmd} invalid'
+            return self._call_device(pc_cmd, move_tables)
         except Exception as e:
             return 'FAILED: Can not send move tables. Exception: %s' % str(e)
-
-    def clear_move_tables(self):
-        '''This function clears existing move tables from all positioners on
-        the petal, so that they will not be executed upon sync signal. The
-        function immediately returns when it has initiated the clearing (which
-        may take some time, during which for example new anticollision
-        schedules can be calculated). Intended usage is that one would
-        subsequently call ready_for_tables() to know when petalcontroller is
-        ready again.
-
-        OUTPUTS:  'INITIATED' or 'FAILED'
-        '''
-        try:
-            return self._call_device('clear_move_tables')
-        except Exception as e:
-            return 'FAILED: Could not initiate clearing of move tables. Exception: %s' % str(e)        
 
     def execute_sync(self, mode):
         """

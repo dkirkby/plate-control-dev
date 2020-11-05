@@ -90,7 +90,7 @@ class XYTest(PECS):
         '''
         keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y',
                 'OFFSET_T', 'OFFSET_P']
-        props = ['targetable_range_T', 'targetable_range_P']
+        props = ['targetable_range_posintT', 'targetable_range_posintP']
         self.data.posids = []
         self.data.posids_pc = {}
         self.data.posids_disabled = set()
@@ -125,7 +125,7 @@ class XYTest(PECS):
             l1['PCID'] = pcid  # add pcid as a column
             l1s[pcid] = l1
         ret1 = self.ptlm.get_pos_vals(keys, self.data.posids)
-        # read posmodel properties, for now just targetable_range_T
+        # read posmodel properties, for now just targetable_range_posintT
         ret2 = self.ptlm.get_posmodel_prop(props, self.data.posids)
         dfs = []
         for pcid in self.data.pcids:
@@ -212,9 +212,10 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        self.set_schedule_stats(enabled=self.schedule_stats)
         self.logger.info(f'Parking {len(self.data.posids)} positioners...')
-        ret = self.ptlm.park_positioners(self.data.posids)
+        ret = self.ptlm.park_positioners(ids=self.data.posids,
+                                         mode='normal', coords='posintTP',
+                                         log_note='moving to xytest starting position')
         ret = pd.concat(list(ret.values()))
         mask = ret['FLAG'] != 4
         ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
@@ -240,8 +241,6 @@ class XYTest(PECS):
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
-        self.logger.info('Disabling positioner schedule stats...')
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
 
     def record_basic_move_data(self, i):
@@ -315,15 +314,15 @@ class XYTest(PECS):
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
         # build move request dataframe for a petal
-        note = (f'xytest: {self.data.test_name}; '  # same for all
-                f'target {i+1} of {self.data.ntargets}; '
-                f'move {n} ({movetype}); expid {self.exp.id}')
+        note = f'xytest: {self.data.test_name}'
+        note = pc.join_notes(note, f'target {i+1} of {self.data.ntargets}')
+        note = pc.join_notes(note, f'move {n} ({movetype})')
         req = pd.DataFrame(
             {'DEVICE_ID': posids,
              'PETAL_LOC': self.posinfo.loc[posids, 'PETAL_LOC'],
              'DEVICE_LOC': self.posinfo.loc[posids, 'DEVICE_LOC'],
              'COMMAND': cmd, 'X1': tgt[:, 0], 'X2': tgt[:, 1],
-             'LOG_NOTE': note})
+             'LOG_NOTE': self.decorate_note(note)})
         self.logger.debug([f'Move requests:', req.to_string()])
         self.logger.info('Calculating move paths...')
         self.ptlm.prepare_move(req, anticollision=self.data.anticollision)

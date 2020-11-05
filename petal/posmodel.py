@@ -16,17 +16,30 @@ class PosModel(object):
             self.state = posstate.PosState()
         else:
             self.state = state
+        self.state.set_posmodel_cache_refresher(self.refresh_cache)
         self.trans = postransforms.PosTransforms(this_posmodel=self, petal_alignment=petal_alignment)
-        self.axis = [None,None]
-        self.axis[pc.T] = Axis(self,pc.T)
-        self.axis[pc.P] = Axis(self,pc.P)
+        self.axis = [None, None]
+        self.axis[pc.T] = Axis(self, pc.T)
+        self.axis[pc.P] = Axis(self, pc.P)
         self._timer_update_rate          = 18e3   # Hz
         self._stepsize_creep             = 0.1    # deg
         self._stepsize_cruise            = 3.3    # deg
         self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
-        self._abs_shaft_speed_cruise_T   = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
-        self._abs_shaft_speed_cruise_P   = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self.refresh_cache()
+        
+    def _load_cached_params(self):
+        '''Do this *after* refreshing the caches in the axis instances.'''
+        self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance))
+        self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
+
+    def refresh_cache(self):
+        """Reloads state parameters with cached values."""
+        for axis in self.axis:
+            axis._load_cached_params()
+        self._load_cached_params()
 
     @property
     def _motor_speed_creep(self):
@@ -62,7 +75,12 @@ class PosModel(object):
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
         return self.state._val['CTRL_ENABLED']
-
+    
+    @property
+    def classified_as_retracted(self):
+        """Returns whether the positioner has been classified as retracted or not."""
+        return self.state._val['CLASSIFIED_AS_RETRACTED']
+    
     @property
     def expected_current_posintTP(self):
         """Returns the internally-tracked expected position of the
@@ -93,14 +111,10 @@ class PosModel(object):
                         curvature is flattened out to an approximate plane
             'ptlXY'     tuple in mm, petal local XY projection of ptlXYZ
             'obsXY'     tuple in mm, dependent, expected global x position
-            'motTP'     tuple in deg, dependent variable, expected position
-                        of theta motor
         """
         posintTP = self.expected_current_posintTP
         QS = self.trans.posintTP_to_QS(posintTP)
         return {'posintTP': posintTP,
-                'motTP': (self.axis[pc.T].shaft_to_motor(posintTP[0]),
-                          self.axis[pc.P].shaft_to_motor(posintTP[1])),
                 'poslocTP': self.trans.posintTP_to_poslocTP(posintTP),
                 'poslocXY': self.trans.posintTP_to_poslocXY(posintTP),
                 'flatXY': self.trans.posintTP_to_flatXY(posintTP),
@@ -117,44 +131,42 @@ class PosModel(object):
         s = ('Q:{:8.3f}{}, S:{:8.3f}{} | '
              'flatX:{:8.3f}{}, flatY:{:8.3f}{} | '
              'obsX:{:8.3f}{}, obsY:{:8.3f}{} | '
-             'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} |'
+             'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} | '
              'poslocX:{:8.3f}{}, poslocY:{:8.3f}{} | '
              'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
-             'posintT:{:8.3f}{}, posintP:{:8.3f}{} | '
-             'motT:{:8.1f}{}, motP:{:8.1f}{}'). \
+             'posintT:{:8.3f}{}, posintP:{:8.3f}{}'). \
             format(pos['QS'][0],       pc.deg, pos['QS'][1],       pc.mm,
                    pos['flatXY'][0],   pc.mm,  pos['flatXY'][1],   pc.mm,
                    pos['obsXY'][0],    pc.mm,  pos['obsXY'][1],    pc.mm,
                    pos['ptlXY'][0],    pc.mm,  pos['ptlXY'][1],    pc.mm,
                    pos['poslocXY'][0], pc.mm,  pos['poslocXY'][1], pc.mm,
                    pos['poslocTP'][0], pc.deg, pos['poslocTP'][1], pc.deg,
-                   pos['posintTP'][0], pc.deg, pos['posintTP'][1], pc.deg,
-                   pos['motTP'][0],    pc.deg, pos['motTP'][1],    pc.deg)
+                   pos['posintTP'][0], pc.deg, pos['posintTP'][1], pc.deg)
         return s
 
     @property
-    def targetable_range_T(self):
+    def targetable_range_posintT(self):
         """Returns a [1x2] array of theta_min, theta_max, after subtracting buffer zones near the hardstops.
         The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_T is not included in these values.
         """
         return self.axis[pc.T].debounced_range
 
     @property
-    def targetable_range_P(self):
+    def targetable_range_posintP(self):
         """Returns a [1x2] array of phi_min, phi_max, after subtracting buffer zones near the hardstops.
         The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_P is not included in these values.
         """
         return self.axis[pc.P].debounced_range
 
     @property
-    def full_range_T(self):
+    def full_range_posintT(self):
         """Returns a [1x2] array of [theta_min, theta_max], from hardstop-to-hardstop.
         The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_T is not included in these values.
         """
         return self.axis[pc.T].full_range
 
     @property
-    def full_range_P(self):
+    def full_range_posintP(self):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop.
         The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_P is not included in these values.
         """
@@ -171,6 +183,16 @@ class PosModel(object):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
         """
         return self._abs_shaft_speed_cruise_P
+    
+    @property
+    def abs_shaft_spinupdown_distance_T(self):
+        '''Acceleration / deceleration distance on theta axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_T
+
+    @property
+    def abs_shaft_spinupdown_distance_P(self):
+        '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_P
 
     def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the
@@ -232,47 +254,30 @@ class PosModel(object):
         """
         if self.state._val['CTRL_ENABLED'] is False:
             return
-        self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
-        self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
+        net_distance = {pc.T: cleanup_table['net_dT'][-1],
+                        pc.P: cleanup_table['net_dP'][-1]}
         for axis in self.axis:
-            exec(axis.postmove_cleanup_cmds)
-            axis.postmove_cleanup_cmds = ''
-        separator = '; '
-        try:
-            self.state.store('MOVE_CMD',  separator.join(cleanup_table['command']))
-            value = []
-            for x in cleanup_table['cmd_val1']:
-                try:
-                    value.append('{0:.6g}'.format(float(x)))
-                except:
-                    pass
-            self.state.store('MOVE_VAL1', separator.join(x for x in value))
-            value = []
-            for x in cleanup_table['cmd_val2']:
-                try:
-                    value.append('{0:.6g}'.format(float(x)))
-                except:
-                    pass
-            self.state.store('MOVE_VAL2', separator.join(x for x in value))
-        except Exception as e:
-            print('postmove_cleanup: %s' % str(e))
-        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T']+ cleanup_table['TOTAL_CRUISE_MOVES_T'])
+            cleanup_cmd = cleanup_table['postmove_cleanup_cmds'][axis.axisid]
+            if '.pos' not in cleanup_cmd:  # some postmove commands (e.g. limit seeks) force axis position to a particular value
+                axis.pos += net_distance[axis.axisid]
+            exec(cleanup_cmd)
+        move_cmds = {}
+        move_cmds['MOVE_CMD'] = [cleanup_table['orig_command']]
+        move_cmds['MOVE_CMD'] += cleanup_table['auto_commands']
+        has_finite_dist = [i for i in range(cleanup_table['nrows']) if cleanup_table['dT'][i] or cleanup_table['dP'][i]]
+        for letter, number in zip(['T', 'P'], ['1', '2']):
+            speeds = cleanup_table[f'speed_mode_{letter}']
+            dists = cleanup_table[f'd{letter}']
+            move_cmds[f'MOVE_VAL{number}'] = [f'{speeds[i]} {dists[i]:.3f}' for i in has_finite_dist]
+        for key, sublist in move_cmds.items():
+            string = pc.join_notes(*sublist)
+            self.state.store(key, string)
+        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T'] + cleanup_table['TOTAL_CRUISE_MOVES_T'])
         self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['TOTAL_CRUISE_MOVES_P'])
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
         self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
-        self.state.append_log_note(cleanup_table['log_note'])
-
-    def clear_postmove_cleanup_cmds_without_executing(self):
-        """Useful for example if a positioner is disabled, and we don't want any false post-move
-        cleanup to be attempted. The reason this function is needed sometimes is due to a corner
-        I backed into, where the postmove_cleanup_cmds need to be stored separate from the cleanup_table.
-        So for example if scheduler denies a move request, then even though there was no move_table
-        generated, it still needs to separately be able to clear out any of these commands that might
-        be lurking.
-        """
-        for axis in self.axis:
-            axis.postmove_cleanup_cmds = ''
+        self.state.store('LOG_NOTE', cleanup_table['log_note'])
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
@@ -281,15 +286,21 @@ class Axis(object):
     def __init__(self, posmodel, axisid):
         self.posmodel = posmodel
         self.axisid = axisid
-        self.postmove_cleanup_cmds = ''
-        self.antibacklash_final_move_dir = self.calc_antibacklash_final_move_dir()
-        self.principle_hardstop_direction = self.calc_principle_hardstop_direction()
-        self.backlash_clearance = self.calc_backlash_clearance()
-        self.hardstop_clearance = self.calc_hardstop_clearance()
-        self.hardstop_clearance_near_full_range = self.calc_hardstop_clearance_near_full_range()
-        self.hardstop_debounce = self.calc_hardstop_debounce()
+        self._load_cached_params()
+        
+    def _load_cached_params(self):
+        # order of operations here matters
+        self.antibacklash_final_move_dir = self._calc_antibacklash_final_move_dir()
+        self.principle_hardstop_direction = self._calc_principle_hardstop_direction()
+        self.backlash_clearance = self._calc_backlash_clearance()
+        self.hardstop_clearance = self._calc_hardstop_clearance()
+        self.hardstop_clearance_near_full_range = self._calc_hardstop_clearance_near_full_range()
+        self.hardstop_debounce = self._calc_hardstop_debounce()
         motor_props = self.motor_calib_properties
         self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio'] / motor_props['gear_calib']
+        self._full_range = self._calc_full_range()
+        self._debounced_range = self._calc_debounced_range()
+        self._near_full_range = self._calc_near_full_range()
 
     @property
     def pos(self):
@@ -302,56 +313,26 @@ class Axis(object):
 
     @pos.setter
     def pos(self, value):
+        full_range = self.full_range
+        if value < min(full_range) or value > max(full_range):
+            print(f'{self.posmodel.posid} axis {self.axisid}: cannot set pos to {value}' +
+                  f' (outside allowed range of {full_range}). Keeping old value {self.pos}')
+            return
         if self.axisid == pc.T:
             self.posmodel.state.store('POS_T', value)
         else:
             self.posmodel.state.store('POS_P', value)
 
     @property
-    def full_range(self):
-        """Calculated from physical range only, with no subtraction of debounce
-        distance.
-        Returns [1x2] array of [min,max]
-        """
-        if self.axisid == pc.T:
-            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_T'])
-            return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
-        else:
-            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
-            return [185.0-r, 185.0]  # split phi range such that 0 is essentially at the minimum
-
-    @property
-    def debounced_range(self):
-        """Calculated from full range, accounting for removal of both the hardstop
-        clearance distances and the backlash removal distance.
-        Returns [1x2] array of [min,max]
-        """
-        f = self.full_range
-        h = self.hardstop_debounce # includes "backlash" and "clearance"
-        return [f[0] + h[0], f[1] + h[1]]
-
-    @property
-    def near_full_range(self):
-        """In-between full_range and debounced_range. This guarantees sufficient
-        backlash clearance, while giving reasonable probability of not contacting
-        the hard stop. Intended use case is to allow a small amount of numerical
-        margin for making tiny cruise move corrections.
-        Returns [1x2] array of [min,max]
-        """
-        f = self.full_range
-        nh = self.hardstop_clearance_near_full_range # does not include "backlash"
-        return [f[0] + nh[0], f[1] + nh[1]]
-
-    @property
     def maxpos(self):
         """Max accessible position, as defined by debounced_range.
         """
-        return self.get_maxpos() # this redirect is for legacy compatibility with external code
+        return self.get_maxpos()  # this redirect is for legacy compatibility with external code
 
     def get_maxpos(self, use_near_full_range=False):
         """Function to return accessible position. By default this is within
-        debounced_range. An option exists to get the min as defined by near_full_range
-        instead.
+        debounced_range. An option exists to get the max as defined by
+        near_full_range instead.
         """
         d = self.near_full_range if use_near_full_range else self.debounced_range
         if self.last_primary_hardstop_dir >= 0:
@@ -360,22 +341,40 @@ class Axis(object):
             return self.get_minpos(use_near_full_range) + (d[1] - d[0])
 
     @property
-    def minpos(self, use_near_full_range=False):
-        """Min accessible position. By default this is within debounced_range.
-        An option exists to get the min as defined by near_full_range instead.
+    def minpos(self):
+        """Min accessible position, as defined by debounced_range.
         """
-        return self.get_minpos()
+        return self.get_minpos()  # this redirect is for legacy compatibility with external code
         
     def get_minpos(self, use_near_full_range=False):
         """Function to return accessible position. By default this is within
-        debounced_range. An option exists to get the min as defined by near_full_range
-        instead.
+        debounced_range. An option exists to get the min as defined by
+        near_full_range instead.
         """
         d = self.near_full_range if use_near_full_range else self.debounced_range
         if self.last_primary_hardstop_dir < 0:
             return min(d)
         else:
             return self.get_maxpos(use_near_full_range) - (d[1] - d[0])
+        
+    @property
+    def full_range(self):
+        '''Returns 1x2 list, [min,max] values for full travel range.'''
+        return self._full_range.copy()
+    
+    @property
+    def debounced_range(self):
+        '''Returns 1x2 list, [min,max] values for debounced travel range.'''
+        return self._debounced_range.copy()
+    
+    @property
+    def near_full_range(self):
+        '''Returns 1x2 list, [min,max] values for a travel range between "full"
+        and "debounced" which allows some small additional margin. In particular
+        this is used for robustness when working with travel distances that have
+        been discretized according to motor steps.
+        '''
+        return self._near_full_range.copy()    
 
     @property
     def last_primary_hardstop_dir(self):
@@ -466,7 +465,39 @@ class Axis(object):
             distance = new_distance
         return distance
 
-    def calc_principle_hardstop_direction(self):
+    def _calc_full_range(self):
+        """Calculated from physical range only, with no subtraction of debounce
+        distance.
+        Returns [1x2] array of [min,max]
+        """
+        if self.axisid == pc.T:
+            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_T'])
+            return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
+        else:
+            r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
+            return [185.0-r, 185.0]  # split phi range such that 0 is essentially at the minimum
+
+    def _calc_debounced_range(self):
+        """Calculated from full range, accounting for removal of both the hardstop
+        clearance distances and the backlash removal distance.
+        Returns [1x2] array of [min,max]
+        """
+        f = self.full_range
+        h = self.hardstop_debounce # includes "backlash" and "clearance"
+        return [f[0] + h[0], f[1] + h[1]]
+
+    def _calc_near_full_range(self):
+        """In-between full_range and debounced_range. This guarantees sufficient
+        backlash clearance, while giving reasonable probability of not contacting
+        the hard stop. Intended use case is to allow a small amount of numerical
+        margin for making tiny cruise move corrections.
+        Returns [1x2] array of [min,max]
+        """
+        f = self.full_range
+        nh = self.hardstop_clearance_near_full_range # does not include "backlash"
+        return [f[0] + nh[0], f[1] + nh[1]]
+
+    def _calc_principle_hardstop_direction(self):
         """The "principle" hardstop is the one which is struck during homing.
         (The "secondary" hardstop is only struck when finding the total available travel range.)
         """
@@ -475,13 +506,13 @@ class Axis(object):
         else:
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
 
-    def calc_antibacklash_final_move_dir(self):
+    def _calc_antibacklash_final_move_dir(self):
         if self.axisid == pc.T:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
         else:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
 
-    def calc_hardstop_debounce(self):
+    def _calc_hardstop_debounce(self):
         """This is the amount to debounce off the hardstop after striking it.
         It is the hardstop clearance distance plus the backlash removal distance.
         Returns [1x2] array of [min,max]
@@ -490,7 +521,7 @@ class Axis(object):
         b = self.backlash_clearance
         return [h[0] + b[0], h[1] + b[1]]
 
-    def calc_hardstop_clearance(self):
+    def _calc_hardstop_clearance(self):
         """Minimum distance to stay clear from hardstop.
         Returns [1x2] array of [clearance_at_min_limit, clearance_at_max_limit].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction
@@ -512,8 +543,8 @@ class Axis(object):
                 return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
                         -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
 
-    def calc_hardstop_clearance_near_full_range(self):
-        """Slightly less clearance than provided by the calc_hardstop_clearance
+    def _calc_hardstop_clearance_near_full_range(self):
+        """Slightly less clearance than provided by the _calc_hardstop_clearance
         function.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction
@@ -522,7 +553,7 @@ class Axis(object):
         h = self.hardstop_clearance
         return [x * pc.near_full_range_reduced_hardstop_clearance_factor for x in h]
 
-    def calc_backlash_clearance(self):
+    def _calc_backlash_clearance(self):
         """Minimum clearance distance required for backlash removal moves.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
         These are DIRECTIONAL quantities (i.e., the sign indicates the direction

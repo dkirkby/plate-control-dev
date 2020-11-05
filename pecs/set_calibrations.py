@@ -1,84 +1,201 @@
+'''Store fiber positioner calibration values to the online database. This is a
+powerful function with risk of major operational errors if used incorrectly.
+Only for focal plane experts, and only to be used with consensus of the focal
+plane team.
+'''
 
-"""
-Created on Mon Feb  3 18:54:30 2020
-
-@author: Duan Yutong (dyt@physics.bu.edu)
-"""
 import os
-from tqdm import tqdm
-import pandas as pd
-import posconstants as pc
-from pecs import PECS
+script_name = os.path.basename(__file__)
 
-# set source calibration file
-path = "/data/focalplane/logs/kpno/20200213/00048406-arc_calibration-ptl2_88_disabled/calibdf.pkl.gz"
-mode = int(input('Choose from the following three modes (enter single digit integer)\n'
-                 '    0: apply to all positioners in the calibration file\n'
-                 '    1: apply to only those specified in posids\n'
-                 '    2: apply to all except those in posids_exclude\n: '))
-# set posids to apply calibrations, leave mpty to apply to all
-posids = ['M01282', 'M02440', 'M02449', 'M02499', 'M03037', 'M03067',
-       'M03151', 'M03416', 'M04606', 'M04717', 'M05612', 'M05836',
-       'M05952', 'M05961', 'M05967', 'M05970', 'M06812', 'M07127',
-       'M07229', 'M05675', 'M06345', 'M02762', 'M04607', 'M05615',
-       'M06278', 'M07129', 'M01383', 'M01476', 'M02284', 'M02367',
-       'M02393', 'M02763', 'M02855', 'M03315', 'M03392', 'M04608',
-       'M04610', 'M04626', 'M05041', 'M05358', 'M05592', 'M05600',
-       'M05605', 'M05622', 'M05623', 'M05662', 'M05678', 'M05801',
-       'M05809', 'M05839', 'M05948', 'M05950', 'M05969', 'M05971',
-       'M06208', 'M06220', 'M06294', 'M06299', 'M06353', 'M06410',
-       'M06418', 'M06503', 'M06695', 'M06697', 'M06699', 'M06714',
-       'M06723', 'M06745', 'M06770', 'M06774', 'M06813', 'M06913',
-       'M06942', 'M07022', 'M07108', 'M07110', 'M07187', 'M07195',
-       'M07216', 'M07263', 'M07264', 'M07267', 'M07270', 'M07287',
-       'M07289', 'M07294', 'M07295', 'M07296']
-posids_exclude = []
-calib = pd.read_pickle(path)['FIT']
-pecs = PECS(interactive=False)
-if mode == 0:
-    posids = calib.index
-elif mode == 1:
-    posids = set(posids) & set(calib.index)
+# input file format
+format_info = 'For data model and procedures to generate these values, see DESI-5732.'
+valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
+              'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
+              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P'}
+fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
+commit_prefix = 'COMMIT_'
+commit_keys = {key: commit_prefix + key for key in valid_keys}
+def dbkey_for_key(key):
+    '''Maps special cases of keys that may have different terminology in input file
+    online database.'''
+    remap = {'SCALE_T': 'GEAR_CALIB_T',
+             'SCALE_P': 'GEAR_CALIB_P',
+             'COMMIT_SCALE_T': 'COMMIT_GEAR_CALIB_T',
+             'COMMIT_SCALE_P': 'COMMIT_GEAR_CALIB_P',
+             }
+    if key in remap:
+        return remap[key]
+    return key
+
+# command line argument parsing
+import argparse
+doc = f'{__doc__} Input CSV file must contain a POS_ID column. Input should'
+doc += f' contain all or any subset of the following parameter columns: {valid_keys}.'
+doc +=  ' For every parameter column there must be a corresponding boolean column'
+doc += f' prefixed with "{commit_prefix}", stating in each row whether that value is'
+doc += f' intended to be saved to the online db. {format_info}'
+parser = argparse.ArgumentParser(description=doc)
+parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file')
+parser.add_argument('-s', '--simulate', action='store_true', help='perform the script "offline" with no storing to memory or database')
+args = parser.parse_args()
+
+# read input data
+from astropy.table import Table
+table = Table.read(args.infile)
+
+# set up a log file
+import simple_logger
+try:
+    import posconstants as pc
+except:
+    import os, sys
+    path_to_petal = '../petal'
+    sys.path.append(os.path.abspath(path_to_petal))
+    print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
+    import posconstants as pc
+    
+# yes, as of 2020-06-17, I'm saving it in two places
+# to be absolutely sure we have a record
+# can cut back to one, once we are confident of logs getting properly saved at KPNO
+log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
+log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
+log_paths = [os.path.join(d, log_name) for d in log_dirs]
+logger = simple_logger.start_logger(log_paths)
+logger.info(f'Running {script_name} to set positioner calibration parameters.')
+logger.info(f'Input file is: {args.infile}')
+logger.info(f'Table contains {len(table)} rows')
+if args.simulate:
+    logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
+assert2 = simple_logger.assert2
+input2 = simple_logger.input2
+
+# validate the table format
+assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
+for key in set(table.columns):  # set op provides a copy
+    remapped_key = dbkey_for_key(key)
+    if key != remapped_key:
+        remap_conflict = key in table.columns and remapped_key in table.columns
+        assert2(not(remap_conflict), f'Columns {key} and {remapped_key} conflict in the input file (two columns with same meaning, so cannot disambiguate)')
+        table.rename_column(key, dbkey_for_key(key))
+        logger.warning(f'For compatibility with online DB, renamed column {key} to {remapped_key}')
+keys = valid_keys & set(table.columns)
+assert2(len(keys) > 0, 'No valid parameter columns found in input table')
+no_commit_key = {key for key in keys if commit_keys[key] not in table.columns}
+assert2(len(no_commit_key) == 0, f'Input table params {no_commit_key} lack {commit_prefix}-prefixed fields. {format_info}')
+logger.info('Checked formatting of input table')
+
+# some basic data validation (type and bounds checking)
+# not a guarantee of quality of parameters
+import numpy as np
+requested_posids = set()
+for key in keys:
+    column = table[key]
+    commit_key = commit_keys[key]
+    commit_column_str = table[commit_key].astype(str).tolist()
+    commit_column_str_bool = []
+    for val in commit_column_str:
+        if val.lower() in {'true', 't', 'yes', 'y', '1'}:
+            commit_column_str_bool.append(True)
+        elif val.lower() in {'false', 'f', 'no', 'n', '0'}:
+            commit_column_str_bool.append(False)
+        else:
+            commit_column_str_bool.append(None)
+    if all(isinstance(val, bool) for val in commit_column_str_bool):
+        table[commit_key] = commit_column_str_bool
+    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
+    assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
+    data_type_ok = column.dtype in [np.int, np.float]
+    assert2(data_type_ok, f'{key} data type must be numeric')
+    commit_requested = table[commit_key]
+    def assert_ok(is_valid_array, err_desc):
+        rng = range(len(table))
+        cannot_commit = [table['POS_ID'][i] for i in rng if not is_valid_array[i] and commit_requested[i]]
+        assert2(not(any(cannot_commit)), f'Input table rejected: {key} contains {err_desc} for posid(s) {cannot_commit}')
+    isfinite = np.isfinite(column)
+    assert_ok(isfinite, 'non-finite value(s)')
+    nom = pc.nominals[key]
+    nom_min = nom['value'] - nom['tol']
+    nom_max = nom['value'] + nom['tol']
+    column[isfinite == False] = np.inf  # dummy value to suppress astropy warnings when performing >= or <= ops below, on values that we don't plan to commit anyway. ok to do here because already checked commit values for finitude above
+    assert_ok(column >= nom_min, f'value(s) below limit {nom_min}')
+    assert_ok(column <= nom_max, f'value(s) above limit {nom_max}')
+    requested_posids |= set(table['POS_ID'][commit_requested])
+logger.info('Checked data types and bounds')
+
+# set up pecs (access to online system)
+try:
+    from pecs import PECS
+    pecs = PECS(interactive=False)
+    logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
+    posids = set(table['POS_ID'])
+    pecs.ptl_setup(pecs.pcids, posids=posids)
+    pecs_on = True
+except:
+    logger.warning('PECS initialization failed')
+    pecs_on = False
+
+# gather some interactive information from the user
+user = ''
+while not user:
+    user = input2('For the log, please enter your NAME or INITIALS:')
+archive_ref = ''
+while not archive_ref:
+    archive_ref = input2('For the log, enter DESI-XXXX DOCUMENT where this input csv table is archived:')
+comment = ''
+while not comment:
+    comment = input2('For the log, enter any additional COMMENT, giving context/rationale for posting these new values:')
+
+# interactive human checks, since it is important to get everything right
+if pecs_on:
+    # Most checks should be done ahead of time with preparation script in desimeter.
+    # Here we would only check about stuff that is known to the online system.
+    # Like maybe validating the posids, etc. Might not be essential to do so here.
+    pass
 else:
-    posids = set(calib.index) - set(posids_exclude)
-pecs.ptl_setup(pecs.pcids, posids=posids)
-print(f'Setting calibration for {len(posids)} positioners using file: {path}')
-keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-            'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
-accepted, rejected = set(), set()
-old, new = [], []
-for posid in tqdm(posids):
-    role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
-    update = {'DEVICE_ID': posid, 'MODE': 'set_calibrations'}
-    update = pecs.ptlm.collect_calib(update, tag='',
-                                     participating_petals=role)[role]
-    old.append(update)
-    ret = {key: pecs.ptlm.set_posfid_val(
-                    posid, key, calib.loc[posid, key],
-                    participating_petals=role)
-                for key in keys_fit}
-    if all(val == True for val in ret.values()):
-        accepted.add(posid)
-    else:
-        print(f'{posid} rejected: {ret}')
-        rejected.add(posid)
-    update = pecs.ptlm.collect_calib(update, tag='',
-                                     participating_petals=role)[role]
-    new.append(update)
-pecs.ptlm.commit(mode='calib',
-                 log_note=f'set_calibrations: {os.path.basename(path)}')
-old = pd.DataFrame(old).set_index('DEVICE_ID').sort_index()
-new = pd.DataFrame(new).set_index('DEVICE_ID').sort_index()
-calibdf = pd.concat([old, calib, new], axis=1,
-                    keys=['OLD', 'FIT', 'NEW'],
-                    names=['label', 'field'], sort=False)
-path = os.path.join(pc.dirs['calib_logs'],
-                    f'{pc.filename_timestamp_str()}-set_calibrations.pkl.gz')
-calibdf.to_pickle(path)
-# preview calibration updates
-print(calibdf['NEW'][['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
-                      'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
-print(f'set_calibrations data saved to: {path}')
-print(f'{len(accepted)} positioners accepted')
-print(f'{len(rejected)} positioneres rejected one or more params:\n'
-      f'{sorted(rejected)}')
+    #logger.warning('Skipping interactive checks, since PECS not initialized')
+    pass
+
+# store the data
+logger.info(f'Storing data to memory (not yet to database) for {len(table)} positioners.')
+any_stored = False
+for row in table:
+    posid = row['POS_ID']
+    if not args.simulate:
+        role = pecs.ptl_role_lookup(posid)
+    stored = {}
+    for key in keys:
+        if row[commit_keys[key]]:
+            value = row[key]
+            if not args.simulate:
+                val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
+            else:
+                val_accepted = True
+            if val_accepted:
+                stored[key] = value
+            else:
+                logger.error(f'set_posfid_val(posid={posid}, key={key}, value={value}')
+    if stored:
+        # [JHS] Would be nice to include analysis metadata fields in the note, drawn
+        # from the input table. Presumably when that table is in ecsv format.
+        note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
+                                 f'input_file {args.infile}', f'archive_ref {archive_ref}',
+                                 f'params {stored}')
+        for key in fit_err_keys:
+            if key in row.columns:
+                note = pc.join_notes(note, f'{key.lower()} {row[key]}')
+            
+        if not args.simulate:
+            pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note)
+        logger.info(f'{posid}: {stored}')
+        any_stored = True
+        
+# commit to online database
+if any_stored:
+    logger.info('Committing the data set to online database.')
+    if not args.simulate:
+        pecs.ptlm.commit(mode='calib', calib_note='')
+    logger.info('Commit complete.')
+else:
+    logger.warning('No data found to commit. Nothing will be changed in the online db.')
+logger.info('Please remember to archive the input CSV file, and the .log file' +
+            ' (generated in the same folder) to docdb.')

@@ -25,7 +25,6 @@ DEVICE_ID, PETAL_LOC, DEVICE_LOC, old and new calibration vals, with
 MODE for updates and old values.
 '''
 import os
-import numpy as np
 import pandas as pd
 import posconstants as pc
 from petaltransforms import PetalTransforms
@@ -34,7 +33,7 @@ from pecs import PECS
 seed = PECS(interactive=True)
 print('Seeding offsets XY...')
 # array of shape (3, 543) in nominal ptlXY
-ptlXYZ = (pd.read_csv(pc.dirs['positioner_locations_file'])
+ptlXYZ = (pd.read_csv(pc.positioner_locations_file)
           [['X', 'Y', 'Z']].values.T)
 pos = PetalTransforms.ptlXYZ_to_flatXY(ptlXYZ)
 updates = []
@@ -50,7 +49,7 @@ for posid, row in seed.posinfo.iterrows():
     update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     updates.append(update)
-seed.ptlm.commit(mode='calib', log_note='seed_offsets_xy')
+seed.ptlm.commit(mode='calib', calib_note='seed_offsets_xy')
 updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
 path = os.path.join(pc.dirs['calib_logs'],
                     f'{pc.filename_timestamp_str()}-seed_offsets_xy.csv')

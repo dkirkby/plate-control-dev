@@ -28,6 +28,8 @@ class PosState(object):
         logging:  boolean whether to enable logging state data to disk
         type:     'pos', 'fid', 'ptl'
         petal_id: '00' to '11', '900' to '909', must be string
+        alt_move_adder: function handle the state can use to add itself to petal's altered_states collection
+        alt_calib_adder: function handle the state can use to add itself to petal's altered_calib_states collection
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -43,10 +45,12 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
-                 logging=False, printfunc=print, defaults=None):  # DOS change
+                 logging=False, printfunc=print, defaults=None,
+                 alt_move_adder=None, alt_calib_adder=None):
         self.printfunc = printfunc
         self.logging = logging
         self.write_to_DB = False
+        self._set_altered_state_adders(func_move=alt_move_adder, func_calib=alt_calib_adder)
         if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
                                     in ['True', 'true', 'T', 't', '1', None]):
             self.write_to_DB = True
@@ -135,10 +139,9 @@ class PosState(object):
                             self.log_basename)
                         break
             # list of fieldnames we save to the log file.
-            self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
-                                   + ['NOTE'])
+            self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys()))
             # used for storing specific notes in the next row written to log
-            self.append_log_note('software initialization')
+            self._append_log_note('software initialization')
             # used for one time check whether need to make a new log file,
             # or whether log file headers have changed since last run
             self.log_unit_called_yet = False
@@ -153,7 +156,10 @@ class PosState(object):
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
             self._val['MOVE_VAL2'] = ''
+        self._clear_last_meas_entries()
         self.clear_log_notes()
+        self.clear_calib_notes()
+        self.clear_late_commit_entries()
 
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
@@ -200,6 +206,7 @@ class PosState(object):
         #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
         self.clear_log_notes() # used here to initialize
+        self.clear_calib_notes() # used here to initialize
 
     def load_from_cfg(self, unit_id=None):
         # do this here because used in 2 different places below
@@ -242,6 +249,7 @@ class PosState(object):
             self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
         self._val = self.conf.dict()
         self.clear_log_notes() # used here to initialize
+        self.clear_calib_notes() # used here to initialize
 
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
@@ -253,7 +261,7 @@ class PosState(object):
         """
         return self._val[key]
 
-    def store(self, key, val):
+    def store(self, key, val, register_if_altered=True):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values.
 
@@ -261,20 +269,40 @@ class PosState(object):
         added boolean return to indicate outcome of storing posstate
 
         (NEVER EVER write directly to state._val dictionary)
+        
+        Normally, if a value is changed, then the state will register itself
+        with petal as having been altered. That way petal knows to push its
+        data to posmovedb upon the next commit(). This registration can be
+        turned off in special cases by arguing register_if_altered=False.
         """
         if key not in self._val.keys():  # 1st check: validate the key name
             self.printfunc(f'Unit {self.unit_id}: invalid Key {key}')
             return False
         if key in pc.nominals:  # 2nd check: reject values too far from nominal
             nom, tol = pc.nominals[key]['value'], pc.nominals[key]['tol']
+            val = float(val)  # helps clear out numpy floats (which are slower) when they sneak into system
             if not nom - tol <= val <= nom + tol:  # check for absurd values
                 self.printfunc(
                     f'Unit {self.unit_id}: new value {val} for posstate key '
                     f'{key} rejected, outside nominal range {nom} ± {tol}')
                 # val = nom
                 return False
-        self._val[key] = val  # set value if all 3 checks above are passed
-        # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
+        old_val = self._val[key]
+        if key == 'LOG_NOTE':
+            self._append_log_note(val, is_calib_note=False)
+        elif key == 'CALIB_NOTE':
+            self._append_log_note(val, is_calib_note=True)
+        else:
+            self._val[key] = val  # set value if all checks above are passed
+            # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
+        if self._val[key] != old_val and register_if_altered:
+            if pc.is_calib_key(key):
+                self._register_altered_calib()
+            elif not pc.is_constants_key(key):
+                # any other key must be in the moves db
+                self._register_altered_move()
+            if pc.is_cached_in_posmodel(key):
+                self._refresh_posmodel()
         return True
 
     def write(self):
@@ -313,11 +341,12 @@ class PosState(object):
                             break
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 row = self._val.copy()
-                row.update({'TIMESTAMP':timestamp,'NOTE':str(self._next_log_notes)})
+                row.update({'TIMESTAMP':timestamp})
                 writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
                 writer.writerow(row)
             self.curr_log_length += 1
             self.clear_log_notes()
+            self.clear_calib_notes()
             self.log_unit_called_yet = True # only need to check this the first time through
 
     @property
@@ -339,17 +368,48 @@ class PosState(object):
     def log_basename(self, name):
         self._val['CURRENT_LOG_BASENAME'] = name
         
-    def append_log_note(self, note):
-        '''Adds a log note (presumably a string) to the existing note data that
-        will be written to log upon commit or writetodb.'''
-        self._next_log_notes.append(str(note))
-        self._val['LOG_NOTE'] = str(self._next_log_notes)
-        
+    def _append_log_note(self, note, is_calib_note=False):
+        '''Adds a log note to the existing note data that will be written to
+        log upon commit or writetodb. Arg calib operates on CALIB_NOTE field
+        rather than LOG_NOTE.
+        '''
+        key = 'CALIB_NOTE' if is_calib_note else 'LOG_NOTE'
+        if key not in self._val:
+            self._val[key] = str(note)
+        else:
+            self._val[key] = pc.join_notes(self._val[key], note)
+            
     def clear_log_notes(self):
-        '''Re-initializes the stored log notes.'''
-        self._next_log_notes = []
-        self._val['LOG_NOTE'] = str(self._next_log_notes)
-
+        '''Re-initializes the stored log notes. Can be used as an initiializer
+        if no LOG_NOTE field yet established.'''
+        self._val['LOG_NOTE'] = ''
+        
+    def clear_calib_notes(self):
+        '''Like clear_log_notes, but for CALIB_NOTE field.'''
+        self._val['CALIB_NOTE'] = ''
+                
+    def clear_late_commit_entries(self):
+        '''Clears the "late commit" data fields.'''
+        for key, value in pc.late_commit_defaults.items():
+            if key in self._val:
+                self._val[key] = value
+                
+    def _set_altered_state_adders(self, func_move=None, func_calib=None):
+        '''Set function handles for registering when state changes. The intent
+        here is that PosState can add itself to Petal's altered_state and
+        altered_calib_state sets.'''
+        if func_move and func_calib:
+            self._register_altered_move = lambda: func_move(self)
+            self._register_altered_calib = lambda: func_calib(self)
+        else:
+            self._register_altered_move = lambda: None
+            self._register_altered_calib = lambda: None
+            
+    def set_posmodel_cache_refresher(self, func):
+        '''Set function handle for refreshing posmodel cache when a relevant
+        state value changes.'''
+        self._refresh_posmodel = func
+            
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
         to have a regular method for incrementing the suffix on log filenames.
@@ -395,21 +455,19 @@ class PosState(object):
                 
         # also insert any missing entirely new keys
         if self.type == 'pos':
-            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None,
-                                              'KEEPOUT_EXPANSION_PHI_RADIAL':0.0,
-                                              'KEEPOUT_EXPANSION_PHI_ANGULAR':0.0,
-                                              'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
-                                              'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0,
-                                              'CLASSIFIED_AS_RETRACTED':False,
-                                              'EXPOSURE_ID':None,
-                                              'EXPOSURE_ITER':None,
-                                              'FLAGS':None,
-                                              'OBS_X':None,
-                                              'OBS_Y':None,
-                                              'PTL_X':None,
-                                              'PTL_Y':None,
-                                              'PTL_Z':None,
+            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM': None,
+                                              'KEEPOUT_EXPANSION_PHI_RADIAL': 0.0,
+                                              'KEEPOUT_EXPANSION_PHI_ANGULAR': 0.0,
+                                              'KEEPOUT_EXPANSION_THETA_RADIAL': 0.0,
+                                              'KEEPOUT_EXPANSION_THETA_ANGULAR': 0.0,
+                                              'CLASSIFIED_AS_RETRACTED': False,
+                                              'EXPOSURE_ID': None,
+                                              'EXPOSURE_ITER': None,
+                                              'DEVICE_CLASSIFIED_NONFUNCTIONAL': False,
+                                              'FIBER_INTACT': True,
+                                              'CALIB_NOTE': '',
                                               }
+            possible_new_keys_and_defaults.update(pc.late_commit_defaults)
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
@@ -417,12 +475,19 @@ class PosState(object):
                                               'DEVICE_CLASSIFIED_NONFUNCTIONAL':False,
                                               }
         elif self.type == 'ptl':
-            possible_new_keys_and_defaults ={}
+            possible_new_keys_and_defaults = {}
 
         for key in possible_new_keys_and_defaults:
             if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]
-
+                
+    def _clear_last_meas_entries(self):
+        '''Clears specific values from legacy "LAST_MEAS_*" fields. Intended
+        to be run upon initialization, to halt useless forward propagation of
+        any old data.'''
+        keys = {key for key in self._val.keys() if 'LAST_MEAS' in key}
+        for key in keys:
+            self._val[key] = None
 
 if __name__ == "__main__":
     # unit tests below, enable DB write
