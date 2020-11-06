@@ -1651,8 +1651,9 @@ class Petal(object):
         position_keys = set(pc.single_coords)
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
         constants_keys = set(pc.constants_keys)
+        model_keys = set(pc.posmodel_keys)
         id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
-        valid_keys = position_keys | state_keys | constants_keys | id_keys
+        valid_keys = position_keys | state_keys | constants_keys | id_keys | model_keys
         valid_ops = {'>': operator.gt,
                      '>=': operator.ge,
                      '==': operator.eq,
@@ -1696,6 +1697,17 @@ class Petal(object):
                 if suffix in {'T', 'X', 'Q'}:
                     return pair[0]
                 return pair[1]
+        elif key in model_keys:
+            func = lambda x: x  # place-holder
+            attr = key
+            for func_name in ['max', 'min']:
+                prefix = f'{func_name}_'
+                if prefix in key and '_range_' in key:
+                    func = eval(func_name)
+                    attr = key.split(prefix)[-1]
+                    break
+            def getter(posid):
+                return func(getattr(self.posmodels[posid], attr))
         else:
             def getter(posid):
                 return self.states[posid]._val[key]

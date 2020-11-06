@@ -233,6 +233,10 @@ other_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
                         'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
                         'CALIB_NOTE', 'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
+posmodel_range_names = {'targetable_range_posintT', 'targetable_range_posintP', 'full_range_posintT', 'full_range_posintP'}
+posmodel_keys = set()
+for name in posmodel_range_names:
+    posmodel_keys |= {f'max_{name}', f'min_{name}'}
 
 # test for whether certain posstate keys are classified as "calibration" vals
 calib_keys = set(nominals.keys()) | set(keepout_keys) | other_pos_calib_keys | fiducial_calib_keys
