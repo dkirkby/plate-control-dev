@@ -296,6 +296,8 @@ try:
             y_out = [c['uv2'][1] for c in coord]
             data[f'OFFSET_X_{suffix}'].extend(x_out)
             data[f'OFFSET_Y_{suffix}'].extend(y_out)
+        logger.info(f' ...x and y offsets calculated in alt coords in {time.perf_counter() - start:.3f} sec')
+        start = time.perf_counter()
         for posid in posids_ordered:
             model_data = ptl.get_posmodel_params(posid, as_dict=True) # can't directly pull posmodel instance through doslib proxy
             for key in range_keys:
@@ -303,8 +305,8 @@ try:
                 rng_key = range_keys_map[key]
                 rng = model_data[rng_key]
                 data[key].append(func(rng))
-        logger.info(f' ...calculated in {time.perf_counter() - start:.3f} sec')
-        
+        logger.info(f' ...range limits calculated in {time.perf_counter() - start:.3f} sec')
+
         logger.info(' ...collecting petal-wide values...')        
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
         # any petal. Here, I simply use the last ptl instance from the for loop above.
