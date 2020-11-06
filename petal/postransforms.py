@@ -154,6 +154,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def construct(self, coord_in, coord_out):
         '''Utility to construct a transform function using strings describing
         the coordinates in and out.'''
+        need_cast = {'obsXY_to_QS', 'QS_to_obsXY', 'flatXY_to_QS', 'QS_to_flatXY', 'flatXY_to_obsXY', 'obsXY_to_flatXY'}
         try:
             for coord in [coord_in, coord_out]:
                 assert coord in {'posintTP', 'poslocTP', 'poslocXY', 'flatXY', 'obsXY', 'QS', 'ptlXY'}
@@ -161,6 +162,10 @@ class PosTransforms(petaltransforms.PetalTransforms):
             func_name = f'{coord_in}_to_{coord_out}'
             assert hasattr(self, func_name)
             handle = eval(f'self.{func_name}')
+            if func_name in need_cast:
+                def handle2(uv):
+                    return tuple(handle(uv, cast=True).flatten())
+                return handle2
             return handle
         except:
             return None

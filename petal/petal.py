@@ -2287,18 +2287,24 @@ class Petal(object):
             else:
                 assert False, f'unrecognized type {type(this)} for key {key}'
         return out
-        
     
-    def postrans2(self, posid, method, *args, **kwarg):
-        '''coordinate_pair is a list or tuple of two components
-        method is the string name of the transform method in PosTransforms
-        some transforms may require more input than just the coordinates
+    def transform(self, cs1, cs2, coord):
+        '''Batch transformation of coordinates.
+        
+        INPUTS:  cs1 ... str, input coordinate system
+                 cs2 ... str, output coordinate system
+                 coord ... list of dicts, each dict must contain:
+                     'posid': positioner id string
+                     'uv1': list or tuple giving the coordinate pair to be transformed
+        
+        OUTPUT:  same as coord, but now with 'uv2' field added
+                 order of coord *will* be preserved
         '''
-        self.debug('postrans: called postrans method %s, posid %s, args %s, kwargs %s' % (method, posid, args, kwarg))
-        if posid in self.posids:
-            return getattr(self.posmodels[posid].trans, method)(*args, **kwarg)
-        else:
-            return 'Not in petal'
+        for d in coord:
+            trans = self.posmodels[d['posid']].trans
+            func = trans.construct(coord_in=cs1, coord_out=cs2)
+            d['uv2'] = func(d['uv1'])
+        return coord
         
 if __name__ == '__main__':
     '''
