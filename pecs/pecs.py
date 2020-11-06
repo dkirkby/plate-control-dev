@@ -39,7 +39,7 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS', device_locs=None):
+                 test_name='PECS', device_locs=None, no_expid=False):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -104,8 +104,9 @@ class PECS:
         if self.interactive:
             self.home_adc() #asks to home, not automatic
             self.turn_on_fids()
-        #Setup exposure ID last incase aborted doing the above
-        self._get_expid()
+        if not(no_expid):
+            #Setup exposure ID last incase aborted doing the above
+            self._get_expid()
 
     def exp_setup(self):
         '''
