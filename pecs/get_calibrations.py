@@ -128,8 +128,10 @@ collider_pos_attr_map = {'KEEPOUT_T': 'keepouts_T',
 offset_variants = {'PTL': 'ptlXY', 'CS5': 'obsXY'}
 offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' for coord in ['OFFSET_X', 'OFFSET_Y'] for var, system in offset_variants.items()}
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
-range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'min'] for c in ['T', 'P']}
-range_keys_map = {key: f'targetable_range_posint{key[-1]}' for key in range_keys}
+range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
+range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
+query_keys.update(range_keys)
+query_keys_map.update(range_keys_map)
 
 # summarize all keys and units (where applicable)
 all_pos_keys = {}
@@ -285,10 +287,11 @@ try:
                 this_list = [str(this_dict[p]) for p in posids_ordered]
                 data[data_key].extend(this_list)
     
-        # dependent values
+        # transformed values
         logger.info(' ...collecting calculated values...')
-        start = time.perf_counter()
-        flat_offset_xy = {posid: tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y']) for posid in posids_ordered}
+        offset_keys = ['OFFSET_X', 'OFFSET_Y']
+        offsets = {key: ptl.quick_query(key=key, mode='iterable') for key in offset_keys}
+        flat_offset_xy = {posid: tuple(offsets[key][posid] for key in offset_keys) for posid in posids_ordered}
         for suffix, coord_sys in offset_variants.items():
             coord = [{'posid': posid, 'uv1': flat_offset_xy[posid]} for posid in posids_ordered]
             coord = ptl.transform(cs1='flatXY', cs2=coord_sys, coord=coord)
@@ -296,16 +299,6 @@ try:
             y_out = [c['uv2'][1] for c in coord]
             data[f'OFFSET_X_{suffix}'].extend(x_out)
             data[f'OFFSET_Y_{suffix}'].extend(y_out)
-        logger.info(f' ...x and y offsets calculated in alt coords in {time.perf_counter() - start:.3f} sec')
-        start = time.perf_counter()
-        for posid in posids_ordered:
-            model_data = ptl.get_posmodel_params(posid, as_dict=True) # can't directly pull posmodel instance through doslib proxy
-            for key in range_keys:
-                func = max if 'MAX' in key else min
-                rng_key = range_keys_map[key]
-                rng = model_data[rng_key]
-                data[key].append(func(rng))
-        logger.info(f' ...range limits calculated in {time.perf_counter() - start:.3f} sec')
 
         logger.info(' ...collecting petal-wide values...')        
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
