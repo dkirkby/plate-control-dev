@@ -288,18 +288,15 @@ try:
         # dependent values
         logger.info(' ...collecting calculated values...')
         start = time.perf_counter()
+        flat_offset_xy = {posid: tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y']) for posid in posids_ordered}
+        for suffix, coord_sys in offset_variants.items():
+            coord = [{'posid': posid, 'uv1': flat_offset_xy[posid]} for posid in posids_ordered]
+            coord = ptl.transform(cs1='flatXY', cs2=coord_sys, coord=coord)
+            x_out = [c['uv2'][0] for c in coord]
+            y_out = [c['uv2'][1] for c in coord]
+            data[f'OFFSET_X_{suffix}'].extend(x_out)
+            data[f'OFFSET_Y_{suffix}'].extend(y_out)
         for posid in posids_ordered:
-            flat_offset_xy = tuple(ptl.get_posfid_val(posid, key) for key in ['OFFSET_X', 'OFFSET_Y'])
-            for suffix, coord in offset_variants.items():
-                kwargs = {'cast': True} if coord in {'obsXY'} else {}
-                if online:
-                    func_name = f'flatXY_to_{coord}'
-                    xy_new = ptl.postrans(posid, func_name, flat_offset_xy, **kwargs)
-                else:
-                    transform_func = ptl.posmodels[posid].trans.construct('flatXY', coord)
-                    xy_new = transform_func(flat_offset_xy, **kwargs)
-                data[f'OFFSET_X_{suffix}'].append(float(xy_new[0]))
-                data[f'OFFSET_Y_{suffix}'].append(float(xy_new[1]))
             model_data = ptl.get_posmodel_params(posid, as_dict=True) # can't directly pull posmodel instance through doslib proxy
             for key in range_keys:
                 func = max if 'MAX' in key else min
