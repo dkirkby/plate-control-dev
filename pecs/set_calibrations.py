@@ -125,7 +125,7 @@ logger.info('Checked data types and bounds')
 # set up pecs (access to online system)
 try:
     from pecs import PECS
-    pecs = PECS(interactive=False)
+    pecs = PECS(interactive=False, fvc=False, no_expid=True)
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     posids = set(table['POS_ID'])
     pecs.ptl_setup(pecs.pcids, posids=posids)
