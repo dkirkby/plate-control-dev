@@ -1061,7 +1061,7 @@ class Petal(object):
         else:
             return 'Not in petal'
 
-    def set_posfid_val(self, device_id, key, value, check_existing=False):
+    def set_posfid_val(self, device_id, key, value, check_existing=False, comment=''):
         """Sets a single value to a positioner or fiducial. In the case of a 
         fiducial, this call does NOT turn the fiducial physically on or off.
         It only saves a value.
@@ -1074,6 +1074,11 @@ class Petal(object):
         """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
+        if key in pc.require_comment_to_store:
+            if not comment:
+                raise ValueError(f'setting {key} requires an accompanying comment string')
+            comment_field = pc.require_comment_to_store[key]
+            self.set_posfid_val(device_id, comment_field, comment)
         state = self.states[device_id]
         if check_existing:
             old = state._val[key] if key in state._val else None

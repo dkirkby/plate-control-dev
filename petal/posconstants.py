@@ -278,6 +278,11 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
 def is_constants_key(key):
     return key.upper() in constants_keys
 
+# data fields which must *always* be accompanied by a comment
+require_comment_to_store = {'CTRL_ENABLED': 'LOG_NOTE',
+                            'DEVICE_CLASSIFIED_NONFUNCTIONAL': 'CALIB_NOTE',
+                            'FIBER_INTACT': 'CALIB_NOTE'}
+
 # state data fields associated with "late" committing to database
 late_commit_defaults = {'OBS_X': None,
                         'OBS_Y': None,
