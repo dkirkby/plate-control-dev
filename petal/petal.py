@@ -2204,12 +2204,12 @@ class Petal(object):
            KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
         """
         if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with DEVICE_CLASSIFIED_NONFUNCTIONAL')
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('NONFUNCTIONAL', self.missing_flag)
             self.disabled_devids.append(devid)
         if not self.get_posfid_val(devid, 'FIBER_INTACT'):
-            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with FIBER_INTACT == False')
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('BROKENFIBER', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('BADPOSFID', self.missing_flag)
