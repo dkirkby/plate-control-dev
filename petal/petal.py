@@ -1074,17 +1074,17 @@ class Petal(object):
         """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
-        if key in pc.require_comment_to_store:
-            if not comment:
+        if key in pc.require_comment_to_store and not comment:
                 raise ValueError(f'setting {key} requires an accompanying comment string')
-            comment_field = pc.require_comment_to_store[key]
-            self.set_posfid_val(device_id, comment_field, comment)
         state = self.states[device_id]
         if check_existing:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
         accepted = state.store(key, value, register_if_altered=True)
+        if comment:
+            comment_field = 'CALIB_NOTE' if pc.is_calib_key(key) else 'LOG_NOTE'
+            self.set_posfid_val(device_id, comment_field, comment)
         return accepted
     
     def get_posids_with_commit_pending(self):
