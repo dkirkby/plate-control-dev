@@ -1072,16 +1072,15 @@ class Petal(object):
         differs from new. A special return value of None is returned if the
         new value is the same.
         
-        Comment allows associating a note string with the change. When arguing a
-        comment, it is often recommended to also argue check_existing=True. This
-        reduces clutter in the DB (needlenss commenting on unchanged values).
+        Comment allows associating a note string with the change. If a comment
+        is provided, then check_existing will be automatically forced to True.
         """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
         if key in pc.require_comment_to_store and not comment:
                 raise ValueError(f'setting {key} requires an accompanying comment string')
         state = self.states[device_id]
-        if check_existing:
+        if check_existing and comment:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
