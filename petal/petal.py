@@ -1082,7 +1082,7 @@ class Petal(object):
             if old == value:
                 return None
         accepted = state.store(key, value, register_if_altered=True)
-        if comment:
+        if comment and accepted:
             comment_field = 'CALIB_NOTE' if pc.is_calib_key(key) else 'LOG_NOTE'
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
