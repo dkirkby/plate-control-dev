@@ -1071,6 +1071,10 @@ class Petal(object):
         The boolean arg check_existing only changes things if the old value
         differs from new. A special return value of None is returned if the
         new value is the same.
+        
+        Comment allows associating a note string with the change. When arguing a
+        comment, it is often recommended to also argue check_existing=True. This
+        reduces clutter in the DB (needlenss commenting on unchanged values).
         """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
