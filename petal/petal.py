@@ -2104,7 +2104,7 @@ class Petal(object):
         for posid in posids:
             self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
             if auto_disabling_on and self.posmodels[posid].is_enabled:
-                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='Disabled due to communication error')
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
                 if accepted:
                     disabled.add(posid)
         if disabled:
