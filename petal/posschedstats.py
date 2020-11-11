@@ -180,6 +180,33 @@ class PosSchedStats(object):
         for collision_pairs in this_dict.values():
             count += len(collision_pairs)
         return count
+    
+    @property
+    def unresolved_posids(self):
+        '''Returns set of posids that were recorded as unresolved after final
+        collision check. For the latest schedule_id.
+        '''
+        unresolved = self.unresolved[self.latest]
+        if 'final' in unresolved:
+            return unresolved['final']
+        return {}
+    
+    @property
+    def unresolved_detail_str(self):
+        '''Returns detailed string describing the unresolved cases.'''
+        s = ''
+        for stage in self.unresolved[self.latest]:
+            s += f'\nSTAGE: {stage}\n'
+            s += f'unresolved: {self.unresolved[self.latest][stage]}\n'
+            tables = self.unresolved_tables[self.latest][stage]
+            sweeps = self.unresolved_sweeps[self.latest][stage]
+            for posid, table in tables.items():
+                s += f'\npositioner: {posid}\n'
+                s += table.display(printfunc=None) + '\n'
+                s += table.display_for('schedule', printfunc=None) + '\n'
+                s += table.display_for('hardware', printfunc=None) + '\n'
+                s += f'{sweeps[posid]}\n'
+        return s
         
     def add_request(self):
         """Increment requests count."""

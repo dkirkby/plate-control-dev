@@ -791,7 +791,7 @@ class PosSchedule(object):
             self.stats.add_final_collision_check(collision_pairs)
             colliding_posids = set(colliding_sweeps.keys())
             colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
-            self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+            self.stats.add_unresolved_colliding_at_stage('final', colliding_posids, colliding_tables, colliding_sweeps)
 
     def _schedule_moves_store_requests_info(self):
         """Goes through the move tables, matching up original request information
