@@ -297,8 +297,6 @@ for m in range(uargs.num_moves):
             profile(schedule_command)
         else:
             eval(schedule_command)
-        num_unresolved_collisions = ptl.schedule_stats.total_unresolved
-        assert num_unresolved_collisions == 0, f'{num_unresolved_collisions} collisions were NOT resolved! this indicates a bug that needs to be fixed'
         candidates['n_resolved'] += [ptl.schedule_stats.total_resolved]
         ptl.send_and_execute_moves()
         candidates['final_posTP'] += [get_current_posTP()]

@@ -1926,7 +1926,7 @@ class Petal(object):
         output_path = self.animator.animate()
         self.printfunc(f'Animation saved to {output_path}.')
         return output_path
-
+    
 # INTERNAL METHODS
 
     def _hardware_ready_move_tables(self):
