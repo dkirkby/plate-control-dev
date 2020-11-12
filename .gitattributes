@@ -44,7 +44,7 @@ petal/petsockcomm.py -text
 petal/posanimator.py -text
 petal/poscollider.pyx -text
 petal/posconstants.py -text
-petal/positioner_locations_0530v14.csv -text
+petal/positioner_locations_0530v18.csv -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
 petal/posschedstats.py -text
