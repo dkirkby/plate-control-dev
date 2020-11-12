@@ -6,11 +6,6 @@ target selection. As of 2020-10-05, only works on one petal worth of positioners
 at a time.
 """
 
-# To retrieve real-world parameters from online DB, use desimeter/get_posmoves, or web tools at e.g.:
-#     "calib" --> http://web.replicator.dev-cattle.stable.spin.nersc.org:60040/DESIPositioners/Positioner_calibration.html
-#     "moves" --> http://web.replicator.dev-cattle.stable.spin.nersc.org:60040/DESIPositioners/Positioner_moves.html
-
-
 # command line argument parsing
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
@@ -21,7 +16,7 @@ parser.add_argument('-s', '--num_stress_select', type=int, default=1, help='opti
 parser.add_argument('-ai', '--allow_interference', action='store_true', help='optional, allows targets to interfere with one another')
 parser.add_argument('-lim', '--enable_phi_limit', action='store_true', help='optional, turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-p', '--profile', action='store_true', help='optional, turns on timing profiler for move scheduling')
-parser.add_argument('-i', '--infile', type=str, default=None, help='optional, path to offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
+parser.add_argument('-i', '--infile', type=str, default=None, help='optional, either "cache" to use the most recently cached calib data, or else a path to an offline csv file, containing positioner calibration parameters. If not argued, will try getting current values from online db instead (for this you may have to be running from a machine at kpno or beyonce)')
 parser.add_argument('-o', '--outdir', type=str, default='.', help='optional, path to directory where to save output file, defaults to current dir')
 parser.add_argument('-m', '--comment', type=str, default='', help='optional, comment string (must enclose in "") that will be included in output file metadata')
 uargs = parser.parse_args()
@@ -53,74 +48,37 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
             'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_THETA_ANGULAR',
             'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
 
-# gather some specific user inputs which may be adjusted later, depending on the data source
+# generate calibrations file or resolve location
+calibs_file_path = uargs.infile
+if calibs_file_path == None:
+    outdir = pc.dirs['temp_files']
+    get_calibs_comment = 'auto-retrieval of calibrations by make_sequence.py'
+    print('\nGENERATING NEW CALIBRATIONS FILE')
+    cmd = f'python get_calibrations.py -m "{get_calibs_comment}" -o {outdir} -ptl {uargs.petal_id}'
+    err = os.system(cmd)
+    assert not(err), f'error calling \'{cmd}\''
+if calibs_file_path in {None, 'cache'}:
+    with open(pc.fp_calibs_path_cache, 'r') as file:
+        calibs_file_path = file.read()
+assert os.path.exists(calibs_file_path), f'calibration data file not found at path {calibs_file_path}'
 
-if uargs.infile == None:
-    # try to grab data from online db
-    import psycopg2, getpass
-    db_configs = [{'host': 'db.replicator.dev-cattle.stable.spin.nersc.org', 'port': 60042, 'password_required': False},
-                  {'host': 'beyonce.lbl.gov', 'port': 5432,  'password_required': True}]
-    max_rows = 10000
-    comm = None
-    for config in db_configs:
-        pw = ''
-        if config['password_required']:
-            pw = getpass.getpass(f'Enter read-access password for database at {config["host"]}: ')
-        try:
-            comm = psycopg2.connect(host=config['host'], port=config['port'], database='desi_dev', user='desi_reader', password=pw)
-            print(f'success connecting to database at {config["host"]}')
-            break
-        except:
-            print(f'failed to connect to database at {config["host"]}')
-            continue
-    assert comm != None, 'failed to connect to any database!'
-    def dbquery(comm, operation, parameters=None):
-        '''Cribbed from desimeter/dbutil.py'''
-        cx=comm.cursor()
-        cx.execute(operation,parameters)
-        names=[d.name for d in cx.description]
-        res=cx.fetchall()
-        cx.close()
-        results=dict()
-        for i,name in enumerate(names) :
-            results[name]=[r[i] for r in res]
-        return results
-    from_moves = f'from posmovedb.positioner_moves_p{uargs.petal_id}'
-    from_calib = f'from posmovedb.positioner_calibration_p{uargs.petal_id}'
-    cmd = f'select distinct pos_id {from_calib}'
-    data = dbquery(comm, cmd)
-    all_posids = sorted(set(data['pos_id']))
-    params_dict = {key: [] for key in required}
-    moves_keys = {'CTRL_ENABLED'}
-    calib_keys = required - moves_keys
-    query_config = [{'from': from_moves, 'keys': moves_keys},
-                    {'from': from_calib, 'keys': calib_keys}]
-    for posid in all_posids:
-        for config in query_config:
-            keys_str = str({key.lower() for key in config['keys']}).strip('{').strip('}').replace("'",'')
-            cmd = f"select {keys_str} {config['from']} where pos_id in ('{posid}') order by time_recorded desc limit 1"
-            data = dbquery(comm, cmd)
-            for key, value in data.items():
-                params_dict[key.upper()] += value  # note how value comes back as a single element list here
-    input_table = Table(params_dict)
-    print('calibration parameters: database retrieval complete!')
-else:
-    # read positioner parameter data from csv file
-    booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
-    nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
-    boolean = lambda x: x not in nulls
-    input_table = Table.read(uargs.infile)
-    missing = required - set(input_table.columns)
-    assert len(missing) == 0, f'input positioner parameters file is missing columns {missing}'
-    for col in booleans:
-        input_table[col] = [boolean(x) for x in input_table[col].tolist()]
+# read positioner parameter data from csv file
+booleans = {'CLASSIFIED_AS_RETRACTED', 'CTRL_ENABLED'}
+nulls = {'--', None, 'none', 'None', '', 0, False, 'False', 'FALSE', 'false'}
+boolean = lambda x: x not in nulls
+print(f'\nREADING CALIBRATIONS FILE: {calibs_file_path}\n')
+input_table = Table.read(calibs_file_path)
+missing = required - set(input_table.columns)
+assert len(missing) == 0, f'input positioner parameters file is missing columns {missing}'
+for col in booleans:
+    input_table[col] = [boolean(x) for x in input_table[col].tolist()]
 
-    # trim out unused data from other petals
-    if 'PETAL_ID' in input_table.columns:
-        all_petal_ids = set(input_table['PETAL_ID'])
-        undesired = input_table['PETAL_ID'] != uargs.petal_id
-        input_table.remove_rows(undesired)
-    print('calibration parameters: read from file complete!')
+# trim out unused data from other petals
+if 'PETAL_ID' in input_table.columns:
+    all_petal_ids = set(input_table['PETAL_ID'])
+    undesired = input_table['PETAL_ID'] != uargs.petal_id
+    input_table.remove_rows(undesired)
+print('calibration parameters: read from file complete!')
     
 # ensure single, unique set of parameters per positioner
 all_posids = set(input_table['POS_ID'])
@@ -159,7 +117,7 @@ reduced = set(movers)
 for posid in movers:
     loc = id2loc[posid]
     neighbor_locs = pc.generic_pos_neighbor_locs[loc]
-    reduced |= {loc2id[loc] for loc in neighbor_locs}
+    reduced |= {loc2id[loc] for loc in neighbor_locs if loc in loc2id}
 eliminate = all_posids - reduced
 elim_rows = [np.where(params['POS_ID'] == posid)[0][0] for posid in eliminate]
 params.remove_rows(elim_rows)
@@ -277,11 +235,16 @@ def profile(evaluatable_string):
     p.print_stats(n_stats_lines)
 
 # generate sequence
-print(f'Now generating the sequence, n_moves = {uargs.num_moves}')
+print('\nGENERATING MOVE SEQUENCE')
+print(f'n_moves = {uargs.num_moves}\n')
 timestamp = pc.compact_timestamp()
+details = f'Generated with settings: {uargs}'
+details += f'\nCalibrations data source: {calibs_file_path}'
+if uargs.comment:
+    details += f'\nComment: {uargs.comment}'
 seq = sequence.Sequence(short_name=f'ptl{uargs.petal_id:02}_npos_{len(movers):03}_ntarg_{uargs.num_moves:03}_{timestamp}',
                         long_name='Test move sequence generated by make_sequence.py',
-                        details=f'Generated with settings: {uargs}')
+                        details=details)
 set_posTP({posid: (0, 150) for posid in ptl.posids})  # inital values like typical "parked" position
 n_collisions_resolved = []
 for m in range(uargs.num_moves):
@@ -321,6 +284,6 @@ seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value int
 if not os.path.isdir(save_dir):
     os.path.os.makedirs(save_dir)
 path = seq.save(save_dir)
-print(f'Sequence generation complete!')
+print('Sequence generation complete!')
 print(f'\n{seq}\n')
 print(f'Saved to file: {path}\n')
