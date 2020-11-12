@@ -45,7 +45,7 @@ parser.add_argument('-i', '--infile', type=str, required=True, help='path to inp
 uargs = parser.parse_args()
 
 data = pd.read_csv(uargs['infile'])
-assert 'POS_ID' in data.columns(), 'POS_ID must be present in the input file'
+assert 'POS_ID' in data.columns, 'POS_ID must be present in the input file'
 
 input('WARNING: this script may have undesirable interactions with an active instance. DO NOT use with an active instance. DO NOT use in place of set_calibrations.py. Hit enter to agree.')
 initials = input('Please enter your INITIALS for logging purposes: ')
@@ -53,7 +53,7 @@ comment = input('Please give a short comment why this script is being used: ')
 input(f'Initials are {initials} and comment is {comment}. Hit enter to confirm.')
 
 columns_to_update = set()
-for key in data.columns():
+for key in data.columns:
     if not(pc.is_constants_key(key)):
         columns_to_update.add(key)
 
@@ -93,4 +93,3 @@ for ptlid in ptlids:
         posmoveDB.WriteToDB(altered_states[ptlid], ptlid, 'pos_move')
     if ptlid in set(altered_calib_states.keys()):
         posmoveDB.WriteToDB(altered_calib_states[ptlid], ptlid, 'pos_calib')
-        
