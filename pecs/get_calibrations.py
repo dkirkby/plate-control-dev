@@ -331,8 +331,7 @@ try:
     logger.info(f'Data saved to: {save_path}')
     
     # save a reference to this file in a standard place
-    ref_dir = pc.dirs['temp_files']
-    ref_path = os.path.join(ref_dir, 'latest_fp_calibs.txt')
+    ref_path = pc.fp_calibs_path_cache
     with open(ref_path, mode='w') as file:
         file.write(save_path)
     logger.info(f'File path cached at standard location: {ref_path}')

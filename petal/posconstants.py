@@ -65,6 +65,7 @@ default_collider_filename = '_collision_settings_DEFAULT.conf'
 def get_keepouts_cache_path(petal_id):
     filename = f'keepouts_cache_petal_id_{petal_id}.ecsv'
     return os.path.join(dirs['temp_files'], filename)
+fp_calibs_path_cache = os.path.join(dirs['temp_files'], 'latest_fp_calibs.txt')
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
