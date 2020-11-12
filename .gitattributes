@@ -2,6 +2,7 @@
 bin/petal -text
 bin/petalcontroller -text
 pecs/1p_calib.py -text
+pecs/expert_set_pos_vals.py -text
 pecs/fvc_sim.py -text
 pecs/get_calibrations.py -text
 pecs/make_sequence.py -text
