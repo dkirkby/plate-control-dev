@@ -157,8 +157,7 @@ logger.info(f'Storing data to memory (not yet to database) for {len(table)} posi
 any_stored = False
 for row in table:
     posid = row['POS_ID']
-    if not args.simulate:
-        role = pecs.ptl_role_lookup(posid)
+    role = -1 if args.simulate else pecs.ptl_role_lookup(posid)
     stored = {}
     for key in keys:
         if row[commit_keys[key]]:
