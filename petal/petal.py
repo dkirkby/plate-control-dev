@@ -2263,7 +2263,7 @@ class Petal(object):
         self._apply_all_state_enable_settings()
         self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
-        self.commit(mode='both', log_note='auto-commit lingering data during petal configure') # commit uncommitted changes to DB
+        self.commit(mode='both', log_note='auto-committed during petal configure') # commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
 
