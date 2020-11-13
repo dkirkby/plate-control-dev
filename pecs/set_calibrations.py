@@ -11,10 +11,13 @@ script_name = os.path.basename(__file__)
 format_info = 'For data model and procedures to generate these values, see DESI-5732.'
 valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
-              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P'}
+              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P',
+              'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
 fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
+boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
@@ -69,6 +72,10 @@ if args.simulate:
 assert2 = simple_logger.assert2
 input2 = simple_logger.input2
 
+# deal with astropy's idiotic handling of booleans as strings
+for key in boolean_keys & set(table.columns):
+    table[key] = [pc.boolean(x) for x in table[key]]
+
 # validate the table format
 assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
 for key in set(table.columns):  # set op provides a copy
@@ -91,21 +98,10 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_column_str = table[commit_key].astype(str).tolist()
-    commit_column_str_bool = []
-    for val in commit_column_str:
-        if val.lower() in {'true', 't', 'yes', 'y', '1'}:
-            commit_column_str_bool.append(True)
-        elif val.lower() in {'false', 'f', 'no', 'n', '0'}:
-            commit_column_str_bool.append(False)
-        else:
-            commit_column_str_bool.append(None)
-    if all(isinstance(val, bool) for val in commit_column_str_bool):
-        table[commit_key] = commit_column_str_bool
     commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [np.int, np.float]
-    assert2(data_type_ok, f'{key} data type must be numeric')
+    data_type_ok = column.dtype in [np.int, np.float, np.bool]
+    assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):
         rng = range(len(table))
@@ -113,12 +109,13 @@ for key in keys:
         assert2(not(any(cannot_commit)), f'Input table rejected: {key} contains {err_desc} for posid(s) {cannot_commit}')
     isfinite = np.isfinite(column)
     assert_ok(isfinite, 'non-finite value(s)')
-    nom = pc.nominals[key]
-    nom_min = nom['value'] - nom['tol']
-    nom_max = nom['value'] + nom['tol']
-    column[isfinite == False] = np.inf  # dummy value to suppress astropy warnings when performing >= or <= ops below, on values that we don't plan to commit anyway. ok to do here because already checked commit values for finitude above
-    assert_ok(column >= nom_min, f'value(s) below limit {nom_min}')
-    assert_ok(column <= nom_max, f'value(s) above limit {nom_max}')
+    if key not in no_nominal_val:
+        nom = pc.nominals[key]
+        nom_min = nom['value'] - nom['tol']
+        nom_max = nom['value'] + nom['tol']
+        column[isfinite == False] = np.inf  # dummy value to suppress astropy warnings when performing >= or <= ops below, on values that we don't plan to commit anyway. ok to do here because already checked commit values for finitude above
+        assert_ok(column >= nom_min, f'value(s) below limit {nom_min}')
+        assert_ok(column <= nom_max, f'value(s) above limit {nom_max}')
     requested_posids |= set(table['POS_ID'][commit_requested])
 logger.info('Checked data types and bounds')
 
@@ -166,14 +163,23 @@ for row in table:
     for key in keys:
         if row[commit_keys[key]]:
             value = row[key]
-            if not args.simulate:
-                val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
-            else:
+            kwargs = {'device_id': posid,
+                      'value': value,
+                      'participating_petals': role
+                      }
+            key_and_children = [key]
+            if key == 'DEVICE_CLASSIFIED_NONFUNCTIONAL':
+                kwargs['comment'] = row['ENABLE_DISABLE_RATIONALE']
+                key_and_children += ['CTRL_ENABLED']
+            for k in key_and_children:
+                kwargs['key'] = k
                 val_accepted = True
-            if val_accepted:
-                stored[key] = value
-            else:
-                logger.error(f'set_posfid_val(posid={posid}, key={key}, value={value}')
+                if not args.simulate:
+                    val_accepted = pecs.ptlm.set_posfid_val(**kwargs)
+                if val_accepted:
+                    stored[k] = value
+                else:
+                    logger.error(f'set_posfid_val({kwargs})')
     if stored:
         # [JHS] Would be nice to include analysis metadata fields in the note, drawn
         # from the input table. Presumably when that table is in ecsv format.
