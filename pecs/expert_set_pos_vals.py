@@ -7,6 +7,13 @@ can cause undesirable interactions with an active instance. DO NOT use if an ins
 is up. DO NOT use if you can you set_calibrations.py to do the same task.
 '''
 
+'''
+2020/11/12 Discussion between KF and JHS led to creation of tool to dig us out
+           of a hole where petals won't start because of bad OFFSET_X/Y
+'''
+allowed_keys = {'OFFSET_X', 'OFFSET_Y'}
+allowed_date = '2020/11/12' # Change this when changing above
+
 import posstate
 from DOSlib.positioner_index import PositionerIndex
 from DBSingleton import DBSingleton
@@ -52,13 +59,23 @@ initials = input('Please enter your INITIALS for logging purposes: ')
 comment = input('Please give a short comment why this script is being used: ')
 input(f'Initials are {initials} and comment is {comment}. Hit enter to confirm.')
 
-columns_to_update = set()
+columns = set()
 for key in data.columns:
-    if not(pc.is_constants_key(key)):
-        columns_to_update.add(key)
+    if not(pc.is_constants_key(key)): #Try to filter keys, not a complete filter
+        columns.add(key)
+
+disallowed = columns - allowed_keys
+columns_to_update = columns & allowed_keys
 
 assert len(columns_to_update) != 0, 'No columns to update'
 print(f'Accepted columns: {columns_to_update}')
+print(f'Columns {disallowed} will *not* be changed. Only {allowed_keys} are allowed.'
+      f'This is our current policy (as of {allowed_date}) in order to restrict ' 
+      f'the power/risk of this script. The more general, "proper" method of ' 
+      f'updating calibration settings is via set_calibrations.py. Procedures ' 
+      f'are provided in DESI-5732. Additionally, certain limited parameters ' 
+      f'may be safely set at the PETAL console. Enter command "readme" there ' 
+      f'for more information.')
 
 posids = set(data['POS_ID'])
 posstates = get_posstates(posids)
