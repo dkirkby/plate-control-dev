@@ -171,19 +171,22 @@ for row in table:
                       'value': value,
                       'participating_petals': role
                       }
-            updates = {key: kwargs}
+            updates = [kwargs]
             if key == 'DEVICE_CLASSIFIED_NONFUNCTIONAL':
                 updates[key]['comment'] = row['ENABLE_DISABLE_RATIONALE']
                 fiber_intact = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'FIBER_INTACT', participating_petals=role)
-                child_key = 'CTRL_ENABLED'
-                updates[child_key] = updates[key].copy()
-                updates[child_key]['key'] = child_key
-                updates[child_key]['value'] = not(updates[key]['value'])
-                updates[child_key]['value'] &= fiber_intact
-            for k, kwargs in updates.items():
+                ctrl_enabled = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'CTRL_ENABLED', participating_petals=role)
+                new_ctrl_enabled = not(value) & fiber_intact
+                if ctrl_enabled != new_ctrl_enabled:
+                    kwargs = kwargs.copy()
+                    kwargs['key'] = 'CTRL_ENABLED'
+                    kwargs['value'] = new_ctrl_enabled
+                    kwargs['comment'] = 'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
+                    updates += [kwargs]
+            for kwargs in updates:
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
-                    stored[k] = kwargs['value']
+                    stored[kwargs['key']] = kwargs['value']
                 else:
                     logger.error(f'set_posfid_val({kwargs})')
     if stored:
@@ -195,7 +198,6 @@ for row in table:
         for key in fit_err_keys:
             if key in row.columns:
                 note = pc.join_notes(note, f'{key.lower()} {row[key]}')
-            
         if not args.simulate:
             pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note)
         logger.info(f'{posid}: {stored}')
