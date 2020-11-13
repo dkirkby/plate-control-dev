@@ -181,10 +181,9 @@ for row in table:
                 updates[child_key]['value'] = not(updates[key]['value'])
                 updates[child_key]['value'] &= fiber_intact
             for k, kwargs in updates.items():
-                kwargs['key'] = k
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
-                    stored[k] = value
+                    stored[k] = kwargs['value']
                 else:
                     logger.error(f'set_posfid_val({kwargs})')
     if stored:
