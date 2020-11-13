@@ -17,6 +17,7 @@ fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
 boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+float_keys = (valid_keys | fit_err_keys) - boolean_keys
 no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
@@ -75,6 +76,10 @@ input2 = simple_logger.input2
 # deal with astropy's idiotic handling of booleans as strings
 for key in boolean_keys & set(table.columns):
     table[key] = [pc.boolean(x) for x in table[key]]
+    
+# deal with astropy's annoying restrictions on integer values
+for key in float_keys & set(table.columns):
+    table[key] = [float(x) for x in table[key]]
 
 # validate the table format
 assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
