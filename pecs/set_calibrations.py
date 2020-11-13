@@ -168,6 +168,7 @@ for row in table:
         if row[commit_keys[key]]:
             value = row[key]
             kwargs = {'device_id': posid,
+                      'key': key,
                       'value': value,
                       'participating_petals': role
                       }
