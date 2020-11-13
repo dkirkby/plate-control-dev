@@ -206,7 +206,7 @@ for row in table:
 if any_stored:
     logger.info('Committing the data set to online database.')
     if not args.simulate:
-        pecs.ptlm.commit(mode='calib', calib_note='')
+        pecs.ptlm.commit(mode='both')
     logger.info('Commit complete.')
 else:
     logger.warning('No data found to commit. Nothing will be changed in the online db.')
