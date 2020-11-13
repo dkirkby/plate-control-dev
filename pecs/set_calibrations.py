@@ -173,7 +173,7 @@ for row in table:
                       }
             updates = [kwargs]
             if key == 'DEVICE_CLASSIFIED_NONFUNCTIONAL':
-                updates[key]['comment'] = row['ENABLE_DISABLE_RATIONALE']
+                kwargs['comment'] = row['ENABLE_DISABLE_RATIONALE']
                 fiber_intact = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'FIBER_INTACT', participating_petals=role)
                 ctrl_enabled = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'CTRL_ENABLED', participating_petals=role)
                 new_ctrl_enabled = not(value) & fiber_intact
