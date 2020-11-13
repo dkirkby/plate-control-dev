@@ -166,15 +166,18 @@ for row in table:
                       'value': value,
                       'participating_petals': role
                       }
-            key_and_children = [key]
+            updates = {key: kwargs}
             if key == 'DEVICE_CLASSIFIED_NONFUNCTIONAL':
-                kwargs['comment'] = row['ENABLE_DISABLE_RATIONALE']
-                key_and_children += ['CTRL_ENABLED']
-            for k in key_and_children:
+                updates[key]['comment'] = row['ENABLE_DISABLE_RATIONALE']
+                fiber_intact = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'FIBER_INTACT', participating_petals=role)
+                child_key = 'CTRL_ENABLED'
+                updates[child_key] = updates[key].copy()
+                updates[child_key]['key'] = child_key
+                updates[child_key]['value'] = not(updates[key]['value'])
+                updates[child_key]['value'] &= fiber_intact
+            for k, kwargs in updates.items():
                 kwargs['key'] = k
-                val_accepted = True
-                if not args.simulate:
-                    val_accepted = pecs.ptlm.set_posfid_val(**kwargs)
+                val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
                     stored[k] = value
                 else:
