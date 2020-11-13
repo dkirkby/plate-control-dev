@@ -61,7 +61,7 @@ input(f'Initials are {initials} and comment is {comment}. Hit enter to confirm.'
 
 columns = set()
 for key in data.columns:
-    if not(pc.is_constants_key(key)): #Try to filter keys, not a complete filter
+    if not(pc.is_constants_key(key)) and key != 'POS_ID': #Try to filter keys, not a complete filter
         columns.add(key)
 
 disallowed = columns - allowed_keys
