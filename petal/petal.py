@@ -1170,8 +1170,8 @@ class Petal(object):
         turned on.
         '''
         assert mode in {'move', 'calib'}, f'invalid mode {mode} for _send_to_db_as_necessary'
+        is_move = mode == 'move'
         if self.db_commit_on and not self.simulator_on:
-            is_move = mode == 'move'
             if is_move:
                 type1, type2 = 'pos_move', 'fid_data'
             else:
@@ -1196,10 +1196,12 @@ class Petal(object):
                     self._devids_committed_this_exposure |= committed_posids
         
         # known minor issue: if local_log_on simultaneously with DB, these may clear the note field
-        for state in self.altered_states:
-            state.clear_log_notes()
-        for state in self.altered_calib_states:
-            state.clear_calib_notes()
+        if is_move:
+            for state in self.altered_states:
+                state.clear_log_notes()
+        else:
+            for state in self.altered_calib_states:
+                state.clear_calib_notes()
             
     def _write_local_logs_as_necessary(self, states):
         '''Saves state data to disk, if those behaviors are currently turned on.'''
