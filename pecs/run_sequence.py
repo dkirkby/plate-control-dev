@@ -675,7 +675,7 @@ if pecs_on:
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
-simple_logger.clear_loggers()
+simple_logger.clear_logger()
 
 # raise exception from loop if we have one
 if exception_here is not None:

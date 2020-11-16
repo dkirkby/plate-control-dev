@@ -180,6 +180,16 @@ class PosSchedStats(object):
         for collision_pairs in this_dict.values():
             count += len(collision_pairs)
         return count
+    
+    @property
+    def unresolved_posids(self):
+        '''Returns set of posids that were recorded as unresolved after final
+        collision check. For the latest schedule_id.
+        '''
+        unresolved = self.unresolved[self.latest]
+        if 'final' in unresolved:
+            return unresolved['final']
+        return {}
         
     def add_request(self):
         """Increment requests count."""

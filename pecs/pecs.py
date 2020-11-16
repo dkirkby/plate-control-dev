@@ -70,6 +70,9 @@ class PECS:
                                use_arcprep=self.use_arcprep)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
+        elif not(fvc): # if FVC is False don't startup FVC stuff
+            self.fvc = fvc
+            self.print('Starting PECS with no FVC proxy.')
         else:
             self.fvc = fvc
             self.print(f"Reusing existing FVC proxy: "
@@ -104,8 +107,8 @@ class PECS:
         if self.interactive:
             self.home_adc() #asks to home, not automatic
             self.turn_on_fids()
+        #Setup exposure ID last incase aborted doing the above
         if not(no_expid):
-            #Setup exposure ID last incase aborted doing the above
             self._get_expid()
 
     def exp_setup(self):
@@ -263,6 +266,7 @@ class PECS:
                  matched ... set of positioner ids matched to measured centroids
                  unmatched ... set of unmatched positioner ids
         '''
+        assert self.fvc, 'fvc_measure called when FVC not availible in PECS instance!'
         assert num_meas > 0, f'argued num_meas={num_meas}, but must do at least one measurement'
         if match_radius is None :
             match_radius = self.match_radius

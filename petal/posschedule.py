@@ -264,10 +264,12 @@ class PosSchedule(object):
                 self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
                 self.printfunc(f'{prefix} frozen posids --> {frozen}')
                 c, _, p = self._check_final_stage(msg_prefix='Final',
-                                                  msg_suffix=' (should always be zero)')
+                                                  msg_suffix=' (should always be zero)',
+                                                  assert_no_unresolved=True)
                 colliding_sweeps, collision_pairs = c, p # for readability
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
+        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
@@ -386,6 +388,34 @@ class PosSchedule(object):
             if these:
                 overlaps[posid] = these
         return overlaps
+    
+    def get_details_str(self, posids, label=''):
+        '''Returns string describing details of move tables and sweeps for
+        positioners in the final stage. The argued posids should be a set.
+        '''
+        if pc.is_string(posids):
+            posids = {posids}
+        else:
+            posids = set(posids)
+        neighbors = set()
+        for posid in posids:
+            neighbors |= self.collider.pos_neighbors[posid]
+        neighbors -= posids
+        label = label if label else 'argued posids'
+        s = f'{label}: {posids}\n'
+        s += f'neighbors: {neighbors}\n'
+        display_posids = (posids | neighbors) & set(self.move_tables)
+        for posid in display_posids:
+            suffix = label.upper() if posid in posids else 'NEIGHBOR'
+            s += f'\n---- {posid} [{suffix}] ----'
+            self.move_tables[posid].for_hardware() # dummy call, to ensure inclusion of final creep rows in next display line
+            s += '\n' + self.move_tables[posid].display(printfunc=None)
+            s += '\n' + self.move_tables[posid].display_for('schedule', printfunc=None)
+            s += '\n' + self.move_tables[posid].display_for('hardware', printfunc=None)
+            s += f'\nsweep for: {posid}'
+            s += '\n' + str(self.stages['final'].sweeps[posid])
+            s += '\n'
+        return s
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -507,7 +537,7 @@ class PosSchedule(object):
                                   f'not resolve within {skip} timestep{"s" if skip != 1 else ""} ({skip*self.collider.timestep:.3f} ' + \
                                   f'sec) by debouncing polygons (jog distances = {db} deg).'
                     deny_msg = self._denied_str(target_str, explanation)
-                    self.petal.print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
+                    self.petal._print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
                 del self._requests[posid]
             self._fill_enabled_but_nonmoving_with_dummy_requests()  # to repopulate deletions
         resolved = overlapping - set(colliding_sweeps)
@@ -755,10 +785,11 @@ class PosSchedule(object):
                     else:
                         final.move_tables[posid].extend(table)
                         
-    def _check_final_stage(self, msg_prefix='', msg_suffix=''):
+    def _check_final_stage(self, msg_prefix='', msg_suffix='', assert_no_unresolved=False):
         """Checks the special "final" schedule stage for collisions.
         
         Inputs: Some prefix and suffix text may be argued for printed messages customization.
+                assert_all_resolved ... if True, will print details and throw an assert if detect any unresolved collisions
         
         Outputs: colliding_sweeps ... dictionary of any colliding sweeps (keys are posids)
                  all_sweeps       ... dictionary of all sweeps checked (keys are posids)
@@ -772,6 +803,13 @@ class PosSchedule(object):
         self.printfunc(msg_prefix + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + msg_suffix)
         collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
         self.printfunc(msg_prefix + ' collision pairs: ' + str(collision_pairs))
+        colliding = set(colliding_sweeps)
+        if assert_no_unresolved and colliding:
+            self.printfunc(self.get_details_str(colliding, label='colliding'))
+            err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+            self.printfunc(err_str)
+            self.petal.enter_pdb()
+            # assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
         return colliding_sweeps, all_sweeps, collision_pairs
 
     def _schedule_moves_check_final_sweeps_continuity(self):
@@ -791,7 +829,7 @@ class PosSchedule(object):
             self.stats.add_final_collision_check(collision_pairs)
             colliding_posids = set(colliding_sweeps.keys())
             colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
-            self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+            self.stats.add_unresolved_colliding_at_stage('final', colliding_posids, colliding_tables, colliding_sweeps)
 
     def _schedule_moves_store_requests_info(self):
         """Goes through the move tables, matching up original request information

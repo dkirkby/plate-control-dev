@@ -24,7 +24,6 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
-import poscollider
 
 # set up logger
 import simple_logger
@@ -86,13 +85,16 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
 query_keys_map = {'PTL_X': 'ptlX',
                   'PTL_Y': 'ptlY',
                   'OBS_X': 'obsX',
-                  'OBS_Y': 'obsY'}
+                  'OBS_Y': 'obsY',
+                  }
 
 # petal-wide keys for storage in positioner data rows
 pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal',
-                  'PETAL_LOC': 'location number of petal on focal plane (c.f. DESI-3596)'}
+                  'PETAL_LOC': 'location number of petal on focal plane (c.f. DESI-3596)',
+                  }
 pos_petal_attr_map = {'PETAL_ID': 'petal_id',
-                      'PETAL_LOC': 'petal_loc'}
+                      'PETAL_LOC': 'petal_loc',
+                      }
 
 # petal-wide keys for storage in meta-data
 other_petal_keys = {'PETAL_ALIGNMENTS': '6 DOF transformation parameters from "PTL" local coordinates to "OBS" a.k.a. "CS5" a.k.a. "FP" global coordinates'}
@@ -103,32 +105,40 @@ keepout_T_note = f'central body (theta) polygon {flat_note}'
 keepout_P_note = f'eccentric body (phi) keepout polygon {flat_note}'
 general_collider_keys = {'timestep': '[sec] quantization when sweeping polygons through rotation schedules, to check for collisions',
                          'Eo_phi': '[deg] poslocP angle (poslocP = POS_P + OFFSET_P) above which phi is defined to be within envelope "Eo" (i.e. retracted)',
-                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle',
-                         'general_keepout_T': f'basic {keepout_T_note}',
-                         'general_keepout_P': f'basic {keepout_P_note}',
-                         'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
-                         'keepout_GFA': f'GFA boundary keepout polygon {flat_note}', 
+                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle', 
                          }
-pos_collider_keys = {'KEEPOUT_T': keepout_T_note,
-                     'KEEPOUT_P': keepout_P_note,
-                     'POS_NEIGHBORS': 'neighboring positioners',
-                     'FIXED_NEIGHBORS': 'neighboring fixed boundaries'}
-pos_collider_attr_map = {'KEEPOUT_T': 'keepouts_T',
+collider_general_poly_keys = {'general_keepout_T': f'basic {keepout_T_note}',
+                              'general_keepout_P': f'basic {keepout_P_note}',
+                              'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
+                              'keepout_GFA': f'GFA boundary keepout polygon {flat_note}',
+                              }
+collider_query_keys = {'POS_NEIGHBORS': 'neighboring positioners',
+                       'FIXED_NEIGHBORS': 'neighboring fixed boundaries',
+                       }
+collider_pos_poly_keys = {'KEEPOUT_T': keepout_T_note,
+                         'KEEPOUT_P': keepout_P_note,
+                         }
+collider_pos_attr_map = {'KEEPOUT_T': 'keepouts_T',
                          'KEEPOUT_P': 'keepouts_P',
                          'POS_NEIGHBORS': 'pos_neighbors',
-                         'FIXED_NEIGHBORS': 'fixed_neighbor_cases'}
+                         'FIXED_NEIGHBORS': 'fixed_neighbor_cases',
+                         }
 
 # dependently-calculated fields
 offset_variants = {'PTL': 'ptlXY', 'CS5': 'obsXY'}
 offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' for coord in ['OFFSET_X', 'OFFSET_Y'] for var, system in offset_variants.items()}
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
-range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for func in ['max', 'min'] for c in ['T', 'P']}
+range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
+range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
+query_keys.update(range_keys)
+query_keys_map.update(range_keys_map)
 
 # summarize all keys and units (where applicable)
 all_pos_keys = {}
 all_pos_keys.update(pos_petal_keys)
 all_pos_keys.update(query_keys)
-all_pos_keys.update(pos_collider_keys)
+all_pos_keys.update(collider_query_keys)
+all_pos_keys.update(collider_pos_poly_keys)
 all_pos_keys.update(offset_variant_keys)
 all_pos_keys.update(range_keys)
 angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
@@ -147,7 +157,7 @@ polygons = 'KEEPOUT_T', 'KEEPOUT_P', 'general_keepout_T', 'general_keepout_P'
 roles = {}
 apps = {}
 ptls = {}
-logger.info(f'Attempting to retrieve data for {len(petal_ids)} petals: {petal_ids}')
+logger.info(f'Attempting to retrieve data for {len(petal_ids)} petal{"s" if len(petal_ids) > 1 else ""}: {petal_ids}')
 try:
     import PetalApp
     from DOSlib.proxies import Petal
@@ -198,13 +208,17 @@ else:
                           )
         ptls[petal_id] = ptl
         
-def getattr_collider(ptl, attr):
-    '''Wrapper around getattr. Specifically for getting a property from the
-    collider sub-module of petal. When online this is behind the DOS proxy wall
-    and so requires app_get(). Whereas offline it uses normal getattr().'''
+def getattr2(ptl, module_name, attr):
+    '''Wrapper around getattr. Specifically for getting a property from submodules
+    petal. Because when online this is behind the DOS proxy wall and so requires
+    app_get(). Whereas offline it uses normal getattr(). So this function wraps
+    that choice.'''
     if online:
-        return ptl.app_get(f'collider.{attr}')
-    return getattr(ptl.collider, attr)
+        s = f'{module_name}.{attr}' if module_name else f'{attr}'
+        return ptl.app_get(s)
+    module = getattr(ptl, module_name) if module_name else ptl
+    return getattr(module, attr)
+    
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
@@ -246,53 +260,59 @@ try:
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values
-        for key in set(query_keys) | set(pos_collider_keys):
+        keys = set(query_keys) | set(collider_query_keys)
+        logger.info(f' ...collecting calib data for {len(keys)} queryable fields...')
+        for key in keys:
             if key in query_keys:
                 query_key = query_keys_map[key] if key in query_keys_map else key
                 this_dict = ptl.quick_query(key=query_key, mode='iterable')
             else:
-                attr_key = pos_collider_attr_map[key]
-                this_dict = getattr_collider(ptl, attr_key)
+                attr_key = collider_pos_attr_map[key]
+                this_dict = getattr2(ptl, 'collider', attr_key)
                 if 'fixed' in attr_key.lower():
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
-                sample = this_dict[posids_ordered[0]]
-                if isinstance(sample, poscollider.PosPoly):
-                    this_dict = {posid: str(poly.points) for posid, poly in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
+            
+        # polygons from collider
+        logger.info(' ...collecting polygon data...')
+        polys = ptl.get_collider_polygons()
+        collider_pos_attr_map_inverted = {v:k for k,v in collider_pos_attr_map.items()}
+        for key, val in polys.items():
+            if key in collider_general_poly_keys:
+                meta[key] = str(polys[key])
+            else:
+                data_key = collider_pos_attr_map_inverted[key]
+                this_dict = polys[key]
+                this_list = [str(this_dict[p]) for p in posids_ordered]
+                data[data_key].extend(this_list)
     
-        # dependent values
-        for posid in posids_ordered:
-            model = ptl.posmodels[posid]
-            flat_offset_xy = (ptl.collider.x0[posid], ptl.collider.y0[posid])
-            for suffix, coord in offset_variants.items():
-                if coord == 'obsXY':   
-                    xy_new = model.trans.flatXY_to_obsXY(flat_offset_xy, cast=True)
-                elif coord == 'ptlXY':
-                    xy_new = model.trans.flatXY_to_ptlXY(flat_offset_xy)
-                else:
-                    assert2(False, f'unexpected destination coordinates {coord}')
-                data[f'OFFSET_X_{suffix}'].append(float(xy_new[0]))
-                data[f'OFFSET_Y_{suffix}'].append(float(xy_new[1]))
-            for key in range_keys:
-                func = max if 'MAX' in key else min
-                rng = model.targetable_range_posintT if 'T' in key else model.targetable_range_posintP
-                data[key].append(func(rng))
+        # transformed values
+        logger.info(' ...collecting calculated values...')
+        offset_keys = ['OFFSET_X', 'OFFSET_Y']
+        offsets = {key: ptl.quick_query(key=key, mode='iterable') for key in offset_keys}
+        flat_offset_xy = {posid: tuple(offsets[key][posid] for key in offset_keys) for posid in posids_ordered}
+        for suffix, coord_sys in offset_variants.items():
+            coord = [{'posid': posid, 'uv1': flat_offset_xy[posid]} for posid in posids_ordered]
+            coord = ptl.transform(cs1='flatXY', cs2=coord_sys, coord=coord)
+            x_out = [c['uv2'][0] for c in coord]
+            y_out = [c['uv2'][1] for c in coord]
+            data[f'OFFSET_X_{suffix}'].extend(x_out)
+            data[f'OFFSET_Y_{suffix}'].extend(y_out)
+
+        logger.info(' ...collecting petal-wide values...')        
+        # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
+        # any petal. Here, I simply use the last ptl instance from the for loop above.
+        meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
+        for key in general_collider_keys:
+            meta[key] = getattr2(ptl, 'collider', key)
         
         # petal-wide values
         for key, attr in pos_petal_attr_map.items():
-            value = getattr(ptl, attr)
+            value = getattr2(ptl, None, attr)
             data[key].extend([value] * len(posids_ordered))
-        meta['PETAL_ALIGNMENTS'][petal_id] = ptl.trans.petal_alignment
-            
-    # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
-    # any petal. Here, I simply use the last ptl instance from the for loop above.
-    meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
-    for key in general_collider_keys:
-        meta[key] = getattr_collider(ptl, key)
-        if isinstance(meta[key], poscollider.PosPoly):
-            meta[key] = str(meta[key].points)
-        
+        meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
+                    
     logger.info('All data gathered, generating table format...')
     t = Table(data)
     t.meta = meta
@@ -311,8 +331,7 @@ try:
     logger.info(f'Data saved to: {save_path}')
     
     # save a reference to this file in a standard place
-    ref_dir = pc.dirs['temp_files']
-    ref_path = os.path.join(ref_dir, 'latest_fp_calibs.txt')
+    ref_path = pc.fp_calibs_path_cache
     with open(ref_path, mode='w') as file:
         file.write(save_path)
     logger.info(f'File path cached at standard location: {ref_path}')

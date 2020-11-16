@@ -65,6 +65,7 @@ default_collider_filename = '_collision_settings_DEFAULT.conf'
 def get_keepouts_cache_path(petal_id):
     filename = f'keepouts_cache_petal_id_{petal_id}.ecsv'
     return os.path.join(dirs['temp_files'], filename)
+fp_calibs_path_cache = os.path.join(dirs['temp_files'], 'latest_fp_calibs.txt')
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
@@ -233,6 +234,10 @@ other_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
                         'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
                         'CALIB_NOTE', 'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
+posmodel_range_names = {'targetable_range_posintT', 'targetable_range_posintP', 'full_range_posintT', 'full_range_posintP'}
+posmodel_keys = set()
+for name in posmodel_range_names:
+    posmodel_keys |= {f'max_{name}', f'min_{name}'}
 
 # test for whether certain posstate keys are classified as "calibration" vals
 calib_keys = set(nominals.keys()) | set(keepout_keys) | other_pos_calib_keys | fiducial_calib_keys
@@ -273,6 +278,11 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
                   }
 def is_constants_key(key):
     return key.upper() in constants_keys
+
+# data fields which must *always* be accompanied by a comment
+require_comment_to_store = {'CTRL_ENABLED',
+                            'DEVICE_CLASSIFIED_NONFUNCTIONAL',
+                            'FIBER_INTACT'}
 
 # state data fields associated with "late" committing to database
 late_commit_defaults = {'OBS_X': None,

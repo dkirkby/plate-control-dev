@@ -402,7 +402,7 @@ class Petal(object):
             if error:
                 marked_for_delete.add(posid)
                 error_str = f'{"move request retry: " if _is_retry else ""}{error}'
-                self.print_and_store_note(posid, error_str)
+                self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
         return requests
@@ -486,7 +486,7 @@ class Petal(object):
             error = self.schedule.expert_add_table(table)
             if error:
                 denied.add(posid)
-                self.print_and_store_note(posid, f'direct_dtdp: {error}')
+                self._print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
         return requests
@@ -533,7 +533,7 @@ class Petal(object):
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
             error = self.schedule.expert_add_table(table)
             if error:
-                self.print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
+                self._print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
 
     def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
@@ -1082,7 +1082,7 @@ class Petal(object):
         else:
             return 'Not in petal'
 
-    def set_posfid_val(self, device_id, key, value, check_existing=False):
+    def set_posfid_val(self, device_id, key, value, check_existing=False, comment=''):
         """Sets a single value to a positioner or fiducial. In the case of a 
         fiducial, this call does NOT turn the fiducial physically on or off.
         It only saves a value.
@@ -1092,15 +1092,23 @@ class Petal(object):
         The boolean arg check_existing only changes things if the old value
         differs from new. A special return value of None is returned if the
         new value is the same.
+        
+        Comment allows associating a note string with the change. If a comment
+        is provided, then check_existing will be automatically forced to True.
         """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
+        if key in pc.require_comment_to_store and not comment:
+                raise ValueError(f'setting {key} requires an accompanying comment string')
         state = self.states[device_id]
-        if check_existing:
+        if check_existing and comment:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
         accepted = state.store(key, value, register_if_altered=True)
+        if comment and accepted:
+            comment_field = 'CALIB_NOTE' if pc.is_calib_key(key) else 'LOG_NOTE'
+            self.set_posfid_val(device_id, comment_field, comment)
         return accepted
     
     def get_posids_with_commit_pending(self):
@@ -1183,8 +1191,8 @@ class Petal(object):
         turned on.
         '''
         assert mode in {'move', 'calib'}, f'invalid mode {mode} for _send_to_db_as_necessary'
+        is_move = mode == 'move'
         if self.db_commit_on and not self.simulator_on:
-            is_move = mode == 'move'
             if is_move:
                 type1, type2 = 'pos_move', 'fid_data'
             else:
@@ -1209,10 +1217,12 @@ class Petal(object):
                     self._devids_committed_this_exposure |= committed_posids
         
         # known minor issue: if local_log_on simultaneously with DB, these may clear the note field
-        for state in self.altered_states:
-            state.clear_log_notes()
-        for state in self.altered_calib_states:
-            state.clear_calib_notes()
+        if is_move:
+            for state in self.altered_states:
+                state.clear_log_notes()
+        else:
+            for state in self.altered_calib_states:
+                state.clear_calib_notes()
             
     def _write_local_logs_as_necessary(self, states):
         '''Saves state data to disk, if those behaviors are currently turned on.'''
@@ -1523,12 +1533,13 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
-    def get_posmodel_params(self, posid):
+    def get_posmodel_params(self, posid, as_dict=False):
         '''Returns a formatted string describing the current parameters known to
         the posmodel instance for a given positioner.
         
         INPUTS:
             posid ... string identifying the positioner
+            as_dict ... boolean, returns a dict rather than formatted string (default=False)
         '''
         properties = ['canid', 'busid', 'deviceloc', 'is_enabled', 'expected_current_position',
                       'full_range_posintT', 'full_range_posintP',
@@ -1537,16 +1548,19 @@ class Petal(object):
         def formatter(key, value):
             return f'\n {key:12s} : {value}'
         if posid in self.posmodels:
-            out = f'{posid}:'
+            out = {} if as_dict else f'{posid}:'
             for name in properties:
                 prop = getattr(self.posmodels[posid], name)
+                if as_dict:
+                    out[name] = prop
+                    continue
                 if isinstance(prop, dict):
                     for k, v in prop.items():
                         out += formatter(k,v)
                 else:
                     out += formatter(name, prop)
         else:
-            out = f'No posid {posid} found'
+            out = {} if as_dict else f'No posid {posid} found'
         return out
     
     def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False, sort='POSID'):
@@ -1668,8 +1682,9 @@ class Petal(object):
         position_keys = set(pc.single_coords)
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
         constants_keys = set(pc.constants_keys)
+        model_keys = set(pc.posmodel_keys)
         id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
-        valid_keys = position_keys | state_keys | constants_keys | id_keys
+        valid_keys = position_keys | state_keys | constants_keys | id_keys | model_keys
         valid_ops = {'>': operator.gt,
                      '>=': operator.ge,
                      '==': operator.eq,
@@ -1713,6 +1728,17 @@ class Petal(object):
                 if suffix in {'T', 'X', 'Q'}:
                     return pair[0]
                 return pair[1]
+        elif key in model_keys:
+            func = lambda x: x  # place-holder
+            attr = key
+            for func_name in ['max', 'min']:
+                prefix = f'{func_name}_'
+                if prefix in key and '_range_' in key:
+                    func = eval(func_name)
+                    attr = key.split(prefix)[-1]
+                    break
+            def getter(posid):
+                return func(getattr(self.posmodels[posid], attr))
         else:
             def getter(posid):
                 return self.states[posid]._val[key]
@@ -1869,6 +1895,13 @@ class Petal(object):
         s = f'num pos with overlapping polygons = {len(listified)}'
         s += f'\n{listified}'
         return s
+    
+    def get_disabled_by_relay(self):
+        '''Returns list of posids which the petalcontroller reports as being
+        disabled by relay.
+        '''
+        conf_data = self.comm.pbget('conf_file')
+        return conf_data['disabled_by_relay']
              
     def _validate_posids_arg(self, posids):
         '''Handles / validates a user argument of posids. Returns a set.'''
@@ -1883,6 +1916,12 @@ class Petal(object):
         unknowns = posids - self.posids
         assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
         return posids
+
+    def expert_pdb(self):
+        '''Expert command to enter debugger.
+        '''
+        import pdb
+        pdb.set_trace()
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
@@ -1916,7 +1955,7 @@ class Petal(object):
         output_path = self.animator.animate()
         self.printfunc(f'Animation saved to {output_path}.')
         return output_path
-
+    
 # INTERNAL METHODS
 
     def _hardware_ready_move_tables(self):
@@ -2062,7 +2101,7 @@ class Petal(object):
                     for move_table in expert_tables_to_retry:
                         error = self.schedule.expert_add_table(move_table)
                         if error:
-                            self.print_and_store_note(move_table.posid, f'expert table retry: {error}')
+                            self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
                 else:
                     cleaned = {}
                     for posid, req in requests_to_retry.items():
@@ -2094,9 +2133,8 @@ class Petal(object):
         for posid in posids:
             self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
             if auto_disabling_on and self.posmodels[posid].is_enabled:
-                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True)
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
                 if accepted:
-                    self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
                     disabled.add(posid)
         if disabled:
             self.printfunc(f'{len(disabled)} positioners disabled due to communication error: {disabled}')
@@ -2197,12 +2235,12 @@ class Petal(object):
            KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
         """
         if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with DEVICE_CLASSIFIED_NONFUNCTIONAL')
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('NONFUNCTIONAL', self.missing_flag)
             self.disabled_devids.append(devid)
         if not self.get_posfid_val(devid, 'FIBER_INTACT'):
-            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with FIBER_INTACT == False')
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('BROKENFIBER', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('BADPOSFID', self.missing_flag)
@@ -2254,7 +2292,7 @@ class Petal(object):
         self._apply_all_state_enable_settings()
         self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
-        self.commit(mode='both', log_note='auto-commit lingering data during petal configure') # commit uncommitted changes to DB
+        self.commit(mode='both', log_note='auto-committed during petal configure') # commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
 
@@ -2269,13 +2307,53 @@ class Petal(object):
         elif posid in self._posids_where_tables_were_just_sent:
             self._posids_where_tables_were_just_sent.remove(posid)
 
-    def print_and_store_note(self, posid, msg):
+    def _print_and_store_note(self, posid, msg):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
         self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
-
+        
+    def get_collider_polygons(self):
+        '''Gets the point data for all polygons known to the collider as 2xN
+        python lists (i.e. not PosPoly objects, which have trouble pickling their
+        way through a DOS proxy interface).
+        
+        INPUTS:  none
+        OUTPUTS: dict with ...
+                   ... keys = 'keepouts_T', 'keepouts_P', 'keepout_PTL', 'keepout_GFA', 'general_keepout_T', 'general_keepout_P'
+                   ... values = point data for the corresponding polys in self.collider (but as 2xN python lists, rather than PosPoly instances)
+        '''
+        keys = ['keepouts_T', 'keepouts_P', 'keepout_PTL', 'keepout_GFA', 'general_keepout_T', 'general_keepout_P']
+        out = {}
+        for key in keys:
+            this = getattr(self.collider, key)
+            if isinstance(this, poscollider.PosPoly):
+                out[key] = this.points
+            elif isinstance(this, dict):
+                out[key] = {subkey: poly.points for subkey, poly in this.items()}
+            else:
+                assert False, f'unrecognized type {type(this)} for key {key}'
+        return out
+    
+    def transform(self, cs1, cs2, coord):
+        '''Batch transformation of coordinates.
+        
+        INPUTS:  cs1 ... str, input coordinate system
+                 cs2 ... str, output coordinate system
+                 coord ... list of dicts, each dict must contain:
+                     'posid': positioner id string
+                     'uv1': list or tuple giving the coordinate pair to be transformed
+        
+        OUTPUT:  same as coord, but now with 'uv2' field added
+                 order of coord *will* be preserved
+        '''
+        for d in coord:
+            trans = self.posmodels[d['posid']].trans
+            func = trans.construct(coord_in=cs1, coord_out=cs2)
+            d['uv2'] = func(d['uv1'])
+        return coord
+        
 if __name__ == '__main__':
     '''
     python -m cProfile -s cumtime petal.py
