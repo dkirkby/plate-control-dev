@@ -1896,6 +1896,12 @@ class Petal(object):
         assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
         return posids
 
+    def expert_pdb(self):
+        '''Expert command to enter debugger.
+        '''
+        import pdb
+        pdb.set_trace()
+
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
     def start_gathering_frames(self):
