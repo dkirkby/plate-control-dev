@@ -806,7 +806,10 @@ class PosSchedule(object):
         colliding = set(colliding_sweeps)
         if assert_no_unresolved and colliding:
             self.printfunc(self.get_details_str(colliding, label='colliding'))
-            assert False, f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'       
+            err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+            self.printfunc(err_str)
+            self.petal.enter_pdb()
+            # assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
         return colliding_sweeps, all_sweeps, collision_pairs
 
     def _schedule_moves_check_final_sweeps_continuity(self):
