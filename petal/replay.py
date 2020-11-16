@@ -127,7 +127,7 @@ else:
     t = vstack(input_tables)
     t.sort(keys=['POS_ID', 'DATE'])
     print_read_complete()
-    t.write(cache_path)
+    t.write(cache_path, overwrite=True)
     print(f'Wrote data to cache at {cache_path}. (For repeat runs with same data, you can use -c option to read this data from cache, which is much faster.)')
 
 print('Setting up petal data...')
