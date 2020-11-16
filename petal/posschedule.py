@@ -805,7 +805,7 @@ class PosSchedule(object):
         self.printfunc(msg_prefix + ' collision pairs: ' + str(collision_pairs))
         colliding = set(colliding_sweeps)
         if assert_no_unresolved and colliding:
-            print(self.get_details_str(colliding, label='colliding'))
+            self.printfunc(self.get_details_str(colliding, label='colliding'))
             assert False, f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'       
         return colliding_sweeps, all_sweeps, collision_pairs
 
