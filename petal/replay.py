@@ -29,6 +29,7 @@ parser.add_argument('-v', '--verbose', action='store_true', help='turn on additi
 parser.add_argument('-t', '--tp_update', action='store_true', help='for each move, force POS_T and POS_P to adopt values from data file (rather than using the simulated values from the previous move), thus any tp_updates done by the online system will be incorporated in sim')
 parser.add_argument('-d', '--display_posids', type=str, default='', help='one or more posids (comma-separated) for which you want extra information printed')
 parser.add_argument('-c', '--reuse_cached_data', action='store_true', help='re-use cached data from previous run (faster to read from disk for repeat uses)')
+parser.add_argument('-r', '--reconstruct_corrections', action='store_true', help='attempts to reconstruct correction delta targets (useful for debugging a crash during a correction move, before data got into DB')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -184,6 +185,10 @@ assert start_move <= final_move, f'final move index {final_move} must be >= than
 should_run = np.logical_and(t['MOVE_ID'] >= start_move, t['MOVE_ID'] <= final_move)
 should_run = np.logical_and(should_run, t['HAS_MOVE_CMD'])
 t['SHOULD_RUN'] = should_run
+
+# set up columns for reconstructed correction calcs
+t['RECORR_VAL1'] = [0.0]*len(t)
+t['RECORR_VAL2'] = [0.0]*len(t)
 
 # helper functions
 def get_row(posid, move_id=None, date=None, prior=False):
@@ -347,6 +352,30 @@ for move_id in move_ids:
                 print(f'{posid_str}{tab}{ptl_coord:8}{tab}{exp_str:20}{tab}{dat_str:20}{tab}{err:>6.3f}')
                 if posid_str:
                     posid_str = ' ' * len(posid_str)
+    if uargs.reconstruct_corrections:
+        # 2020-11-16 [JHS] currently only supporting poslocXY, and only the first correction move
+        # that is what I need "today" for some debugging, and more generality will take too much time
+        recorr_requests = {}
+        for i in run_now_idxs:
+            posid = t[i]['POS_ID']
+            req = requests[posid]
+            if req['command'] == 'poslocXY':
+                trans = ptl.posmodels[posid].trans
+                meas_ptl_xy = [t[i][key] for key in ['PTL_X', 'PTL_Y']]
+                meas_loc_xy = trans.ptlXY_to_poslocXY(meas_ptl_xy)
+                delta_xy = trans.delta_XY(meas_loc_xy, req['target'])
+                t[i]['RECORR_VAL1'] = delta_xy[0]
+                t[i]['RECORR_VAL2'] = delta_xy[1]
+                recorr_requests[posid] = {'command': 'poslocdXdY', 'target':delta_xy}
+        sel = [i for i in run_now_idxs if t[i]['POS_ID'] in display_posids]
+        print(f'\nDoing a reconstructed correction move on {len(recorr_requests)} positioner(s)...')
+        print('\nCorrection amounts for display posids are:')
+        print(t[sel]['POS_ID', 'RECORR_VAL1', 'RECORR_VAL2'])
+        print('')
+        ptl.request_targets(recorr_requests)
+        ptl.schedule_moves()
+        ptl._cancel_move()
+        
 if ptl.schedule_stats.is_enabled():
     ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
     print(f'Stats saved to {ptl.sched_stats_path}')
