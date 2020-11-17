@@ -194,17 +194,11 @@ def generate_target_set(posids):
             else:
                 targets_obsTP[posid] = this_obsTP
                 targets_posXY[posid] = this_posXY
-        if attempts_remaining < 0:
+        if attempts_remaining <= 0:
             v = model.state._val
             print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
                   f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')
-        
-    # 2020-11-16 [JHS] temporary, for debugging a particular occasional key error
-    missing_posids = set(posids) - set(targets_posXY)
-    if missing_posids:
-        print(f'Some posid(s) are missing from the targets group: {missing_posids}')
-        import pdb
-        pdb.set_trace()
+            import pdb; pdb.set_trace()
     return targets_posXY
 
 def generate_request_set(targets):
