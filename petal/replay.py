@@ -368,13 +368,14 @@ for move_id in move_ids:
                 t[i]['RECORR_VAL2'] = delta_xy[1]
                 recorr_requests[posid] = {'command': 'poslocdXdY', 'target':delta_xy}
         sel = [i for i in run_now_idxs if t[i]['POS_ID'] in display_posids]
-        print(f'\nDoing a reconstructed correction move on {len(recorr_requests)} positioner(s)...')
-        print('\nCorrection amounts for display posids are:')
-        print(t[sel]['POS_ID', 'RECORR_VAL1', 'RECORR_VAL2'])
-        print('')
-        ptl.request_targets(recorr_requests)
-        ptl.schedule_moves()
-        ptl._cancel_move()
+        if sel:
+            print(f'\nDoing a reconstructed correction move on {len(recorr_requests)} positioner(s)...')
+            print('\nCorrection amounts for display posids are:')
+            print(t[sel]['POS_ID', 'RECORR_VAL1', 'RECORR_VAL2'])
+            print('')
+            ptl.request_targets(recorr_requests)
+            ptl.schedule_moves()
+            ptl._cancel_move()
         
 if ptl.schedule_stats.is_enabled():
     ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
