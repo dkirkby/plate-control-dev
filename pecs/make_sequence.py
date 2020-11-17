@@ -269,6 +269,14 @@ for m in range(uargs.num_moves):
     n_collisions_resolved += [sel['n_resolved']]
     print(f'Move {m}: Targets selected. Num collisions avoided = {n_collisions_resolved[-1]}')
     set_posTP(sel['final_posTP'])
+    
+    # 2020-11-16 [JHS] temporary, for debugging a particular occasional key error
+    missing_posids = set(movers) - set(sel['targets'])
+    if missing_posids:
+        print(f'Some posid(s) are missing from the targets group: {missing_posids}')
+        import pdb
+        pdb.set_trace()
+    
     move = sequence.Move(command='poslocXY',
                          target0=[sel['targets'][posid][0] for posid in movers],
                          target1=[sel['targets'][posid][1] for posid in movers],
