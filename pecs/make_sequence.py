@@ -198,6 +198,13 @@ def generate_target_set(posids):
             v = model.state._val
             print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
                   f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')
+        
+    # 2020-11-16 [JHS] temporary, for debugging a particular occasional key error
+    missing_posids = set(posids) - set(targets_posXY)
+    if missing_posids:
+        print(f'Some posid(s) are missing from the targets group: {missing_posids}')
+        import pdb
+        pdb.set_trace()
     return targets_posXY
 
 def generate_request_set(targets):
@@ -268,15 +275,7 @@ for m in range(uargs.num_moves):
     sel = {k:v[selection] for k,v in candidates.items()}
     n_collisions_resolved += [sel['n_resolved']]
     print(f'Move {m}: Targets selected. Num collisions avoided = {n_collisions_resolved[-1]}')
-    set_posTP(sel['final_posTP'])
-    
-    # 2020-11-16 [JHS] temporary, for debugging a particular occasional key error
-    missing_posids = set(movers) - set(sel['targets'])
-    if missing_posids:
-        print(f'Some posid(s) are missing from the targets group: {missing_posids}')
-        import pdb
-        pdb.set_trace()
-    
+    set_posTP(sel['final_posTP'])    
     move = sequence.Move(command='poslocXY',
                          target0=[sel['targets'][posid][0] for posid in movers],
                          target1=[sel['targets'][posid][1] for posid in movers],
