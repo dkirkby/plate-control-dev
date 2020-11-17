@@ -197,8 +197,7 @@ def generate_target_set(posids):
         if attempts_remaining <= 0:
             v = model.state._val
             print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
-                  f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')
-            import pdb; pdb.set_trace()
+                  f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')        
     return targets_posXY
 
 def generate_request_set(targets):
@@ -268,12 +267,13 @@ for m in range(uargs.num_moves):
     selection = candidates['n_resolved'].index(max(candidates['n_resolved']))
     sel = {k:v[selection] for k,v in candidates.items()}
     n_collisions_resolved += [sel['n_resolved']]
-    print(f'Move {m}: Targets selected. Num collisions avoided = {n_collisions_resolved[-1]}')
-    set_posTP(sel['final_posTP'])    
+    set_posTP(sel['final_posTP'])
+    posids_with_targ = sorted(set(sel['targets']) & set(movers))
+    print(f'Move {m}: Targets selected for {len(posids_with_targ)} positioners. Num collisions avoided = {n_collisions_resolved[-1]}')
     move = sequence.Move(command='poslocXY',
-                         target0=[sel['targets'][posid][0] for posid in movers],
-                         target1=[sel['targets'][posid][1] for posid in movers],
-                         device_loc=[ptl.posmodels[posid].deviceloc for posid in movers],
+                         target0=[sel['targets'][posid][0] for posid in posids_with_targ],
+                         target1=[sel['targets'][posid][1] for posid in posids_with_targ],
+                         device_loc=[ptl.posmodels[posid].deviceloc for posid in posids_with_targ],
                          log_note='',
                          pos_settings={},
                          allow_corr=True,
