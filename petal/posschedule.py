@@ -198,8 +198,8 @@ class PosSchedule(object):
           None      ... Expert use only.
 
           'freeze'  ... If any collisions are found, the colliding positioner
-                        is frozen at its original position. This setting is
-                        suitable for small correction moves.
+                        is frozen prior to the requested target position. This
+                        setting is suitable for small correction moves.
 
           'adjust'  ... If any collisions are found, the motion paths of the
                         colliding positioners are adjusted to attempt to avoid
