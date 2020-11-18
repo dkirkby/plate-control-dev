@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file')
 uargs = parser.parse_args()
 
-data = pd.read_csv(uargs['infile'])
+data = pd.read_csv(uargs.infile)
 assert 'POS_ID' in data.columns, 'POS_ID must be present in the input file'
 
 input('WARNING: this script may have undesirable interactions with an active instance. DO NOT use with an active instance. DO NOT use in place of set_calibrations.py. Hit enter to agree.')
@@ -69,13 +69,14 @@ columns_to_update = columns & allowed_keys
 
 assert len(columns_to_update) != 0, 'No columns to update'
 print(f'Accepted columns: {columns_to_update}')
-print(f'Columns {disallowed} will *not* be changed. Only {allowed_keys} are allowed.'
-      f'This is our current policy (as of {allowed_date}) in order to restrict ' 
-      f'the power/risk of this script. The more general, "proper" method of ' 
-      f'updating calibration settings is via set_calibrations.py. Procedures ' 
-      f'are provided in DESI-5732. Additionally, certain limited parameters ' 
-      f'may be safely set at the PETAL console. Enter command "readme" there ' 
-      f'for more information.')
+if disallowed:
+    print(f'Columns {disallowed} will *not* be changed. Only {allowed_keys} are allowed.'
+          f'This is our current policy (as of {allowed_date}) in order to restrict ' 
+          f'the power/risk of this script. The more general, "proper" method of ' 
+          f'updating calibration settings is via set_calibrations.py. Procedures ' 
+          f'are provided in DESI-5732. Additionally, certain limited parameters ' 
+          f'may be safely set at the PETAL console. Enter command "readme" there ' 
+          f'for more information.')
 
 posids = set(data['POS_ID'])
 posstates = get_posstates(posids)
@@ -107,6 +108,8 @@ os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
 for ptlid in ptlids:
     posmoveDB = DBSingleton(petal_id=ptlid)
     if ptlid in set(altered_states.keys()):
-        posmoveDB.WriteToDB(altered_states[ptlid], ptlid, 'pos_move')
+        if altered_states[ptlid]: #make sure its not an empty set
+            posmoveDB.WriteToDB(altered_states[ptlid], ptlid, 'pos_move')
     if ptlid in set(altered_calib_states.keys()):
-        posmoveDB.WriteToDB(altered_calib_states[ptlid], ptlid, 'pos_calib')
+        if altered_calib_states[ptlid]: #make sure its not an empty set
+            posmoveDB.WriteToDB(altered_calib_states[ptlid], ptlid, 'pos_calib')
