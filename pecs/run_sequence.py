@@ -35,7 +35,7 @@ parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
-parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents value. Defaults to values specified in sequence file. This arg two ways to override: (a) integer between 1 and 100 --> uses that setting value, or (b) argue 0 to use existing values from online system')
+parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents value. Defaults to values specified in sequence file. This arg gives you two ways to override: (a) integer between 1 and 100 --> uses that value for all positioners, or (b) argue 0 to use existing values for each pos, taken from online system')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
