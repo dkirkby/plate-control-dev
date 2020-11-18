@@ -35,6 +35,7 @@ parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
+parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents value. Defaults to values specified in sequence file. This arg two ways to override: (a) integer between 1 and 100 --> uses that setting value, or (b) argue 0 to use existing values from online system')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -46,6 +47,7 @@ assert uargs.prepark in park_options, f'invalid park option, must be one of {par
 assert uargs.postpark in park_options, f'invalid park option, must be one of {park_options}'
 uargs.prepark = None if uargs.prepark in ['None', 'False'] else uargs.prepark
 uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
+assert uargs.motor_current == None or 0 <= uargs.motor_current <= 100, f'out of range argument {uargs.motor_current} for motor current parameter'
 
 # read sequence file
 import sequence
@@ -222,7 +224,6 @@ def trans(posid, method, *args, **kwargs):
     result = ptlcall('postrans', posid, method, *args, **kwargs) 
     return result
 
-
 # general settings for the move measure function
 if uargs.match_radius == None and pecs_on:
     uargs.match_radius = pecs.match_radius
@@ -230,8 +231,25 @@ move_meas_settings = {key: uargs.__dict__[key] for key in ['match_radius', 'chec
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
 # motor settings (must be made known to petal.py and FIPOS)
-motor_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
+motor_current_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
+motor_settings = motor_current_settings | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
+
+# overrides of positioner settings
+use_online_value = 'use_online_value'
+pos_settings_overrides = {}
+currents_txt = 'Using motor currents: '
+if uargs.motor_current == None:
+    new = {}
+    currents_txt += 'as-specified in the sequence file'
+elif uargs.motor_current == 0:
+    new = {key: use_online_value for key in motor_current_settings}
+    currents_txt += 'as-specified for each individual positioner in the online system'
+else:
+    new = {key: uargs.motor_current for key in motor_current_settings}
+    currents_txt += f'uniformly set at the run_sequence command line, value={uargs.motor_current}'
+logger.info(currents_txt)
+pos_settings_overrides.update(new)
 
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
@@ -301,6 +319,24 @@ def apply_pos_settings(settings):
                     ' parameters. Now pushing new settings to petal controllers on petals' +
                     f' {motor_update_petals}')
         pecs.ptlm.set_motor_parameters(participating_petals=list(motor_update_petals))
+        
+def update_with_pos_overrides(settings):
+    '''Return copy of settings dict, to which any global overrides have been applied.
+    Input shuld have keys/values formatted like sequence.pos_defaults.
+    '''
+    new = settings.copy()
+    if not pos_settings_overrides:
+        return new
+    prefix = 'Overriding a positioner setting: '
+    width = max([len(key) for key in pos_settings_overrides]) + 4
+    fill = '.'
+    for key, value in pos_settings_overrides.items():
+        if value != use_online_value:
+            new[key] = value
+        elif key in new:
+            del new[key]
+        logger.info(f'{prefix}{key + " ":{fill}<{width}} set to {value}')
+    return new                
 
 def calc_poslocXY_errors(requests, results):
     '''Calculates positioning errors based on initial requested targets and
@@ -485,6 +521,10 @@ def park(park_option, is_prepark=True):
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
+    pos_settings = sequence.pos_defaults
+    pos_settings = update_with_pos_overrides(pos_settings)
+    logger.info(f'Positioner settings during parking: {pos_settings}')
+    all_pos_settings = {posid: pos_settings for posid in get_posids()}
     if real_moves:
         kwargs = {'posids': all_to_park,
                   'mode': 'normal',
@@ -499,6 +539,7 @@ def park(park_option, is_prepark=True):
             pecs.tp_frac = 1.0
             if orig_tp_frac != pecs.tp_frac:
                 logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
+        apply_pos_settings(all_pos_settings)
         pecs.park_and_measure(**kwargs)
         if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
             pecs.tp_frac = orig_tp_frac
@@ -506,7 +547,7 @@ def park(park_option, is_prepark=True):
     if any(seq) and is_prepark:
         do_pause()
     logger.info('Parking complete\n')
-        
+
 # do the sequence
 logger.info('Beginning the move sequence\n')
 # storage for exceptions
@@ -526,8 +567,6 @@ try:
             logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
             continue
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
-        descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
-        logger.info(f'Move settings are {descriptive_dict}\n')
         correction_not_defined = move.command not in sequence.general_commands
         correction_not_allowed = not move.allow_corr
         not_correctable = correction_not_allowed or correction_not_defined 
@@ -584,6 +623,10 @@ try:
                 continue
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
+            new_settings = update_with_pos_overrides(new_settings)
+            descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
+            descriptive_dict = update_with_pos_overrides(descriptive_dict)
+            logger.info(f'Move settings are {descriptive_dict}\n')
             if new_settings != last_pos_settings:
                 all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
                 if pecs_on:
