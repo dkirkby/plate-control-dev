@@ -722,12 +722,15 @@ class Petal(object):
         this often makes sense, but not for a global coordinate.
 
         INPUTS:     posids    ... either a single posid or an iterable collection of posids (note sets don't work at DOS Console interface)
-                    cmd       ... command string like those usually put in the requests dictionary (see request_targets method)
+                    cmd       ... command string like those usually put in the requests dictionary (see valid options below)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
                     anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle
+                    
+        Valid cmd options:
+            'QS', 'dQdS', 'obsXY', 'ptlXY', 'poslocXY', 'obsdXdY', 'poslocdXdY', 'poslocTP', 'posintTP', or 'dTdP'
         """
         old_limit = self.limit_angle
         if disable_limit_angle:
