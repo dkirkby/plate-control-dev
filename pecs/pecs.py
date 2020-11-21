@@ -274,7 +274,7 @@ class PECS:
             # participating_petals=None gets responses from all
             # not just selected petals
             exppos = (self.ptlm.get_positions(
-                          return_coord='QS', drop_devid=False
+                          return_coord='QS', drop_devid=False,
                           participating_petals=self.illuminated_ptl_roles)
                       .sort_values(by='DEVICE_ID').reset_index(drop=True))
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
