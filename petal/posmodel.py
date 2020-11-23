@@ -193,6 +193,19 @@ class PosModel(object):
     def abs_shaft_spinupdown_distance_P(self):
         '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
         return self._abs_shaft_spinupdown_distance_P
+    
+    @property
+    def theta_hardstop_ambiguous_zone(self):
+        '''Returns a 1x2 tuple of (AMBIG_MIN, AMBIG_MAX), describing the range in which a measured
+        a measured theta value could mean it's in fact on *either* side of the hardstop (in which case
+        the situation must be resolved by some physical motion). The output values are always returned
+        as positive numbers within the range [0, 360]. So like (+170, +190).'''
+        full_range = self.full_range_posintT
+        ambig_min = 360 + min(full_range) - pc.theta_hardstop_ambig_tol
+        ambig_max = max(full_range) + pc.theta_hardstop_ambig_tol
+        for key in {'ambig_min', 'ambig_max'}:
+            assert 0 <= eval(key) <= 360, f'{self.posid} ambig_min={eval(key)} is not within [0,360]. full_range={full_range}'
+        return (ambig_min, ambig_max)
 
     def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the
