@@ -13,7 +13,7 @@ script_name = os.path.basename(__file__)
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='Path to sequence file, readable by sequence.py. For some common pre-cooked sequences, run sequence_generator.py.')
-parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
+parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
 parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
@@ -40,7 +40,7 @@ parser.add_argument('-curr', '--motor_current', type=int, default=None, help='se
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
-assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
+assert uargs.anticollision in {'adjust', 'adjust_requested_only', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
 assert 0 <= uargs.num_corr <= max_corr, f'out of range argument {uargs.num_corr} for num_corr parameter'
 assert uargs.prepark in park_options, f'invalid park option, must be one of {park_options}'

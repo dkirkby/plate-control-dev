@@ -18,7 +18,7 @@ parser.add_argument('-i', '--infiles', type=str, required=True, nargs='*',
                          '(see that function''s help for full syntax). Regex is ok (like M*.csv). Multiple ' +
                          'file args are also ok (like M00001.csv M00002.csv M01*.csv), as is a directory ' +
                          'that contains the files.')
-parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
+parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-ms', '--start_move', type=str, default=null_move_id, help='syntax: <exposure_id>.<exposure_iter>, start the simulation at this move (or defaults to first move in data)')
 parser.add_argument('-mf', '--final_move', type=str, default=null_move_id_large, help='syntax: <exposure_id>.<exposure_iter>, finish the simulation at this move (or defaults to last move in data)')
@@ -34,7 +34,7 @@ parser.add_argument('-r', '--reconstruct_corrections', action='store_true', help
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
-assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
+assert uargs.anticollision in {'adjust', 'adjust_requested_only', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 
 import time
 import glob

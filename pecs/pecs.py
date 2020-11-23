@@ -348,7 +348,7 @@ class PECS:
                  match_radius ... passed to fvc_measure()
                  check_umatched ... passed to PetalApp.handle_fvc_feedback()
                  test_tp ... passed to PetalApp.handle_fvc_feedback()
-                 anticollison ... mode like 'default', 'freeze', 'adjust', or None
+                 anticollison ... mode like 'default', 'freeze', 'adjust', 'adjust_requested_only' or None
                  num_meas ... how many FVC images to take (the results will be median-ed)
         
         OUTPUTS: result ... pandas dataframe that includes columns:

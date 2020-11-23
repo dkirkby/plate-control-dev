@@ -588,7 +588,7 @@ class Petal(object):
         if anticollision == 'None':
             anticollision = None  # because DOS Console casts None into 'None'
         self.printfunc(f'schedule_moves called with anticollision = {anticollision}')
-        if anticollision not in {None,'freeze','adjust'}:
+        if anticollision not in {None, 'freeze', 'adjust', 'adjust_requested_only'}:
             anticollision = self.anticollision_default
             self.printfunc(f'using default anticollision mode --> {self.anticollision_default}')
             
@@ -725,7 +725,7 @@ class Petal(object):
                     cmd       ... command string like those usually put in the requests dictionary (see valid options below)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
-                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    anticollsion  ... 'default', 'adjust', 'adjust_requested_only', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle
                     
@@ -779,7 +779,7 @@ class Petal(object):
                     n_repeats ... integer number of repeats of the sequence, defaults to 1
                     delay ... minimum seconds from move to move, defaults to 60
                     targets ... sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
-                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    anticollsion  ... 'default', 'adjust', 'adjust_requested_only', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''

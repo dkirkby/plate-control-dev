@@ -206,7 +206,18 @@ class PosSchedule(object):
                         each other. If this fails, the colliding positioner
                         is frozen at its original position. This setting is
                         suitable for gross retargeting moves.
-
+                        
+                        Occasionally, there is a neighbor positioner with no
+                        requested target in the desired path of one with a target.
+                        In this case, the 'adjust' algorithm is allowed to move
+                        that neighbor out of the way, and then restore it back
+                        to its starting position.
+            
+          'adjust_requested_only'
+                    ... Same as 'adjust', however no automatic
+                        "get out of the way" moves will be done on unrequested
+                        neighbors.
+        
         If there were ANY pre-existing move tables in the list (for example, hard-
         stop seeking tables directly added by an expert user or expert function),
         then the requests list is ignored. The only changes to move tables are
@@ -238,7 +249,9 @@ class PosSchedule(object):
         else:
             self._fill_enabled_but_nonmoving_with_dummy_requests()
             if anticollision == 'adjust':
-                self._schedule_requests_with_path_adjustments(should_anneal) # there is only one possible anticollision method for this scheduling method
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
+            elif anticollision == 'adjust_requested_only':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
         self._combine_stages_into_final()
@@ -554,7 +567,7 @@ class PosSchedule(object):
                                      stage.start_posintTP[posid][1] + dP)
         return final_posintTP
 
-    def _schedule_requests_with_path_adjustments(self, should_anneal=True):
+    def _schedule_requests_with_path_adjustments(self, should_anneal=True, adjust_requested_only=False):
         """Gathers data from requests dictionary and populates the 'retract',
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
@@ -565,6 +578,9 @@ class PosSchedule(object):
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
         retracted_poslocP = self.collider.Eo_phi  # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to
+        no_auto_adjust = set()
+        if adjust_requested_only:
+            no_auto_adjust = {posid for posid, req in self._requests.items() if req['is_dummy']}            
         for posid, request in self._requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
@@ -614,7 +630,7 @@ class PosSchedule(object):
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        adjusted, frozen = stage.adjust_path(posid, freezing)
+                        adjusted, frozen = stage.adjust_path(posid, freezing=freezing, do_not_move=no_auto_adjust)
                         for p in frozen:
                             if not_the_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
