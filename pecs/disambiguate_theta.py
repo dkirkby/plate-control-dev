@@ -38,7 +38,7 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
-log_dir = pc.dirs['sequence_logs']
+log_dir = pc.dirs['calib_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_disambig_theta.log'
 log_path = os.path.join(log_dir, log_name)
