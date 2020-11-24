@@ -292,7 +292,7 @@ class PECS:
                                         matched_only=matched_only,
                                         all_fiducials=self.all_fiducials,centers=centers)
             # Positions is a dictionary (from np.rec_array). Is empty when no posiitoners are present
-            assert positions, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            assert not(positions.empty), 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
             this_meapos = pd.DataFrame(positions).rename(columns=
                             {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
             if np.any(['P' in device_id for device_id in this_meapos.index]):
@@ -464,7 +464,9 @@ class PECS:
 
     def turn_on_fids(self):
         if self._parse_yn(input('Turn on fiducials (y/n): ')):
-            responses = self.ptlm.set_fiducials(setting='on')
+            responses = self.ptlm.set_fiducials(setting='on',
+                            participating_petals=list(self.ptlm.Petals.keys()))
+            # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
         self.print(f'Petals report fiducials in the following states: {responses}')
