@@ -61,6 +61,12 @@ common_move_meas_kwargs = {'match_radius': uargs.match_radius,
                            'num_meas': uargs.num_meas,
                            }
 
+# neighbor listings
+neighbor_data = pecs.ptlm.app_get("collider.pos_neighbors")
+neighbors = {}
+for these in neighbor_data.values():
+    neighbors.update(these)
+
 # algorithm
 def disambig(n_retries):
     '''See DESI-5911 for diagram and plain-language explanation of the basic algorithm.
@@ -95,12 +101,6 @@ def disambig(n_retries):
     locT_current = pecs.quick_query(key='poslocT', posids=unambig)
     locT_targets = {posid: locT_current[posid] for posid in unambig}
     locP_target = 150.0
-    
-    # get neighbor listings
-    neighbor_data = pecs.ptlm.app_get("collider.pos_neighbors")
-    neighbors = {}
-    for these in neighbor_data.values():
-        neighbors.update(these)
     
     # where possible, target unambiguous posids "opposite" ambiguous neighbors,
     # to maximize clearance
