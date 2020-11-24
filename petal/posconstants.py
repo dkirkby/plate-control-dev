@@ -236,8 +236,12 @@ other_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
                         'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
                         'CALIB_NOTE', 'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
-posmodel_range_names = {'targetable_range_posintT', 'targetable_range_posintP', 'full_range_posintT', 'full_range_posintP'}
-posmodel_keys = set()
+posmodel_range_names = {'targetable_range_posintT', 'targetable_range_posintP',
+                        'full_range_posintT', 'full_range_posintP',
+                        'theta_hardstop_ambiguous_zone'}
+posmodel_keys = {'in_theta_hardstop_ambiguous_zone',
+                 'abs_shaft_speed_cruise_T', 'abs_shaft_speed_cruise_P',
+                 'abs_shaft_spinupdown_distance_T', 'abs_shaft_spinupdown_distance_P'}
 for name in posmodel_range_names:
     posmodel_keys |= {f'max_{name}', f'min_{name}'}
 
@@ -327,8 +331,9 @@ def is_cached_in_posmodel(key):
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 # move command strings
-valid_move_commands = {'QS', 'dQdS', 'obsXY', 'obsdXdY', 'ptlXY', 'poslocXY',
-                       'poslocdXdY', 'poslocTP', 'posintTP', 'dTdP'}
+delta_move_commands = {'dQdS', 'obsdXdY', 'poslocdXdY', 'dTdP'}
+abs_move_commands = {'QS', 'obsXY', 'ptlXY', 'poslocXY', 'poslocTP', 'posintTP'}
+valid_move_commands = abs_move_commands | delta_move_commands
 
 # common formatting / split-up names
 coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
