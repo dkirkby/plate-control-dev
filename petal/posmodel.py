@@ -206,12 +206,12 @@ class PosModel(object):
             assert 0 <= eval(key) <= 360, f'{self.posid} ambig_min={eval(key)} is not within [0,360]. full_range={full_range}'
         return (ambig_min, ambig_max)
     
-    def in_theta_hardstop_ambiguous_zone(self, posintT=None):
-        '''Returns boolean whether an argured theta (posintTP coordinates) is in this
-        positioner's ambiguous either-side-of-the-hardstop zone. Either argue a specific
-        value for posintT, or else will use the current value automatically.'''
+    @property
+    def in_theta_hardstop_ambiguous_zone(self):
+        '''Returns boolean whether positioner is currently in the ambiguous either-side-of-the-hardstop
+        zone.'''
         ambig_range = self.theta_hardstop_ambiguous_zone
-        t_test = self.axis[pc.T].pos if posintT == None else posintT
+        t_test = self.axis[pc.T].pos
         t_test %= 360
         return ambig_range[0] <= t_test <= ambig_range[1]
 
