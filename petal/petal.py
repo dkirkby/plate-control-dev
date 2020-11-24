@@ -448,7 +448,7 @@ class Petal(object):
         denied = set()
         for posid, request in requests.items():
             if posid not in self.posids:
-                pass
+                continue  # handle this noiselessly, so that simpler to throw many petals' requests at this func, and the petal will sort out which apply to itself
             request['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 request['log_note'] = ''
@@ -1569,7 +1569,7 @@ class Petal(object):
         else:
             assert pc.is_collection(coords)
             coords = list(coords)
-        posids = self._validate_posids_arg(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=True)
         id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID']
         status_columns = ['ENABLED', 'OVERLAP', 'AMBIG_T']
         stat_name_col = 'CANID'
@@ -1591,7 +1591,7 @@ class Petal(object):
             data['CANID'].append(model.canid)
             data['ENABLED'].append(model.is_enabled)
             data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
-            data['AMBIG_T'].append(model.in_theta_hardstop_ambiguous_zone())
+            data['AMBIG_T'].append(model.in_theta_hardstop_ambiguous_zone)
             pos = self.posmodels[posid].expected_current_position
             for coord in coords:
                 for i in (0, 1):
@@ -1669,6 +1669,7 @@ class Petal(object):
         import operator
         position_keys = set(pc.single_coords)
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        state_keys -= pc.fiducial_calib_keys  # fiducial data not currently supported
         constants_keys = set(pc.constants_keys)
         model_keys = set(pc.posmodel_keys)
         id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
@@ -1721,7 +1722,7 @@ class Petal(object):
             attr = key
             for func_name in ['max', 'min']:
                 prefix = f'{func_name}_'
-                if prefix in key and '_range_' in key:
+                if prefix in key and ('_range_' in key or '_zone' in key):
                     func = eval(func_name)
                     attr = key.split(prefix)[-1]
                     break
@@ -1891,16 +1892,21 @@ class Petal(object):
         conf_data = self.comm.pbget('conf_file')
         return conf_data['disabled_by_relay']
     
-    def get_posids_in_tstop_ambig_zone(self):
-        '''Returns set of posids for which their current theta value is in the
-        hardstop ambiguous zone. This is the region near theta = 180 in which an
-        external measurement (i.e. by the FVC) cannot distinguish which side of
-        the hardstop the robot is physically on. (Only contextual knowledge of
-        move history can disambiguate.)
+    def get_requested_posids(self, kind='all'):
+        '''Returns set of posids with requests in the current schedule.
+        
+        INPUT:  kind ... 'all', 'regular', or 'expert'
+        
+        OUTPUT: set of posid strings
         '''
-        return {p for p in self.posids if self.posmodels[p].in_theta_hardstop_ambiguous_zone()}
+        assert kind in {'all', 'regular', 'expert'}, f'argument kind={kind} not recognized'
+        if kind == 'regular':
+            return self.schedule.regular_requested_posids 
+        elif kind == 'expert':
+            return self.schedule.expert_requested_posids
+        return self.schedule.regular_requested_posids | self.schedule.expert_requested_posids
              
-    def _validate_posids_arg(self, posids):
+    def _validate_posids_arg(self, posids, skip_unknowns=False):
         '''Handles / validates a user argument of posids. Returns a set.'''
         if posids == 'all':
             posids = self.posids
@@ -1910,8 +1916,11 @@ class Petal(object):
             assert pc.is_collection(posids), '_validate_posids_arg: invalid arg {posids}'
             posids = set(posids)
         assert len(posids) > 0, '_validate_posids_arg: empty posids argument'
-        unknowns = posids - self.posids
-        assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
+        if skip_unknowns:
+            posids &= self.posids
+        else:
+            unknowns = posids - self.posids
+            assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
         return posids
 
     def expert_pdb(self):
