@@ -68,10 +68,9 @@ def disambig(n_retries):
     '''
             
     # This type of call to PetalMan (in the next line) returns *either* dict with keys = like
-    # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR if only one
-    # petal in the system, it's not a dict, but rather just the return data from that one petal.
-    # (Also not a dict if the petals all respond with the same value.) Hence much easier to use
-    # this syntax on functions that *don't* return dicts!
+    # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR just the return
+    # data from that one petal. It's not perfectly clear when this does or doesn't happen. Hence
+    # much easier to use this syntax on functions that *don't* return dicts!
     tables = pecs.ptlm.quick_table(as_table=True)  # quick_table gives back astropy tables
     if isinstance(tables, dict):
         tables = list(tables.values())
