@@ -80,7 +80,6 @@ def disambig(n_retries):
     # get ambiguous and unambiguous posids
     ambig_dict = pecs.quick_query('in_theta_hardstop_ambiguous_zone', posids=enabled_posids)
     all_ambig = {posid for posid, val in ambig_dict.items() if val == True}
-    unambig = enabled_posids - all_ambig
     logger.info(f'{len(all_ambig)} enabled positioner(s) are in theta hardstop ambiguous zone: {all_ambig}')
     do_not_fix = all_ambig - allowed_to_fix
     ambig = all_ambig & allowed_to_fix
@@ -92,11 +91,12 @@ def disambig(n_retries):
     logger.info(f'Will attempt to resolve {len(ambig)} posids: {ambig}')
     
     # targets for unambiguous pos
+    unambig = enabled_posids - all_ambig
     locT_current = pecs.quick_query(key='poslocT', posids=unambig)
     locT_targets = {posid: locT_current[posid] for posid in unambig}
     locP_target = 150.0
     
-    # rigamarole to extract neighbor data through the PetalMan interface
+    # get neighbor listings
     neighbor_data = pecs.ptlm.app_get("collider.pos_neighbors")
     neighbors = {}
     for these in neighbor_data.values():
@@ -121,7 +121,7 @@ def disambig(n_retries):
                     }
     request = pandas.DataFrame(request_data)
     if request.empty:
-        logger.info('No unambiguous, enabled positioners detected.')
+        logger.info('No unambiguous + enabled positioners detected.')
     else:
         logger.info(f'Doing clerance move for {len(request)} unambiguous positioners. Anticollision mode: {anticollision}')
         pecs.ptlm.move_measure(request=request, anticollision=anticollision, **common_move_meas_kwargs)
