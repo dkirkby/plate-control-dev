@@ -52,6 +52,7 @@ pecs = PECS(interactive=True)
 pecs.logger = logger
 logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
 enabled_posids = sorted(pecs.get_enabled_posids('all', include_posinfo=False))
+allowed_to_fix = sorted(pecs.get_enabled_posids('sub', include_posinfo=False))
 
 # some boilerplate
 common_move_meas_kwargs = {'match_radius': uargs.match_radius,
@@ -78,12 +79,17 @@ def disambig(n_retries):
     '''
     # get ambiguous and unambiguous posids
     ambig_dict = pecs.quick_query('in_theta_hardstop_ambiguous_zone', posids=enabled_posids)
-    ambig = {posid for posid, val in ambig_dict.items() if val == True}
-    logger.info(f'{len(ambig)} enabled positioner(s) are in theta hardstop ambiguous zone: {ambig}')
+    all_ambig = {posid for posid, val in ambig_dict.items() if val == True}
+    unambig = enabled_posids - all_ambig
+    logger.info(f'{len(all_ambig)} enabled positioner(s) are in theta hardstop ambiguous zone: {all_ambig}')
+    do_not_fix = all_ambig - allowed_to_fix
+    ambig = all_ambig & allowed_to_fix
+    if do_not_fix:
+        logger.info(f'{len(do_not_fix)} positioner(s) are not within the allowed-to-fix selection group. Excluded posids: {do_not_fix}')
     if not ambig or n_retries == 0:
         return ambig
-    unambig = enabled_posids - ambig
     logger.info(f'Disambiguation attempt {uargs.num_retries - n_retries + 1} of {uargs.num_retries}')
+    logger.info(f'Will attempt to resolve {len(ambig)} posids: {ambig}')
     
     # targets for unambiguous pos
     locT_current = pecs.quick_query(key='poslocT', posids=unambig)
@@ -162,4 +168,4 @@ if __name__ == '__main__':
         details = pecs.ptlm.quick_table(posids=ambig, coords=['posintTP', 'poslocTP'], as_table=False, sort='POSID')
         logger.warning(f'{len(ambig)} positioners remain *unresolved*. Details:\n{details}')
     else:
-        logger.info('All ambiguous cases resolved!')
+        logger.info('All selected ambiguous cases were resolved!')
