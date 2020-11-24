@@ -1547,15 +1547,20 @@ class Petal(object):
     
     def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False, sort='POSID'):
         '''Returns a printable string tabulating current position (in several 
-        coordinate systems), overlap status, and enabled status for one or more
-        positioners.
+        coordinate systems), overlap status, enabled status, and whether in
+        theta hardstop ambiguous zone, for one or more positioners.
         
         INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
                  coords ... specify one or more particular coordinate systems to display. enter None for a listing of valid args
                  as_table ... boolean to return astropy table, rather than printable string (default False)
                  sort ... sorts by the argued columns (default 'POSID')
         
-        OUTPUTS: string for display
+        OUTPUTS: as_table == False --> string for display
+        
+                 as_table == True --> astropy table with columns: 'POSID','LOCID','BUSID',
+                 'CANID','ENABLED','OVERLAP','AMBIG_T', as well as those requested by the
+                 coords argument, e.g. 'posintT','posintP','poslocT','poslocP','poslocX',
+                 'poslocY','obsX','obsY','Q','S'
         '''
         if pc.is_string(coords):
             if coords in {None, 'none', 'None', 'NONE'}:
@@ -1566,7 +1571,7 @@ class Petal(object):
             coords = list(coords)
         posids = self._validate_posids_arg(posids)
         id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID']
-        status_columns = ['ENABLED', 'OVERLAP']
+        status_columns = ['ENABLED', 'OVERLAP', 'AMBIG_T']
         stat_name_col = 'CANID'
         n_rows_repeat_headers = 20
         columns = id_columns.copy()
@@ -1586,6 +1591,7 @@ class Petal(object):
             data['CANID'].append(model.canid)
             data['ENABLED'].append(model.is_enabled)
             data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
+            data['AMBIG_T'].append(model.in_theta_hardstop_ambiguous_zone())
             pos = self.posmodels[posid].expected_current_position
             for coord in coords:
                 for i in (0, 1):
@@ -1884,6 +1890,15 @@ class Petal(object):
         '''
         conf_data = self.comm.pbget('conf_file')
         return conf_data['disabled_by_relay']
+    
+    def get_posids_in_tstop_ambig_zone(self):
+        '''Returns set of posids for which their current theta value is in the
+        hardstop ambiguous zone. This is the region near theta = 180 in which an
+        external measurement (i.e. by the FVC) cannot distinguish which side of
+        the hardstop the robot is physically on. (Only contextual knowledge of
+        move history can disambiguate.)
+        '''
+        return {p for p in self.posids if self.posmodels[p].in_theta_hardstop_ambiguous_zone()}
              
     def _validate_posids_arg(self, posids):
         '''Handles / validates a user argument of posids. Returns a set.'''
