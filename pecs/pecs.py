@@ -618,6 +618,8 @@ class PECS:
         # data from that one petal. It's not perfectly clear when this does or doesn't happen, but
         # from discussion with Kevin and some trials at the CONSOLE this ought to be ok here.
         data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode)
+        if isinstance(data_by_petal, (str, list, tuple)):
+            return data_by_petal
         check_val = data_by_petal[list(data_by_petal.keys())[0]]
         if isinstance(check_val, dict):
             combined = {}
