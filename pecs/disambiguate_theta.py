@@ -51,8 +51,8 @@ from pecs import PECS
 pecs = PECS(interactive=True)
 pecs.logger = logger
 logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
-enabled_posids = sorted(pecs.get_enabled_posids('all', include_posinfo=False))
-allowed_to_fix = sorted(pecs.get_enabled_posids('sub', include_posinfo=False))
+enabled_posids = set(pecs.get_enabled_posids('all', include_posinfo=False))
+allowed_to_fix = set(pecs.get_enabled_posids('sub', include_posinfo=False))
 
 # some boilerplate
 common_move_meas_kwargs = {'match_radius': uargs.match_radius,
