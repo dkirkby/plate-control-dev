@@ -64,6 +64,14 @@ class PosSchedule(object):
     @property
     def collider(self):
         return self.petal.collider
+    
+    @property
+    def regular_requested_posids(self):
+        return self._all_requested_posids['regular'].copy()
+    
+    @property
+    def expert_requested_posids(self):
+        return self._all_requested_posids['expert'].copy()
 
     def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=True):
         """Adds a request to the schedule for a given positioner to move to the
@@ -103,7 +111,7 @@ class PosSchedule(object):
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
-        if self.already_requested(posid):
+        if posid in self._all_requested_posids['regular']:
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
@@ -309,12 +317,6 @@ class PosSchedule(object):
         """
         anneal_time_sum = sum(t for t in self.anneal_time.values())
         return anneal_time_sum * safety_factor
-
-    def already_requested(self, posid):
-        """Returns boolean whether a request has already been registered in the
-        schedule for the argued positioner.
-        """
-        return posid in self._requests
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
