@@ -163,7 +163,7 @@ class PosScheduleStage(object):
             self.printfunc(f'posschedulestage: move time after annealing = {max_time}')
         return max_time
 
-    def adjust_path(self, posid, freezing='on'):
+    def adjust_path(self, posid, freezing='on', do_not_move=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
         has no collision, then no adjustment is made.
 
@@ -179,6 +179,9 @@ class PosScheduleStage(object):
                 'off'    ... don't freeze, even if the path adjustment options all fail to resolve collisions
                 'forced' ... only freeze, and *must* do so
                 'forced_recursive' ... like 'forced', then closes any follow-on neighbor collisions
+                
+            do_not_move ... set of posids which are *not* allowed to be automatically
+                            moved (i.e. like moved out of the way) of posid
 
         Returns a tuple:
             
@@ -227,7 +230,7 @@ class PosScheduleStage(object):
             methods = pc.all_adjustment_methods
         for method in methods:        
             collision_neighbor = self.sweeps[posid].collision_neighbor
-            proposed_tables = self._propose_path_adjustment(posid, method)
+            proposed_tables = self._propose_path_adjustment(posid, method, do_not_move)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             should_accept = not(colliding_sweeps) or freezing in {'forced','forced_recursive'}
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated
@@ -396,7 +399,7 @@ class PosScheduleStage(object):
                 discontinuous.add(p)
         return discontinuous
 
-    def _propose_path_adjustment(self, posid, method='freeze'):
+    def _propose_path_adjustment(self, posid, method='freeze', do_not_move=None):
         """Generates a proposed alternate move table for the positioner posid
         The alternate table is meant to attempt to avoid collision.
 
@@ -427,6 +430,8 @@ class PosScheduleStage(object):
 
              'freeze'      ... Positioner is halted prior to the collision, and no attempt
                                is made for its final target.
+                               
+          do_not_move ... see comments in adjust_path() docstr
 
         The subscript 'X' in many of the adjustment methods above refers to the
         size of the maximum distance jog step to attempt, labeled 'A', 'B', etc.
@@ -462,7 +467,9 @@ class PosScheduleStage(object):
         fixed_collision = self.sweeps[posid].collision_case in pc.case.fixed_cases
         if fixed_collision and method in pc.useless_with_fixed_boundary:
             return {}
-        unmoving_neighbor = self.sweeps[posid].collision_neighbor not in self.move_tables
+        neighbor = self.sweeps[posid].collision_neighbor
+        do_not_move = set() if do_not_move == None else do_not_move
+        unmoving_neighbor = neighbor not in self.move_tables or neighbor in do_not_move
         if unmoving_neighbor and method in pc.useless_with_unmoving_neighbor:
             return {}
         
@@ -490,9 +497,8 @@ class PosScheduleStage(object):
             return tables
         
         # get neighbor table
-        neighbor = self.sweeps[posid].collision_neighbor
         posmodels = {posid:self.collider.posmodels[posid], neighbor:self.collider.posmodels[neighbor]}
-        neighbor_can_move = posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen
+        neighbor_can_move = posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen and neighbor not in do_not_move
         if neighbor_can_move:
             tables[neighbor] = self._get_or_generate_table(neighbor,should_copy=True)
             tables_data[neighbor] = tables[neighbor].for_schedule()
@@ -551,6 +557,8 @@ class PosScheduleStage(object):
         
         # apply jogs and associated pauses to tables
         if 'repel' in method:
+            wait_for_posid_to_jog = 0
+            wait_for_neighbor_to_jog = 0
             if neighbor in tables:
                 jog_times_diff = jog_times[neighbor] - jog_times[posid]
                 wait_for_neighbor_to_jog = max(jog_times_diff, 0)

@@ -10,7 +10,6 @@ class PosModel(object):
 
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
-
     def __init__(self, state=None, petal_alignment=None):
         if not(state):
             self.state = posstate.PosState()
@@ -193,6 +192,28 @@ class PosModel(object):
     def abs_shaft_spinupdown_distance_P(self):
         '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
         return self._abs_shaft_spinupdown_distance_P
+    
+    @property
+    def theta_hardstop_ambiguous_zone(self):
+        '''Returns a 1x2 tuple of (AMBIG_MIN, AMBIG_MAX), describing the range in which a measured
+        a measured theta value could mean it's in fact on *either* side of the hardstop (in which case
+        the situation must be resolved by some physical motion). The output values are always returned
+        as positive numbers within the range [0, 360]. So like (+170, +190).'''
+        full_range = self.full_range_posintT
+        ambig_min = (full_range[0] - pc.theta_hardstop_ambig_tol) % 360 
+        ambig_max = (full_range[1] + pc.theta_hardstop_ambig_tol) % 360 
+        for key in {'ambig_min', 'ambig_max'}:
+            assert 0 <= eval(key) <= 360, f'{self.posid} ambig_min={eval(key)} is not within [0,360]. full_range={full_range}'
+        return (ambig_min, ambig_max)
+    
+    @property
+    def in_theta_hardstop_ambiguous_zone(self):
+        '''Returns boolean whether positioner is currently in the ambiguous either-side-of-the-hardstop
+        zone.'''
+        ambig_range = self.theta_hardstop_ambiguous_zone
+        t_test = self.axis[pc.T].pos
+        t_test %= 360
+        return ambig_range[0] <= t_test <= ambig_range[1]
 
     def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the

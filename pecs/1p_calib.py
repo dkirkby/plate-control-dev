@@ -6,6 +6,25 @@ Contains a function to perform a onepoint calibration on positioners.
 If executed standalone, main function will create a PECS instance to
 interactively run the onepoint calibration.
 '''
+
+import argparse
+parser = argparse.ArgumentParser(description=__doc__)
+def_mode = 'posTP'
+def_tol = 0.0
+def_frac = 1.0
+parser.add_argument('-m', '--mode', type=str, default=def_mode, help=f'Which pair or tp angles to adjust, posTP or offsetsTP. Default is {def_mode}.')
+parser.add_argument('-t', '--tp_tol', type=float, default=def_tol, help=f'Minimum error in mm over which to update TP. Default is {def_tol} mm.')
+parser.add_argument('-f', '--tp_frac', type=float, default=def_frac, help=f'Percentatge of error to apply in the TP update. Maximum 1.0. Default is {def_frac}.')
+parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
+parser.add_argument('-n', '--no_update', action='store_true', help='suppress auto-updating of TP values')
+parser.add_argument('-prep', '--prepark', action='store_true', help='automatically do an initial parking move prior to the measurement')
+max_fvc_iter = 10
+parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
+uargs = parser.parse_args()
+assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posTP or offsetsTP!'
+assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
+assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
+
 import pandas as pd
 
 def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac=1.0,
@@ -25,9 +44,6 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
         updates - pandas.DataFrame with columns 'DEVICE_ID','DEVICE_LOC',
                   'PETAL_LOC','ERR_XY','dT','dP' and a pair of TP parameters
     '''
-    if pecs.interactive:
-        move = pecs._parse_yn(input('Move positioners to default parked position? (y/n): '))
-        commit = pecs._parse_yn(input('Commit calibration results (y/n): '))
     pecs.ptlm.set_exposure_info(pecs.exp.id, pecs.iteration)
     note = pecs.decorate_note(log_note=f'1p_calib_{mode}')
     if move:
@@ -46,27 +62,13 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
     return updates
 
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    def_mode = 'posTP'
-    def_tol = 0.0
-    def_frac = 1.0
-    parser.add_argument('-m', '--mode', type=str, default=def_mode, help=f'Which pair or tp angles to adjust, posTP or offsetsTP. Default is {def_mode}.')
-    parser.add_argument('-t', '--tp_tol', type=float, default=def_tol, help=f'Minimum error in mm over which to update TP. Default is {def_tol} mm.')
-    parser.add_argument('-f', '--tp_frac', type=float, default=def_frac, help=f'Percentatge of error to apply in the TP update. Maximum 1.0. Default is {def_frac}.')
-    parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
-    parser.add_argument('-ud', '--use_disabled', action='store_true', help='Run calibration on disabled positioners as well (uses all matched).')
-    max_fvc_iter = 10
-    parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
-    uargs = parser.parse_args()
-    assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posTP or offsetsTP!'
-    assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
-    assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
+    from pecs import PECS
     from pecs import PECS
     input(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
-    updates = onepoint(cs, mode=uargs.mode, tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac,
-                       match_radius=uargs.match_radius, num_meas=uargs.num_meas, use_disabled=uargs.use_disabled)
+    updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
+                       tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
+                       num_meas=uargs.num_meas)
     if uargs.mode == 'posTP':
         key1, key2 = 'POS_T', 'POS_P'
     else:

@@ -329,7 +329,7 @@ class Petal(object):
 
     # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests, allow_initial_interference=True, _is_retry=False):
+    def request_targets(self, requests, allow_initial_interference=True, _is_retry=False, return_posids_only=False):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
 
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -368,6 +368,10 @@ class Petal(object):
             
             _is_retry ... boolean, internally used, whether this is a retry (e.g. cases where failed to send move_tables)
 
+            return_posids_only ... bool, default=False, work-around for inability of DOS proxy
+                                   to pass back accepted requests, in cases where external call is
+                                   made to request_direct_dtdp()
+
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
 
@@ -382,8 +386,7 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
-            pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
-                          positioner should receive going to the FLI camera with fvcproxy
+            In cases where return_posids_only=True ... you will just get a set of posids back, no dict.
         """
         marked_for_delete = set()
         for posid in requests:
@@ -405,9 +408,11 @@ class Petal(object):
                 self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
+        if return_posids_only:
+            return set(requests.keys())
         return requests
 
-    def request_direct_dtdp(self, requests, cmd_prefix=''):
+    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
         amounts at their theta and phi shafts.
 
@@ -446,6 +451,10 @@ class Petal(object):
                            in the 'MOVE_CMD' field. This is different from log_note. Generally,
                            log_note is meant for users, whereas cmd_prefix is meant for internal lower-
                            level detailed logging.
+                           
+            return_posids_only ... bool, default=False, work-around for inability of DOS proxy
+                                   to pass back accepted requests, in cases where external call is
+                                   made to request_direct_dtdp()
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
@@ -459,7 +468,7 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
-            pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
+            In cases where return_posids_only=True ... you will just get a set of posids back, no dict.
 
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
@@ -469,7 +478,7 @@ class Petal(object):
         denied = set()
         for posid, request in requests.items():
             if posid not in self.posids:
-                pass
+                continue  # handle this noiselessly, so that simpler to throw many petals' requests at this func, and the petal will sort out which apply to itself
             request['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 request['log_note'] = ''
@@ -489,6 +498,8 @@ class Petal(object):
                 self._print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
+        if return_posids_only:
+            return set(requests.keys())
         return requests
 
     def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note=''):
@@ -609,7 +620,7 @@ class Petal(object):
         if anticollision == 'None':
             anticollision = None  # because DOS Console casts None into 'None'
         self.printfunc(f'schedule_moves called with anticollision = {anticollision}')
-        if anticollision not in {None,'freeze','adjust'}:
+        if anticollision not in {None, 'freeze', 'adjust', 'adjust_requested_only'}:
             anticollision = self.anticollision_default
             self.printfunc(f'using default anticollision mode --> {self.anticollision_default}')
             
@@ -743,12 +754,15 @@ class Petal(object):
         this often makes sense, but not for a global coordinate.
 
         INPUTS:     posids    ... either a single posid or an iterable collection of posids (note sets don't work at DOS Console interface)
-                    cmd       ... command string like those usually put in the requests dictionary (see request_targets method)
+                    cmd       ... command string like those usually put in the requests dictionary (see valid options below)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
-                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    anticollsion  ... 'default', 'adjust', 'adjust_requested_only', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle
+                    
+        Valid cmd options:
+            'QS', 'dQdS', 'obsXY', 'ptlXY', 'poslocXY', 'obsdXdY', 'poslocdXdY', 'poslocTP', 'posintTP', or 'dTdP'
         """
         old_limit = self.limit_angle
         if disable_limit_angle:
@@ -797,7 +811,7 @@ class Petal(object):
                     n_repeats ... integer number of repeats of the sequence, defaults to 1
                     delay ... minimum seconds from move to move, defaults to 60
                     targets ... sequence of tuples giving poslocXY targets, default is [(3,0), (0,1), (-3,0), (0,-1)]
-                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
+                    anticollsion  ... 'default', 'adjust', 'adjust_requested_only', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''
@@ -1565,15 +1579,20 @@ class Petal(object):
     
     def quick_table(self, posids='all', coords=['posintTP', 'poslocTP', 'poslocXY', 'obsXY', 'QS'], as_table=False, sort='POSID'):
         '''Returns a printable string tabulating current position (in several 
-        coordinate systems), overlap status, and enabled status for one or more
-        positioners.
+        coordinate systems), overlap status, enabled status, and whether in
+        theta hardstop ambiguous zone, for one or more positioners.
         
         INPUTS:  posids ... 'all' (default), single posid string, or iterable collection of them
                  coords ... specify one or more particular coordinate systems to display. enter None for a listing of valid args
                  as_table ... boolean to return astropy table, rather than printable string (default False)
                  sort ... sorts by the argued columns (default 'POSID')
         
-        OUTPUTS: string for display
+        OUTPUTS: as_table == False --> string for display
+        
+                 as_table == True --> astropy table with columns: 'POSID','LOCID','BUSID',
+                 'CANID','ENABLED','OVERLAP','AMBIG_T', as well as those requested by the
+                 coords argument, e.g. 'posintT','posintP','poslocT','poslocP','poslocX',
+                 'poslocY','obsX','obsY','Q','S'
         '''
         if pc.is_string(coords):
             if coords in {None, 'none', 'None', 'NONE'}:
@@ -1582,9 +1601,9 @@ class Petal(object):
         else:
             assert pc.is_collection(coords)
             coords = list(coords)
-        posids = self._validate_posids_arg(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=True)
         id_columns = ['POSID', 'LOCID', 'BUSID', 'CANID']
-        status_columns = ['ENABLED', 'OVERLAP']
+        status_columns = ['ENABLED', 'OVERLAP', 'AMBIG_T']
         stat_name_col = 'CANID'
         n_rows_repeat_headers = 20
         columns = id_columns.copy()
@@ -1604,6 +1623,7 @@ class Petal(object):
             data['CANID'].append(model.canid)
             data['ENABLED'].append(model.is_enabled)
             data['OVERLAP'].append(overlap_strs[posid] if posid in overlap_strs else 'None')
+            data['AMBIG_T'].append(model.in_theta_hardstop_ambiguous_zone)
             pos = self.posmodels[posid].expected_current_position
             for coord in coords:
                 for i in (0, 1):
@@ -1681,6 +1701,7 @@ class Petal(object):
         import operator
         position_keys = set(pc.single_coords)
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        state_keys -= pc.fiducial_calib_keys  # fiducial data not currently supported
         constants_keys = set(pc.constants_keys)
         model_keys = set(pc.posmodel_keys)
         id_keys = {'CAN_ID', 'BUS_ID', 'DEVICE_LOC', 'POS_ID'}
@@ -1733,7 +1754,7 @@ class Petal(object):
             attr = key
             for func_name in ['max', 'min']:
                 prefix = f'{func_name}_'
-                if prefix in key and '_range_' in key:
+                if prefix in key and ('_range_' in key or '_zone' in key):
                     func = eval(func_name)
                     attr = key.split(prefix)[-1]
                     break
@@ -1902,8 +1923,22 @@ class Petal(object):
         '''
         conf_data = self.comm.pbget('conf_file')
         return conf_data['disabled_by_relay']
+    
+    def get_requested_posids(self, kind='all'):
+        '''Returns set of posids with requests in the current schedule.
+        
+        INPUT:  kind ... 'all', 'regular', or 'expert'
+        
+        OUTPUT: set of posid strings
+        '''
+        assert kind in {'all', 'regular', 'expert'}, f'argument kind={kind} not recognized'
+        if kind == 'regular':
+            return self.schedule.regular_requests_accepted 
+        elif kind == 'expert':
+            return self.schedule.expert_requests_accepted
+        return self.schedule.regular_requests_accepted | self.schedule.expert_requests_accepted
              
-    def _validate_posids_arg(self, posids):
+    def _validate_posids_arg(self, posids, skip_unknowns=False):
         '''Handles / validates a user argument of posids. Returns a set.'''
         if posids == 'all':
             posids = self.posids
@@ -1913,8 +1948,11 @@ class Petal(object):
             assert pc.is_collection(posids), '_validate_posids_arg: invalid arg {posids}'
             posids = set(posids)
         assert len(posids) > 0, '_validate_posids_arg: empty posids argument'
-        unknowns = posids - self.posids
-        assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
+        if skip_unknowns:
+            posids &= self.posids
+        else:
+            unknowns = posids - self.posids
+            assert len(unknowns) == 0, f'{unknowns} not defined for petal_id {self.petal_id} at location {self.petal_loc}'
         return posids
 
     def expert_pdb(self):

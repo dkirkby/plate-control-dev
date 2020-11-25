@@ -161,6 +161,9 @@ class PECS:
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PC{pcid:02} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
+        all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
+        self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
+        self.petal_locs = self.all_posinfo[['DEVICE_ID', 'PETAL_LOC']]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             if device_locs:
@@ -337,24 +340,33 @@ class PECS:
                                       up_frac=self.tp_frac, postscript=submeas)
         return exppos, meapos, matched, unmatched
 
-    def move_measure(self, request, match_radius=None, check_unmatched=False,
+    def move_measure(self, request=None, match_radius=None, check_unmatched=False,
                      test_tp=False, anticollision=None, num_meas=1):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request.
         
-        INPUTS:  request ... pandas dataframe that includes columns:
-                             ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
-                 match_radius ... passed to fvc_measure()
+        INPUTS:  request        ... pandas dataframe that includes columns:
+                                    ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
+                                ... if request == None, the "prepare_move" call is suppressed.
+                                    This is for special cases where move requests have already
+                                    been independently registered and scheduled by direct calls
+                                    to petal(s).
+                                    
+                 match_radius   ... passed to fvc_measure()
+                 
                  check_umatched ... passed to PetalApp.handle_fvc_feedback()
-                 test_tp ... passed to PetalApp.handle_fvc_feedback()
-                 anticollison ... mode like 'default', 'freeze', 'adjust', or None
-                 num_meas ... how many FVC images to take (the results will be median-ed)
-        
+                 
+                 test_tp        ... passed to PetalApp.handle_fvc_feedback()
+                 
+                 anticollison   ... mode like 'default', 'freeze', 'adjust', 'adjust_requested_only' or None
+                 
+                 num_meas       ... how many FVC images to take (the results will be median-ed)
+                         
         OUTPUTS: result ... pandas dataframe that includes columns:
                             ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR',
-                             'mea_Q', 'mea_S', 'COMMAND', 'tgt_posintT',
-                             'tgt_posintP', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
+                             'mea_Q', 'mea_S', 'COMMAND', 'MOVE_VAL1',
+                             'MOVE_VAL2', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
                              'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
                             
                             And also, ['Q0', 'Q1', 'Q2', etc ...]
@@ -367,7 +379,20 @@ class PECS:
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
-        self.ptlm.prepare_move(request, anticollision=anticollision)
+        should_prepare_move = True
+        if request is None:
+            should_prepare_move = False
+            self.print('Skipping "prepare_moves" call, under assumption of independently requested / scheduled moves.')
+            requested_posids = self.ptlm.get_requested_posids(kind='all')
+            all_requested = set()
+            for posids in requested_posids.values():
+                all_requested |= posids
+            dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
+            request = pd.DataFrame(dummy_req)
+        if 'PETAL_LOC' not in request.columns:
+            request = request.merge(self.petal_locs, on='DEVICE_ID')
+        if should_prepare_move:
+            self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
@@ -593,9 +618,39 @@ class PECS:
             out[posid] = s
         return out
     
+    def quick_query(self, key=None, op='', value='', posids='all', mode='iterable'):
+        '''Returns a collection containing values for all petals of a quick_query()
+        call. See documentation for petal.quick_query() for details.
+        '''
+        # This type of call to PetalMan (in the next line) returns *either* dict with keys = like
+        # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR just the return
+        # data from that one petal. It's not perfectly clear when this does or doesn't happen, but
+        # from discussion with Kevin and some trials at the CONSOLE this ought to be ok here.
+        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode)
+        if isinstance(data_by_petal, (str, list, tuple)):
+            return data_by_petal
+        check_val = data_by_petal[list(data_by_petal.keys())[0]]
+        if isinstance(check_val, dict):
+            combined = {}
+            for data in data_by_petal.values():
+                combined.update(data)
+        elif isinstance(check_val, set):
+            combined = set()
+            for data in data_by_petal.values():
+                combined |= data
+        elif isinstance(check_val, list):
+            combined = []
+            for data in data_by_petal.values():
+                combined += data
+        elif isinstance(check_val, str):
+            combined = '\n'.join(data_by_petal.values())
+        else:
+            assert False, f'unrecognized return type {type(check_val)} from quick_query()'
+        return combined
+    
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
         '''Returns results of fvc measurement after checking for target matches
-        and doing ome pandas juggling, very specifc to the other data interchange
+        and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
         
         request ... pandas dataframe with index column DEVICE_ID and request data
@@ -603,13 +658,14 @@ class PECS:
         matched ... set of posids
         '''
         # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
+        posids_to_match = set(request['DEVICE_ID']) | set(self.posids)
+        matched_df = meapos.loc[sorted(matched & posids_to_match)]
         merged = matched_df.merge(request, on='DEVICE_ID')
         if not(merged.index.name == 'DEVICE_ID'):
             merged = merged.set_index('DEVICE_ID')
         
         # columns get renamed
-        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
+        merged.rename(columns={'X1': 'MOVE_VAL1', 'X2': 'MOVE_VAL2',
                                'Q': 'mea_Q', 'S': 'mea_S', 'FLAG': 'FLAGS'},
                       inplace=True)
         mask = merged['FLAGS'].notnull()
