@@ -118,7 +118,7 @@ def disambig(n_retries):
     request_data = {'DEVICE_ID': sorted_unambig,
                     'COMMAND': 'poslocTP',
                     'X1': [locT_targets[posid] for posid in sorted_unambig],
-                    'X2': [locP_target for posid in sorted_unambig],
+                    'X2': locP_target,
                     'LOG_NOTE': pc.join_notes(script_name, 'clearance move for unambiguous positioner'),
                     }
     request = pandas.DataFrame(request_data)
