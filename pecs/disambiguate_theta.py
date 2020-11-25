@@ -98,7 +98,8 @@ def disambig(n_retries):
     
     # targets for unambiguous pos
     unambig = enabled_posids - all_ambig
-    locT_current = pecs.quick_query(key='poslocT', posids=unambig)
+    active_posids = ambig & unambig
+    locT_current = pecs.quick_query(key='poslocT', posids=active_posids)
     locT_targets = {posid: locT_current[posid] for posid in unambig}
     locP_target = 150.0
     
