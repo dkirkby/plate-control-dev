@@ -648,7 +648,7 @@ class PECS:
     
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
         '''Returns results of fvc measurement after checking for target matches
-        and doing ome pandas juggling, very specifc to the other data interchange
+        and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
         
         request ... pandas dataframe with index column DEVICE_ID and request data
@@ -656,7 +656,8 @@ class PECS:
         matched ... set of posids
         '''
         # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
+        posids_to_match = set(request['DEVICE_ID']) | set(self.posids)
+        matched_df = meapos.loc[sorted(matched & posids_to_match)]
         merged = matched_df.merge(request, on='DEVICE_ID')
         if not(merged.index.name == 'DEVICE_ID'):
             merged = merged.set_index('DEVICE_ID')
