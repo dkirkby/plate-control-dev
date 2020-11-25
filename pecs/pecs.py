@@ -163,7 +163,7 @@ class PECS:
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
         self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
-        self.petal_locs = self.all_posinfo[['DEVICE_LOC', 'PETAL_LOC']]
+        self.petal_locs = self.all_posinfo[['DEVICE_ID', 'PETAL_LOC']]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             if device_locs:
