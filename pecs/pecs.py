@@ -161,6 +161,8 @@ class PECS:
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PC{pcid:02} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
+        all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
+        self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             if device_locs:
@@ -376,15 +378,18 @@ class PECS:
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
+        should_prepare_move = True
         if request is None:
+            should_prepare_move = False
             self.print('Skipping "prepare_moves" call, under assumption of independently requested / scheduled moves.')
             requested_posids = self.ptlm.get_requested_posids(kind='all')
             all_requested = set()
             for posids in requested_posids.values():
                 all_requested |= posids
-            dummy_req = {'DEVICE_ID':list(all_requested), 'COMMAND':'dummy_cmd', 'X1':0.0, 'X2':0.0, 'LOG_NOTE':''}
+            dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
             request = pd.DataFrame(dummy_req)
-        else:
+        request.merge(self.all_posinfo, on='DEVICE_ID')
+        if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
