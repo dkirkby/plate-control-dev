@@ -108,7 +108,7 @@ def disambig(n_retries):
         these_neighbors = neighbors[posid]
         these_ambig = {n for n in these_neighbors if n in ambig}
         if these_ambig:
-            selected = random.choice(these_ambig)
+            selected = random.choice(list(these_ambig))
             locT_targets[posid] = locT_current[selected]  # this is a good config to minimize collision opportunity
         
     # move unambiguous positioners to targets
