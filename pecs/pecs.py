@@ -376,7 +376,7 @@ class PECS:
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
-        if request == None:
+        if request is None:
             self.print('Skipping "prepare_moves" call, under assumption of independently requested / scheduled moves.')
             requested_posids = self.ptlm.get_requested_posids(kind='all')
             all_requested = set()
