@@ -18,6 +18,7 @@ parser.add_argument('-f', '--tp_frac', type=float, default=def_frac, help=f'Perc
 parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
 parser.add_argument('-n', '--no_update', action='store_true', help='suppress auto-updating of TP values')
 parser.add_argument('-prep', '--prepark', action='store_true', help='automatically do an initial parking move prior to the measurement')
+parser.add_argument('-ud', '--use_disabled', action='store_true', help='Use disabled positioners in calibration as well. (All measured positioners will be used.)')
 max_fvc_iter = 10
 parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
 uargs = parser.parse_args()
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
                        tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
-                       num_meas=uargs.num_meas)
+                       num_meas=uargs.num_meas, use_disabled=uargs.use_disabled)
     if uargs.mode == 'posTP':
         key1, key2 = 'POS_T', 'POS_P'
     else:

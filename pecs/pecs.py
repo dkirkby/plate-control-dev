@@ -294,6 +294,7 @@ class PECS:
                                         exptime=self.exptime, match_radius=match_radius,
                                         matched_only=matched_only,
                                         all_fiducials=self.all_fiducials,centers=centers)
+            self.print('Finished FVC.measure')
             # Positions is a dictionary (from np.rec_array). Is empty when no posiitoners are present
             assert not(positions.empty), 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
             this_meapos = pd.DataFrame(positions).rename(columns=
