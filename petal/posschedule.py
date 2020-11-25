@@ -116,7 +116,7 @@ class PosSchedule(object):
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
-        if posid in self.has_regular_request_already(posid):
+        if self.has_regular_request_already(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
