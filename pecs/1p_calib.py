@@ -9,7 +9,7 @@ interactively run the onepoint calibration.
 import pandas as pd
 
 def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac=1.0,
-             match_radius=None, num_meas=1):
+             match_radius=None, num_meas=1, use_disabled=False):
     '''
     Function to do a onepoint calibration with given PECS isntance.
     args:
@@ -34,7 +34,10 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
         pecs.ptlm.park_positioners(pecs.posids, mode='normal', log_note=f'Moving for 1p_calib_{mode}')
     _, meas, matched, _ = pecs.fvc_measure(test_tp=False, check_unmatched=False,
                                            match_radius=match_radius, num_meas=num_meas)
-    calib_pos = meas.loc[sorted(matched & (set(pecs.posids)))]
+    if use_disabled:
+        calib_pos = meas.loc[sorted(matched)]
+    else:
+        calib_pos = meas.loc[sorted(matched & (set(pecs.posids)))]
     updates = pecs.ptlm.test_and_update_TP(calib_pos.reset_index(), mode=mode,
                                            auto_update=commit, tp_updates_tol=tp_tol,
                                            tp_updates_fraction=tp_frac,
@@ -52,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tp_tol', type=float, default=def_tol, help=f'Minimum error in mm over which to update TP. Default is {def_tol} mm.')
     parser.add_argument('-f', '--tp_frac', type=float, default=def_frac, help=f'Percentatge of error to apply in the TP update. Maximum 1.0. Default is {def_frac}.')
     parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
+    parser.add_argument('-ud', '--use_disabled', action='store_true', help='Run calibration on disabled positioners as well (uses all matched).')
     max_fvc_iter = 10
     parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
     uargs = parser.parse_args()
@@ -62,7 +66,7 @@ if __name__ == '__main__':
     input(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac,
-                       match_radius=uargs.match_radius, num_meas=uargs.num_meas)
+                       match_radius=uargs.match_radius, num_meas=uargs.num_meas, use_disabled=uargs.use_disabled)
     if uargs.mode == 'posTP':
         key1, key2 = 'POS_T', 'POS_P'
     else:
