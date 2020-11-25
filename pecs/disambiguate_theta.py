@@ -139,7 +139,7 @@ def disambig(n_retries):
                              } for posid in ambig
                      }
     logger.info(f'Doing retraction move for {len(dtdp_requests)} ambiguous positioners. Anticollision mode: {anticollision}')
-    pecs.ptlm.request_direct_dtdp(dtdp_requests)
+    pecs.ptlm.request_direct_dtdp(dtdp_requests, return_posids_only=True)
     pecs.ptlm.schedule_moves(anticollision=anticollision)
     pecs.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
     
@@ -158,7 +158,7 @@ def disambig(n_retries):
                              } for posid in ambig
                      }
     logger.info(f'Doing theta test move for {len(dtdp_requests)} ambiguous positioners. Anticollision mode: {anticollision}')
-    pecs.ptlm.request_direct_dtdp(dtdp_requests)
+    pecs.ptlm.request_direct_dtdp(dtdp_requests, return_posids_only=True)
     pecs.ptlm.schedule_moves(anticollision=anticollision)
     pecs.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
     return disambig(n_retries=n_retries - 1)

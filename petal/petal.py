@@ -308,7 +308,7 @@ class Petal(object):
 
     # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests, allow_initial_interference=True, _is_retry=False):
+    def request_targets(self, requests, allow_initial_interference=True, _is_retry=False, return_posids_only=False):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
 
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -347,6 +347,10 @@ class Petal(object):
             
             _is_retry ... boolean, internally used, whether this is a retry (e.g. cases where failed to send move_tables)
 
+            return_posids_only ... bool, default=False, work-around for inability of DOS proxy
+                                   to pass back accepted requests, in cases where external call is
+                                   made to request_direct_dtdp()
+
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
 
@@ -361,8 +365,7 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
-            pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
-                          positioner should receive going to the FLI camera with fvcproxy
+            In cases where return_posids_only=True ... you will just get a set of posids back, no dict.
         """
         marked_for_delete = set()
         for posid in requests:
@@ -384,9 +387,11 @@ class Petal(object):
                 self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
+        if return_posids_only:
+            return set(requests.keys())
         return requests
 
-    def request_direct_dtdp(self, requests, cmd_prefix=''):
+    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
         amounts at their theta and phi shafts.
 
@@ -425,6 +430,10 @@ class Petal(object):
                            in the 'MOVE_CMD' field. This is different from log_note. Generally,
                            log_note is meant for users, whereas cmd_prefix is meant for internal lower-
                            level detailed logging.
+                           
+            return_posids_only ... bool, default=False, work-around for inability of DOS proxy
+                                   to pass back accepted requests, in cases where external call is
+                                   made to request_direct_dtdp()
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
@@ -438,7 +447,7 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
-            pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
+            In cases where return_posids_only=True ... you will just get a set of posids back, no dict.
 
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
@@ -468,6 +477,8 @@ class Petal(object):
                 self._print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
+        if return_posids_only:
+            return set(requests.keys())
         return requests
 
     def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note=''):
