@@ -119,14 +119,14 @@ def disambig(n_retries):
                     'COMMAND': 'poslocTP',
                     'X1': [locT_targets[posid] for posid in sorted_unambig],
                     'X2': locP_target,
-                    'LOG_NOTE': pc.join_notes(script_name, 'clearance move for unambiguous positioner'),
+                    'LOG_NOTE': pc.join_notes(script_name, 'parking move for unambiguous positioner'),
                     }
     request = pandas.DataFrame(request_data)
     if request.empty:
         logger.info('No unambiguous + enabled positioners detected.')
     else:
-        logger.info(f'Doing clerance move for {len(request)} unambiguous positioners. Anticollision mode: {anticollision}')
-        pecs.ptlm.move_measure(request=request, anticollision=anticollision, **common_move_meas_kwargs)
+        logger.info(f'Doing parking move for {len(request)} unambiguous positioners. Anticollision mode: {anticollision}')
+        pecs.move_measure(request=request, anticollision=anticollision, **common_move_meas_kwargs)
 
     # retract ambiguous positioners' phi axes, again to maximize clearance
     # (this is safely done by *not* allowing extra theta anticollision moves)
@@ -141,7 +141,7 @@ def disambig(n_retries):
     logger.info(f'Doing retraction move for {len(dtdp_requests)} ambiguous positioners. Anticollision mode: {anticollision}')
     pecs.ptlm.request_direct_dtdp(dtdp_requests)
     pecs.ptlm.schedule_moves(anticollision=anticollision)
-    pecs.ptlm.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
+    pecs.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
     
     # theta test moves on ambiguous positioners
     anticollision = 'freeze'
@@ -160,7 +160,7 @@ def disambig(n_retries):
     logger.info(f'Doing theta test move for {len(dtdp_requests)} ambiguous positioners. Anticollision mode: {anticollision}')
     pecs.ptlm.request_direct_dtdp(dtdp_requests)
     pecs.ptlm.schedule_moves(anticollision=anticollision)
-    pecs.ptlm.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
+    pecs.move_measure(request=None, anticollision=anticollision, **common_move_meas_kwargs)
     return disambig(n_retries=n_retries - 1)
 
 if __name__ == '__main__':
