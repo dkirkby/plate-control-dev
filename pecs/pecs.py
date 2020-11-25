@@ -163,6 +163,7 @@ class PECS:
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
         self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
+        self.petal_locs = self.all_posinfo[['DEVICE_LOC', 'PETAL_LOC']]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             if device_locs:
@@ -388,7 +389,8 @@ class PECS:
                 all_requested |= posids
             dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
             request = pd.DataFrame(dummy_req)
-        request.merge(self.all_posinfo, on='DEVICE_ID')
+        if 'PETAL_LOC' not in request.columns:
+            request.merge(self.petal_locs, on='DEVICE_ID')
         if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
