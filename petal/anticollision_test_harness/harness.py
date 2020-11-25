@@ -37,8 +37,8 @@ retracted_TP = [0, 110]
 include_neighbors = True
 
 # Whether to test some "expert" mode commands
-test_direct_dTdP = False
-test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_direct_dTdP = True
+test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
@@ -46,7 +46,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_single' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_double' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -157,7 +157,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       local_log_on    = False,
                       collider_file   = None,
                       sched_stats_on  = True, # minor speed-up if turn off
-                      anticollision   = 'adjust',
+                      anticollision   = 'adjust_requested_only',
                       verbose         = False,
                       phi_limit_on    = False)
     for key, val in sim_fail_freq.items():
@@ -246,7 +246,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                             results_row[keys[0]] = expected[0]
                             results_row[keys[1]] = expected[1] 
                     results_rows[posid] = results_row
-            anticollision = 'adjust'
+            anticollision = 'adjust_requested_only'
             if n > 0:
                 for request in requests.values():
                     request['command'] = 'poslocdXdY'
@@ -292,13 +292,13 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 print(f'direct_dTdP {dtdp}')
                 direct_requests = {posid: {'target': dtdp, 'log_note':''} for posid in posids_to_test}
                 ptl.request_direct_dtdp(direct_requests)
-                ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
+                ptl.schedule_send_and_execute_moves(anticollision='adjust_requested_only') # 'adjust' here *should* internally be ignored in favor of 'freeze'
         if test_homing:
             posids_to_test = list(requests.keys())
             for axis in ['phi_only', 'theta_only', 'both']:
                 print(f'homing {axis}')
                 ptl.request_homing(posids_to_test, axis=axis)
-                ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
+                ptl.schedule_send_and_execute_moves(anticollision='adjust_requested_only') # 'adjust' here *should* internally be ignored in favor of 'freeze'
     if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
         print(f'Stats saved to {ptl.sched_stats_path}')

@@ -1901,10 +1901,10 @@ class Petal(object):
         '''
         assert kind in {'all', 'regular', 'expert'}, f'argument kind={kind} not recognized'
         if kind == 'regular':
-            return self.schedule.regular_requested_posids 
+            return self.schedule.regular_requests_accepted 
         elif kind == 'expert':
-            return self.schedule.expert_requested_posids
-        return self.schedule.regular_requested_posids | self.schedule.expert_requested_posids
+            return self.schedule.expert_requests_accepted
+        return self.schedule.regular_requests_accepted | self.schedule.expert_requests_accepted
              
     def _validate_posids_arg(self, posids, skip_unknowns=False):
         '''Handles / validates a user argument of posids. Returns a set.'''

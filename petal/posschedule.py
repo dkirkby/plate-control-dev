@@ -66,12 +66,17 @@ class PosSchedule(object):
         return self.petal.collider
     
     @property
-    def regular_requested_posids(self):
-        return self._all_requested_posids['regular'].copy()
+    def regular_requests_accepted(self):
+        return {self.has_regular_request_already(posid) for posid in self._requests}
     
     @property
-    def expert_requested_posids(self):
-        return self._all_requested_posids['expert'].copy()
+    def expert_requests_accepted(self):
+        return set(self.stages['expert'].move_tables.keys())
+    
+    def has_regular_request_already(self, posid):
+        if posid in self._requests and not self._requests[posid]['is_dummy']:
+            return True
+        return False
 
     def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=True):
         """Adds a request to the schedule for a given positioner to move to the
@@ -111,7 +116,7 @@ class PosSchedule(object):
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
-        if posid in self._all_requested_posids['regular']:
+        if posid in self.has_regular_request_already(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
