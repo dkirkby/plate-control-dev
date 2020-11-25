@@ -449,22 +449,9 @@ class PECS:
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         posids = kwargs['ids']
         enabled = self.get_enabled_posids(posids)
-        posids_by_petal = {}
-        for posid in enabled:
-            pcid = self.pcid_lookup(posid)
-            if pcid not in posids_by_petal:
-                posids_by_petal[pcid] = set()
-            posids_by_petal[pcid].add(posid)
-        for pcid, these_posids in posids_by_petal.items():
-            # 2020-07-12 [JHS] this happens sequentially petal by petal, only because
-            # I haven't studied the PetalMan / PECS interfaces sufficiently well to
-            # understand how to call the rehome_pos commands simultanously across
-            # multiple petals. That said, this is probably such a rarely called function
-            # that it's not critical to achieve that parallelism right now.
-            role = self._pcid2role(pcid)
-            move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
-            move_kwargs.update({'ids': these_posids, 'participating_petals': role})
-            funcs[move](**move_kwargs)
+        move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
+        move_kwargs['ids'] = enabled
+        funcs[move](**move_kwargs)
         
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
         meas_kwargs = {key:kwargs[key] for key in meas_args}
