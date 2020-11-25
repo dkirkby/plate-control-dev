@@ -390,7 +390,7 @@ class PECS:
             dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
             request = pd.DataFrame(dummy_req)
         if 'PETAL_LOC' not in request.columns:
-            request.merge(self.petal_locs, on='DEVICE_ID')
+            request = request.merge(self.petal_locs, on='DEVICE_ID')
         if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
