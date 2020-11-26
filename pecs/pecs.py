@@ -502,7 +502,7 @@ class PECS:
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')
             expserv = SimpleProxy('EXPOSURESERVER')
-            retcode = expserv._send_command('distribute', source=destination)
+            retcode = expserv._send_command('distribute', source=destination, expid=self.exp.id)
             self.print(f'ExposureServer.distribute returned code: {retcode}')
             if retcode == 'SUCCESS':
                 self.print(f'symlink created for: {destination}')

@@ -260,7 +260,7 @@ def cache_current_pos_settings(posids):
     cache_path = os.path.join(log_dir, cache_name)
     settings_by_petal = pecs.ptlm.batch_get_posfid_val(posids, list(sequence.pos_defaults.keys()))
     settings = {}
-    for setting in settings_by_petal:
+    for setting in settings_by_petal.values():
         settings.update(setting)
     frame = pd.DataFrame.from_dict(settings, orient='index')
     frame.to_csv(cache_path)
@@ -303,16 +303,16 @@ def apply_pos_settings(settings):
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
             value = these_settings[key]                
-            accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
-            for accepted in accepted_by_petal.values():
-                for posid, these_accepted in accepted.items():
-                    for key, val_accepted in these_accepted.items():
-                        value = settings[posid][key]
-                        if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
-                            assert2(False, f'unable to set {key}={value} for {posid}')
-                        elif val_accepted == True:  # again, distinct from the None case
-                            if key in motor_settings:
-                                motor_update_petals.add(role)
+    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
+    for accepted in accepted_by_petal.values():
+        for posid, these_accepted in accepted.items():
+            for key, val_accepted in these_accepted.items():
+                value = settings[posid][key]
+                if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
+                    assert2(False, f'unable to set {key}={value} for {posid}')
+                elif val_accepted == True:  # again, distinct from the None case
+                    if key in motor_settings:
+                        motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
         logger.info('apply_pos_settings: Positioner settings include change(s) to motor' +
@@ -457,7 +457,10 @@ def get_parkable_neighbors(posids):
     '''
     parkable_neighbors = set()
     all_enabled = get_all_enabled_posids()
-    all_neighbors = pecs.ptlm.batch_get_neighbors(posids)
+    ret = pecs.ptlm.batch_get_neighbors(posids)
+    all_neighbors = {}
+    for neigh in ret.values():
+        all_neighbors.update(neigh)
     for posid in posids:
         neighbors = all_neighbors[posid]
         enabled_neighbors = set(neighbors) & set(all_enabled)
