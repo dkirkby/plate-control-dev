@@ -1103,7 +1103,7 @@ class Petal(object):
            OUTPUT: values ... dict (keyed by uniqueid) of dicts with keys keys
         """
         values = {}
-        devids = set(self.posids) + set(self.fidids)
+        devids = set(self.posids) | set(self.fidids)
         for devid in uniqueids:
             if devid in devids:
                 values[devid] = {}
@@ -1151,7 +1151,7 @@ class Petal(object):
 
             NOTE: no comments accepted - one cannot set keys in pc.require_comment_to_store
         """
-        devids = set(self.posids) + set(self.fidids)
+        devids = set(self.posids) | set(self.fidids)
         accepts ={}
         for devid, sets in settings.items():
             if devid in devids:
