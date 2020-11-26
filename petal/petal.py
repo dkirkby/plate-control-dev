@@ -1096,6 +1096,23 @@ class Petal(object):
         else:
             return 'Not in petal'
 
+    def batch_get_posfid_val(self, uniqueids, keys):
+        """Retrives a batch of state values useful for calling from external scripts
+           INPUT: uniqueids ... list, list of posids/fidids to retrive values for
+                  keys ... list, state keys to retrieve
+           OUTPUT: values ... dict (keyed by uniqueid) of dicts with keys keys
+        """
+        values = {}
+        devids = set(self.posids) + set(self.fidids)
+        for devid in uniqueids:
+            if devid in devids:
+                values[devid] = {}
+                for key in keys:
+                    values[devid][key] = self.get_posfid_val(devid, key)
+            else:
+                self.printfunc(f'WARNING: {devid} not in petal')
+        return values
+
     def set_posfid_val(self, device_id, key, value, check_existing=False, comment=''):
         """Sets a single value to a positioner or fiducial. In the case of a 
         fiducial, this call does NOT turn the fiducial physically on or off.
@@ -1124,6 +1141,24 @@ class Petal(object):
             comment_field = 'CALIB_NOTE' if pc.is_calib_key(key) else 'LOG_NOTE'
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
+
+    def batch_set_posfid_val(self, settings):
+        """ Sets several values for several positioners or fiducials.
+            INPUT: settings ... dict (keyed by devid) of dicts {state key:value}
+                                same as output of batch_get_posfid_val
+            OUTPUT: accepts ... dict (keyed by devid) of dicts {state key:bool}
+                                where the bool indicates if the value was accepted
+
+            NOTE: no comments accepted - one cannot set keys in pc.require_comment_to_store
+        """
+        devids = set(self.posids) + set(self.fidids)
+        accepts ={}
+        for devid, sets in settings.items():
+            if devid in devids:
+                accepts[devid] = {}
+                for setting, value in sets.items():
+                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value)
+        return accepts
     
     def get_posids_with_commit_pending(self):
         '''Returns set of all posids for which there is a commit to DB pending.

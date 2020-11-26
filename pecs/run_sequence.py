@@ -258,16 +258,12 @@ def cache_current_pos_settings(posids):
     '''
     cache_name = f'{log_timestamp}_pos_settings_cache.ecsv'
     cache_path = os.path.join(log_dir, cache_name)
-    settings = []
-    for posid in posids:
-        these_settings = {'POS_ID': posid}
-        these_settings.update(sequence.pos_defaults.copy())
-        for key in sequence.pos_defaults:
-            value = ptlcall('get_posfid_val', posid, key)
-            these_settings[key] = value
-        settings.append(these_settings)
-    frame = pd.DataFrame(data=settings)
-    frame.to_csv(cache_path, index=False)
+    settings_by_petal = pecs.ptlm.batch_get_posfid_val(posids, list(sequence.pos_defaults.keys()))
+    settings = {}
+    for setting in settings_by_petal:
+        settings.update(setting)
+    frame = pd.DataFrame.from_dict(settings, orient='index')
+    frame.to_csv(cache_path)
     return cache_path
 
 def retrieve_cached_pos_settings(path):
@@ -307,12 +303,16 @@ def apply_pos_settings(settings):
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
             value = these_settings[key]                
-            val_accepted = ptlcall('set_posfid_val', posid, key, value, check_existing=True)
-            if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
-                assert2(False, f'unable to set {key}={value} for {posid}')
-            elif val_accepted == True:  # again, distinct from the None case
-                if key in motor_settings:
-                    motor_update_petals.add(role)
+            accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
+            for accepted in accepted_by_petal.values():
+                for posid, these_accepted in accepted.items():
+                    for key, val_accepted in these_accepted.items():
+                        value = settings[posid][key]
+                        if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
+                            assert2(False, f'unable to set {key}={value} for {posid}')
+                        elif val_accepted == True:  # again, distinct from the None case
+                            if key in motor_settings:
+                                motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
         logger.info('apply_pos_settings: Positioner settings include change(s) to motor' +
@@ -358,11 +358,17 @@ def calc_poslocXY_errors(requests, results):
     combo = requests.merge(useful_results, on='DEVICE_ID')
     targ_errs = {}
     trac_errs = {}
+    df = combo.set_index('DEVICE_ID')
+    ret = pecs.ptlm.batch_transform(df, 'obsXY', 'poslocXY')
+    df = pd.concat([x for x in ret.values()]).rename(columns={'poslocX': 'x_meas', 'poslocY': 'y_meas'})
+    ret = pecs.ptlm.batch_transform(df, 'posintTP', 'poslocXY')
+    df = pd.concat([x for x in ret.values()]).rename(columns={'poslocX': 'x_trac', 'poslocY': 'y_trac'})
+    combo = df.reset_index()
     for row in combo.iterrows():
         data = row[1]
         posid = data['DEVICE_ID']
-        xy_meas = trans(posid, 'obsXY_to_poslocXY', (data['obsX'], data['obsY']))
-        xy_trac = trans(posid, 'posintTP_to_poslocXY', (data['posintT'], data['posintP']))
+        xy_meas = (row['x_meas'], row['y_meas'])
+        xy_trac = (row['x_trac'], row['y_trac'])
         command = data['COMMAND']
         uv_targ = [data['X1'], data['X2']]
         assert2(command in sequence.abs_commands, 'error calc when initial request was a delta ' +
@@ -371,6 +377,7 @@ def calc_poslocXY_errors(requests, results):
             xy_targ = uv_targ
         else:
             conversion = f'{command}_to_poslocXY'
+            # Need to think how best to do in batch
             xy_targ = trans(posid, conversion, uv_targ)
         targ_err_x = xy_meas[0] - xy_targ[0]
         targ_err_y = xy_meas[1] - xy_targ[1]
@@ -450,8 +457,9 @@ def get_parkable_neighbors(posids):
     '''
     parkable_neighbors = set()
     all_enabled = get_all_enabled_posids()
+    all_neighbors = pecs.ptlm.batch_get_neighbors(posids)
     for posid in posids:
-        neighbors = ptlcall('get_positioner_neighbors', posid)
+        neighbors = all_neighbors[posid]
         enabled_neighbors = set(neighbors) & set(all_enabled)
         parkable_neighbors |= enabled_neighbors
     
