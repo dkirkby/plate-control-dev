@@ -1110,7 +1110,7 @@ class Petal(object):
                 for key in keys:
                     values[devid][key] = self.get_posfid_val(devid, key)
             else:
-                self.printfunc(f'WARNING: {devid} not in petal')
+                self.printfunc(f'DEBUG: {devid} not in petal')
         return values
 
     def set_posfid_val(self, device_id, key, value, check_existing=False, comment=''):
