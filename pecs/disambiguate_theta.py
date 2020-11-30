@@ -150,7 +150,7 @@ def disambig(n_retries):
     ambig_min = pecs.quick_query(key='min_theta_hardstop_ambiguous_zone', posids=ambig)
     dT_abs = {posid: ambig_max[posid] - ambig_min[posid] + pc.theta_hardstop_ambig_exit_margin for posid in ambig}
     presumed_no_hardstop_dir = {posid: 1 if intT_current[posid] < 0 else -1 for posid in ambig}
-    move_dir = {posid: presumed_no_hardstop_dir * (-1 if n_retries % 2 else 1) for posid in ambig}
+    move_dir = {posid: presumed_no_hardstop_dir[posid] * (-1 if n_retries % 2 else 1) for posid in ambig}
     dT = {posid: dT_abs[posid] * move_dir[posid] for posid in ambig}
     dir_note = {posid: f'{"away from" if presumed_no_hardstop_dir[posid] == move_dir[posid] else "toward"} currently-presumed closest hardstop' for posid in ambig}
     dtdp_requests = {posid: {'target': [dT[posid], 0.0],
