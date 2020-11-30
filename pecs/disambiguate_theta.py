@@ -94,7 +94,7 @@ def disambig(n_try):
         logger.info(f'{len(do_not_fix)} positioner(s) are not within the allowed-to-fix selection group. Excluded posids: {do_not_fix}')
     if not ambig or n_try == 0:
         return ambig
-    logger.info(f'Disambiguation attempt {uargs.num_tries - ngc + 1} of {uargs.num_tries}')
+    logger.info(f'Disambiguation attempt {uargs.num_tries - n_try + 1} of {uargs.num_tries}')
     logger.info(f'Will attempt to resolve {len(ambig)} posid(s): {ambig}')
     
     # targets for unambiguous pos
