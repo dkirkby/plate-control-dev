@@ -145,7 +145,7 @@ def disambig(n_retries):
     
     # theta test moves on ambiguous positioners
     anticollision = 'freeze'
-    intT_current = pecs.quick_query(key='posintT', posid=ambig)
+    intT_current = pecs.quick_query(key='posintT', posids=ambig)
     ambig_max = pecs.quick_query(key='max_theta_hardstop_ambiguous_zone', posids=ambig)
     ambig_min = pecs.quick_query(key='min_theta_hardstop_ambiguous_zone', posids=ambig)
     dT_abs = {posid: ambig_max[posid] - ambig_min[posid] + pc.theta_hardstop_ambig_exit_margin for posid in ambig}
@@ -171,3 +171,4 @@ if __name__ == '__main__':
         logger.warning(f'{len(ambig)} positioners remain *unresolved*. Details:\n{details}')
     else:
         logger.info('All selected ambiguous cases were resolved!')
+
