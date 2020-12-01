@@ -367,8 +367,8 @@ def calc_poslocXY_errors(requests, results):
     for row in combo.iterrows():
         data = row[1]
         posid = data['DEVICE_ID']
-        xy_meas = (row['x_meas'], row['y_meas'])
-        xy_trac = (row['x_trac'], row['y_trac'])
+        xy_meas = (data['x_meas'], data['y_meas'])
+        xy_trac = (data['x_trac'], data['y_trac'])
         command = data['COMMAND']
         uv_targ = [data['X1'], data['X2']]
         assert2(command in sequence.abs_commands, 'error calc when initial request was a delta ' +
