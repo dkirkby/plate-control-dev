@@ -53,6 +53,8 @@ pecs.logger = logger
 logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
 enabled_posids = set(pecs.get_enabled_posids('all', include_posinfo=False))
 allowed_to_fix = set(pecs.get_enabled_posids('sub', include_posinfo=False))
+pecs.up_tol = 0.0   # correct POS_T, POS_P for FVC measurements above this err value
+pecs.up_frac = 1.0  # when correcting POS_T, POS_P, do so by this fraction of err distance
 
 # some boilerplate
 common_move_meas_kwargs = {'match_radius': uargs.match_radius,
