@@ -961,6 +961,16 @@ class Petal(object):
             if hasattr(self, 'ops_state_sv'):
                 self.ops_state_sv.write('READY')
             return 'OBSERVING' # bypass everything below if in petal sim mode - sim should always be observing
+        if hw_state == 'OBSERVING':
+            conf = self.comm.pbget('CONF_FILE')
+            if not isinstance(conf, dict):
+                self.printfunc(f'WARNING: pbget CONF_FILE returned {conf}')
+                raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
+            canbusses = conf['can_bus_list']
+            ready = self.comm.check_can_ready(canbusses)
+            if not(ready) or 'FAILED' in ready:
+                self.printfunc(f'WARNING: check_can_ready returned {ready}')
+                raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
         todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
         for key, value in pc.PETAL_OPS_STATES[self._last_state].items():
             old_state = self.comm.pbget(key)
