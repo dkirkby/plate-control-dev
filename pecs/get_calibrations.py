@@ -6,7 +6,7 @@ an astropy table (when run as an imported module) or save to disk as an ecsv.
 
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma-separated integers, specifying one or more PETAL_ID number(s) for which to retrieve data. Defaults to all known petals at kpno database. Alternately argue "lbnl" for all known petals in lbnl (beyonce) database.')
+parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma-separated integers, specifying one or more PETAL_ID number(s) for which to retrieve data. Defaults to all known petals at kpno. Alternately argue "lbnl" for all known petals at lbnl.')
 parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
 parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
 parser.add_argument('-dl', '--disable_logger', action='store_true', help='Disable logging to disk.')
