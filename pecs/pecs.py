@@ -39,7 +39,7 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS', device_locs=None, no_expid=False):
+                 test_name='PECS', device_locs=None, no_expid=False, posids=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -100,7 +100,7 @@ class PECS:
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
         if self.interactive or (self.pcids is None):
-            self.interactive_ptl_setup(device_locs)  # choose which petal to operate
+            self.interactive_ptl_setup(device_locs=device_locs, posids=posids)
         elif self.interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         # Do this after interactive_ptl_setup
@@ -190,12 +190,12 @@ class PECS:
         self.posinfo = posinfo
         self.ptl_roles = self.ptlm.participating_petals
 
-    def interactive_ptl_setup(self, device_locs=None):
+    def interactive_ptl_setup(self, device_locs=None, posids=None):
         self.print('Running interactive setup for PECS')
         pcids = self._interactively_get_pcid()  # set selected ptlid
-        if device_locs:
-            posids = None
-        else:
+        if posids:
+            device_locs = None  # i.e. posids override device_locs
+        elif device_locs == None:
             posids = self._interactively_get_posids()  # set selected posids
         self.ptl_setup(pcids, posids=posids, device_locs=device_locs)
 
