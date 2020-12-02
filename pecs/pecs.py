@@ -660,7 +660,7 @@ class PECS:
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
         # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+        exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
                                           participating_petals=self.ptl_roles)
                   .set_index('DEVICE_ID')[['X1', 'X2']])
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
