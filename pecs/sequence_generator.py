@@ -46,20 +46,20 @@ seq = sequence.Sequence(short_name='debug posintTP with corr',
 move = sequence.Move(command='posintTP', target0=t, target1=p, log_note='', allow_corr=True)
 seq.append(move)
 seqs.append(seq)
-
+make_sparse_csv.append(seq)
 
 seq = sequence.Sequence(short_name='debug multitarget',
                         long_name='test the code with differing simultaneous targets on several positioners')
-locs = sequence.possible_device_locs
+posids = [f'M{i:05}' for i in range(10000)]
 targ_val_options = [i*.5-2.0 for i in range(9)]
 targ_val_unique_combos = list(itertools.combinations(targ_val_options,2))
-fill_repeats = math.ceil(len(locs) / len(targ_val_unique_combos))
+fill_repeats = math.ceil(len(posids) / len(targ_val_unique_combos))
 targ_val_combos = []
 for i in range(fill_repeats):
     targ_val_combos += targ_val_unique_combos
 targets = [[], []]
 for axis in [0,1]:
-    targets[axis] = [targ_val_combos[k][axis] for k in range(len(locs))]
+    targets[axis] = [targ_val_combos[k][axis] for k in range(len(posids))]
 n_moves = 2
 shift = lambda X: X[1:] + [X[0]]
 for i in range(n_moves):
@@ -68,14 +68,12 @@ for i in range(n_moves):
     move = sequence.Move(command='poslocXY',
                          target0=targets[0],
                          target1=targets[1],
-                         device_loc=locs,
+                         posids=posids,
                          log_note='',
                          allow_corr=True,
                          )
     seq.append(move)
 seqs.append(seq)
-make_sparse_csv.append(seq)
-
 
 # GENERIC XY TESTS
 # ----------------
@@ -324,7 +322,7 @@ for seq in seqs:
     if seq in make_sparse_csv:
         table = seq.to_table()
         all_cols = set(table.columns)
-        keep_cols = {sequence.move_idx_key, 'command', 'target0', 'target1', 'device_loc'}
+        keep_cols = {sequence.move_idx_key, 'command', 'target0', 'target1', 'posids'}
         for col in all_cols - keep_cols:
             del table[col]
         sparse_path = os.path.splitext(path)[0] + '_sparse.csv'

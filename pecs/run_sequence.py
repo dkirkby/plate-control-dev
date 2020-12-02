@@ -104,32 +104,26 @@ logger.info(f'Minimum move cycle time: {uargs.cycle_time} sec')
 try:
     from pecs import PECS
     kwargs = {'interactive': True}
-    specified_locs = seq.get_device_locs()
-    if any(specified_locs):
-        kwargs['device_locs'] = specified_locs
+    specified_posids = seq.get_posids()
+    if any(specified_posids):
+        kwargs['posids'] = specified_posids
     pecs = PECS(**kwargs)
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     _get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
     get_all_enabled_posids = lambda: list(pecs.get_enabled_posids('all', include_posinfo=False))
-    _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
-    all_posinfo = all_posinfo.reset_index()
-    temp = all_posinfo[['DEVICE_LOC','DEVICE_ID']].to_dict(orient='list')
-    all_loc2id = {temp['DEVICE_LOC'][i]: temp['DEVICE_ID'][i] for i in range(len(all_posinfo))}
 except:
     # still a useful case, for testing some portion of the script offline
     logger.warning('PECS initialization failed (hint: double-check whether you need to join instance in this terminal')
     pecs_on = False
-    device_locs = seq.get_device_locs()
-    if len(device_locs) == 0:
-        device_locs = range(10)
-    all_loc2id = {i:f'DUMMY{i:05d}' for i in device_locs}
-    _dummy_posids = list(all_loc2id.values())
-    _get_posids = lambda: _dummy_posids
-    temp = sorted(_get_posids())
-    
-all_id2loc = {val: key for key, val in all_loc2id.items()}
+    specified_posids = list(seq.get_posids())
+    max_posids_for_debug = 10
+    if len(specified_posids) == 0:
+        specified_posids = [f'DUMMY{i:05d}' for i in range(max_posids_for_debug)]
+    if len(specified_posids) > max_posids_for_debug:
+        specified_posids = specified_posids[:max_posids_for_debug]
+    _get_posids = lambda: specified_posids
 
 class NoPosidsError(Exception):
     pass
@@ -151,30 +145,6 @@ except NoPosidsError:
                  ' Suggested things to check: CTRL_ENABLED flags, posfid power,' +
                  ' canbus status, petal ops_state. Now quitting.')
     sys.exit(0)
-    
-_loc2id_cache = {}  # reduces overhead for function below
-_id2loc_cache = {}  # reduces overhead for function below
-def get_map(key='loc', posids=None):
-    '''Returns dict with containing positioner locations and corresponding ids.
-    By default, positioners will be only those delivered dynamically by get_posids().
-    
-    INPUTS:  key ... 'loc' --> output has keys = locations, values = posids
-                     'ids' --> output has keys = posids, values = locations
-             posids ... (optional) collection of posids, to skip get_posids() call
-    
-    OUTPUT:  dict, with keys/values as determined by key arg above
-    '''
-    posids = posids if posids else get_posids()
-    if key == 'loc':
-        global _loc2id_cache
-        if set(_loc2id_cache.values()) != set(posids):
-            _loc2id_cache = {k:v for k,v in all_loc2id.items() if v in posids}
-        return _loc2id_cache
-    else:
-        global _id2loc_cache
-        if set(_id2loc_cache.values()) != set(posids):
-            _id2loc_cache = {k:v for k,v in all_id2loc.items() if k in posids}
-        return _id2loc_cache
 
 if pecs_on:
     these = len(get_posids())
@@ -535,6 +505,7 @@ def park(park_option, is_prepark=True):
     pos_settings = sequence.pos_defaults
     pos_settings = update_with_pos_overrides(pos_settings)
     logger.info(f'Positioner settings during parking: {pos_settings}')
+    logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
     all_pos_settings = {posid: pos_settings for posid in get_posids()}
     if real_moves:
         kwargs = {'posids': all_to_park,
@@ -571,11 +542,10 @@ try:
     for m in range(start_move, final_move + 1):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-        device_loc_unordered = set(get_map(key='loc', posids=posids))
         move_counter += 1
         move_num_text = f'target {move_counter} of {num_moves} (sequence_move_idx = {m})'
-        if not move.is_defined_for_all_locations(device_loc_unordered):
-            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
+        if not move.is_defined_for_all_positioners(posids):
+            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioners.\n')
             continue
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
         correction_not_defined = move.command not in sequence.general_commands
@@ -608,18 +578,16 @@ try:
                     if any(no_err_val):
                         logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
                                     f' missing error results. Excluded posids: {no_err_val}')
-                    device_loc_map = get_map(key='ids', posids=posids)
-                    # note below how order is preserved for target0, target1, and device_loc
+                    # note below how order is preserved for target0 and target1
                     # lists, on the assumption that get_posids() returns a list
-                    device_locs = [device_loc_map[posid] for posid in posids]
                     submove = sequence.Move(command='poslocdXdY',
                                             target0=[-targ_errs[posid][0] for posid in posids],
                                             target1=[-targ_errs[posid][1] for posid in posids],
-                                            device_loc=device_locs,
-                                            log_note=move.get_log_notes(device_locs),
+                                            posids=posids,
+                                            log_note=move.get_log_notes(posids),
                                             pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
-                request = submove.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
+                request = submove.make_request(posids=posids, log_note=extra_log_note)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
@@ -635,9 +603,11 @@ try:
             kwargs.update(move_meas_settings)
             new_settings = move.pos_settings
             new_settings = update_with_pos_overrides(new_settings)
-            descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
+            descriptive_dict = move.to_dict(sparse=True, posids=posids)
             descriptive_dict = update_with_pos_overrides(descriptive_dict)
-            logger.info(f'Move settings are {descriptive_dict}\n')
+            logger.info(f'Move settings: {descriptive_dict}')
+            if move.is_uniform:
+                logger.info(f'Requested positioners: {sorted(set(kwargs["request"]["DEVICE_ID"]))}')
             if new_settings != last_pos_settings:
                 all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
                 if pecs_on:

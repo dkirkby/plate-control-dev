@@ -2164,6 +2164,17 @@ class Petal(object):
                                'likely.')
                 posids_to_retry = {}
                 failed_send_posids = self._posids_where_tables_were_just_sent
+                
+            # 2020-11-30 [JHS] This code block below could be used (need to add method to turn on that boolean
+            # in the if statement) to let failures still proceed in limited cases.
+            # 
+            # if n_retries == 0 and self.limit_angle >= self.collider.Eo_phi and self.accept_comm_failures_if_restricted_patrol:
+            #     msg = f'WARNING: Despite failures of CAN communication, with n_retries remaining == {n_retries}, ' + \
+            #           'this move will simply be allowed to proceed, because collision risk has been mitigated by ' + \
+            #           f'restricted target patrol zones (phi limit angle = {self.limit_angle}). Failures of spotmatching ' + \
+            #           'may result, if this incurs significant loss of tracking accuracy.'
+            #     return failed_send_posids
+            
             if self.schedule.expert_mode_is_on():
                 expert_mode = True
                 all_tables = self.schedule.get_orig_expert_tables_sequence()

@@ -74,7 +74,6 @@ is_bool = lambda x: isinstance(x, (bool, np.bool, np.bool_))
 is_string = lambda x: isinstance(x, (str, np.str))
 
 move_idx_key = 'move_idx'
-possible_device_locs = set(pc.generic_pos_neighbor_locs)
 get_datestr = lambda: datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
 sequence_note_prefix = 'sequence: '
 
@@ -161,15 +160,15 @@ class Sequence(object):
         table.meta = {k:v for k,v in vars(self).items() if k in meta}
         return table
     
-    def get_device_locs(self):
-        '''Returns set of all device location integers specified in the sequence.
+    def get_posids(self):
+        '''Returns set of all posid strings specified in the sequence.
         '''
-        locs = set()
+        posids = set()
         for move in self:
-            locs |= set(move.device_loc)
-        if 'any' in locs:
-            locs.remove('any')
-        return locs
+            posids |= set(move.posids)
+        if 'any' in posids:
+            posids.remove('any')
+        return posids
     
     def __str__(self):
         s = self._meta_str()
@@ -281,10 +280,7 @@ class Sequence(object):
                 test = example_table[col][0]
                 if is_number(val) and is_number(test) or is_bool(val) and is_bool(test):
                     continue
-                if col == 'device_loc':
-                    assert is_number(val) or isinstance(val, str)
-                else:
-                    assert isinstance(val, type(test))
+                assert isinstance(val, type(test))
             try:
                 np.isfinite(example_table[col][0])
                 isnumber = True
@@ -308,6 +304,40 @@ class Sequence(object):
             new[move_idx_key] = range(len(new))
         return new
     
+    def merge(self, other):
+        '''Return a new sequnce, which merges this one with another. A number of
+        restrictions apply. The two sequences must be:
+            - same number of moves
+            - within each move, must have:
+                - unique posids
+                - same command
+                - same allow_corr
+                - same pos_settings
+        '''
+        assert isinstance(other, Sequence)
+        new = Sequence(short_name=pc.join_notes(self.short_name, other.short_name),
+                       long_name=pc.join_notes(self.long_name, other.long_name),
+                       details=pc.join_notes(self.details, other.details),
+                       )
+        assert len(self) == len(other), 'merge of non-equal length sequences is not defined'
+        for i in range(len(self)):
+            A = self[i]
+            B = other[i]
+            assert not A.is_uniform and not B.is_uniform, 'merge of move with undifferentiated posids is not defined'
+            for key in Move.single_keys | {'pos_settings'}:
+                assert getattr(A, key) == getattr(B, key), f'merge of moves with differing values for "{key}" is not defined'
+            assert len(set(A.posids) & set(B.posids)) == 0, 'merge of moves with overlapping posids is not defined'
+            move = Move(command=A.command,
+                        target0=A.target0 + B.target0,
+                        target1=A.target1 + B.target1,
+                        posids=A.posids + B.posids,
+                        log_note=A._log_note + B._log_note,
+                        pos_settings=A.pos_settings,
+                        allow_corr=A.allow_corr
+                        )
+            new.append(move)
+        return new
+    
 class Move(object):
     '''Encapsulates the command and settings data for a simultaneous movement of
     one or more fiber positioners.
@@ -315,19 +345,19 @@ class Move(object):
         command      ... move command string as described in petal.request_targets()
         target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
         target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
-        device_loc   ... optional sequence of which positioner device locations should be commanded
+        posids       ... optional sequence of which positioner ids should be commanded
         log_note     ... optional string (uniformly applied) or sequence of strings (per device) to store alongside log data in this move
         pos_settings ... optional dict of positioner settings to apply during the move
         allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
         
     Multiple positioners, same targets:
-        By default, device_loc='any', which means that the move command should be applied
+        By default, posids='any', which means that the move command should be applied
         to any positioners selected at runtime (presumably by the PECS initialization
         process). In this case, all positioners get the same target0 and target1. The
         command string must be one of local_commands, as defined in this module.
         
     Multiple positioners, multiple targets:
-        By arguing ordered sequences for target0, target1, and device_loc, the user
+        By arguing ordered sequences for target0, target1, and posids, the user
         can specify different targets for different positioners. The command will be
         the same in all cases, and must be one of general_commands, as defined in this
         module.
@@ -336,29 +366,27 @@ class Move(object):
         Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
         or set both to home both axes.
     '''
-    def __init__(self, command, target0, target1, device_loc='any', log_note='', pos_settings=None, allow_corr=True):
+    def __init__(self, command, target0, target1, posids='any', log_note='', pos_settings=None, allow_corr=True):
         pos_settings = {} if pos_settings is None else pos_settings
-        if device_loc == 'any' or is_number(device_loc):
+        if is_string(posids):
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
                 assert is_number(x), f'target {x} is not a number'
             self.target0 = [target0]
             self.target1 = [target1]
-            self.device_loc = [device_loc]           
+            self.posids = [posids]           
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
-            assert (len(target0) == len(target1) == len(device_loc)), 'args target0, target1, and device_loc are not of equal length'
+            assert (len(target0) == len(target1) == len(posids)), 'args target0, target1, and posid are not of equal length'
             self.target0 = list(target0)
             self.target1 = list(target1)
-            self.device_loc = list(device_loc)
+            self.posids = list(posids)
         self.log_note = log_note
         for X in [self.target0, self.target1]:
             assert all([is_number(x) for x in X]), 'all elements of target0 or target1 must be numbers'
         if command in homing_commands:
             assert target0 or target1, 'for a homing command, need to set target0 to 1 for theta ' + \
                                        'homing, target1 to 1 for phi homing, or both simultaneously'
-        allowed_posloc = possible_device_locs | {'any'}
-        assert all([x in allowed_posloc for x in self.device_loc]), 'all elements of device_loc must be valid device locations'
         self.command = command
         self.pos_settings = pos_settings
         self.allow_corr = bool(allow_corr)
@@ -366,11 +394,17 @@ class Move(object):
     
     # properties of Move with single values vs multiple values
     single_keys = {'command', 'allow_corr'}
-    multi_keys = {'target0', 'target1', 'device_loc', 'log_note'}
+    multi_keys = {'target0', 'target1', 'posids', 'log_note'}
     
     def register_sequence_name_getter(self, function):
         '''Register function that can get name of the sequence that contains this move.'''
         self._sequence_name_getter = function
+    
+    @property
+    def is_uniform(self):
+        '''Boolean whether the same uniform move command and target is to be done on
+        any positioner.'''
+        return self.posids == ['any']
     
     @property
     def log_note(self):
@@ -399,22 +433,24 @@ class Move(object):
     def log_note(self, note):
         if self.has_multiple_targets:
             if is_string(note):
-                self._log_note = [note] * len(self.device_loc)
+                self._log_note = [note] * len(self.posids)
             else:
-                assert len(note) == len(self.device_loc)
+                assert len(note) == len(self.posids)
                 self._log_note = list(note)
         else:
             self._log_note = [note] if is_string(note) else list(note)[0]
     
-    def get_log_notes(self, device_locs='any'):
-        '''Returns list of log note values for the collection device_locs, in
-        the same order as device_locs.'''
+    def get_log_notes(self, posids='any'):
+        '''Returns list of log note values for the collection posids, in
+        the same order as posids.'''
         notes = self.log_note
-        if device_locs == 'any':
-            device_locs = self.device_loc
-        elif self.device_loc == ['any']:
-            return [notes[0]] * len(device_locs)
-        return [notes[self.device_loc.index(loc)] for loc in device_locs]
+        if posids != 'any':
+            assert isinstance(posids, (list, tuple)), f'posids={posids} of type {type(posids)} is not supported for get_log_notes()'
+        if posids == 'any':
+            posids = self.posids
+        elif self.is_uniform:
+            return [notes[0]] * len(posids)
+        return [notes[self.posids.index(posid)] for posid in posids]
     
     @staticmethod
     def _validate_pos_settings(settings):
@@ -456,25 +492,25 @@ class Move(object):
         return d        
     
     def __len__(self):
-        return len(self.device_loc)
+        return len(self.posids)
     
     @property
     def has_multiple_targets(self):
         '''Boolean whether this move has mulitple targets.'''
         return len(self) > 1
     
-    def is_defined_for_all_locations(self, device_locs):
+    def is_defined_for_all_positioners(self, posids):
         '''Returns boolean whether the move has valid command definitions for
-        the argued collection of device locations.
+        the argued collection of posids.
         '''
-        if 'any' in self.device_loc:
+        if 'any' in self.posids:
             return True
-        missing = set(device_locs) - set(self.device_loc)
+        missing = set(posids) - set(self.posids)
         if any(missing):
             return False
         return True
     
-    def to_dict(self, sparse=False, device_loc='any'):
+    def to_dict(self, sparse=False, posids='any'):
         '''Returns a dict, which is ready for direct conversion to an astropy
         table or pandas dataframe. Keys = column names and values = equal-length
         lists of column data.
@@ -483,12 +519,12 @@ class Move(object):
                             representation (non-arrays not expanded). This form
                             is not suitable for direct conversion to table.
                             
-                 device_loc ... Optional set, tuple, or list of locations. Any
-                                arrays in the returned dictionary will only contain
-                                entries corresponding to these locations.
+                 posids ... Optional set, tuple, or list of posids. Any
+                            arrays in the returned dictionary will only contain
+                            entries corresponding to these positioners.
         '''
         data = {}
-        key_order = ['command', 'target0', 'target1', 'device_loc', 'allow_corr', 'log_note']
+        key_order = ['command', 'target0', 'target1', 'posids', 'allow_corr', 'log_note']
         for key in self.single_keys:
             data[key] = [getattr(self, key)] * len(self)
         for key in self.multi_keys:
@@ -497,39 +533,46 @@ class Move(object):
             data[key] = [val] * len(self)
         key_order = key_order + sorted(set(data) - set(key_order))
         data = {key: data[key] for key in key_order}
-        if device_loc != 'any':
-            locs = sorted(device_loc)
-            selection = [i for i in range(len(locs)) if locs[i] in self.device_loc]
+        if posids != 'any':
+            ids = sorted(posids)
+            if self.is_uniform:
+                selection = [0] if sparse else [0 for i in range(len(ids))]
+            else:
+                selection = [i for i in range(len(ids)) if ids[i] in self.posids]
             for key, value in data.items():
                 data[key] = [value[i] for i in selection]
         if sparse:
             for key in self.single_keys | set(self.pos_settings):
                 data[key] = data[key][0] if len(data[key]) > 0 else []
+            for key in self.multi_keys:
+                if len(set(data[key])) == 1:
+                    data[key] = data[key][0]
         return data
     
-    def make_request(self, loc2id_map, log_note=''):
+    def make_request(self, posids, log_note=''):
         '''Make a move request data structure, ready for sending to the online control system.
-        Any positioners known to this move instance, but not included in loc2id_map, will be
+        Any positioners known to this move instance, but not included in posids, will be
         skipped.
         
-        INPUT:  loc2id_map ... keys=device_loc, values=posids
+        INPUT:  posids ... collection of positioner ids
                 log_note ... optional string, will be appended to any existing log note
         
         OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
         '''
         assert self.command not in homing_commands, 'Cannot make a request for homing. Try make_homing_kwargs() instead.'
-        posids, target0, target1, final_log_note = [], [], [], []
+        posids = list(set(posids))
+        sorted_posids, target0, target1, final_log_note = [], [], [], []
         possible_notes = [pc.join_notes(note, log_note) for note in self.log_note]
         if self.has_multiple_targets:
             for i in range(len(self)):
-                device_loc = self.device_loc[i]
-                if device_loc in loc2id_map:
-                    posids += [loc2id_map[device_loc]]
+                posid = self.posids[i]
+                if posid in posids:
+                    sorted_posids += [posid]
                     target0 += [self.target0[i]]
                     target1 += [self.target1[i]]
                     final_log_note += [possible_notes[i]]
         else:
-            posids = list(loc2id_map.values())
+            sorted_posids = posids
             target0 = self.target0[0]
             target1 = self.target1[0]
             final_log_note = possible_notes[0]
