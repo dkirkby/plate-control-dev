@@ -304,6 +304,40 @@ class Sequence(object):
             new[move_idx_key] = range(len(new))
         return new
     
+    def merge(self, other):
+        '''Return a new sequnce, which merges this one with another. A number of
+        restrictions apply. The two sequences must be:
+            - same number of moves
+            - within each move, must have:
+                - unique posids
+                - same command
+                - same allow_corr
+                - same pos_settings
+        '''
+        assert isinstance(other, Sequence)
+        new = Sequence(short_name=pc.join_notes(self.short_name, other.short_name),
+                       long_name=pc.join_notes(self.long_name, other.long_name),
+                       details=pc.join_notes(self.details, other.details),
+                       )
+        assert len(self) == len(other), 'merge of non-equal length sequences is not defined'
+        for i in range(len(self)):
+            A = self[i]
+            B = other[i]
+            assert not A.is_uniform and not B.is_uniform, 'merge of move with undifferentiated posids is not defined'
+            for key in Move.single_keys | {'pos_settings'}:
+                assert getattr(A, key) == getattr(B, key), f'merge of moves with differing values for "{key}" is not defined'
+            assert len(set(A.posids) & set(B.posids)) == 0, 'merge of moves with overlapping posids is not defined'
+            move = Move(command=A.command,
+                        target0=A.target0 + B.target0,
+                        target1=A.target1 + B.target1,
+                        posids=A.posids + B.posids,
+                        log_note=A._log_note + B._log_note,
+                        pos_settings=A.pos_settings,
+                        allow_corr=A.allow_corr
+                        )
+            new.append(move)
+        return new
+    
 class Move(object):
     '''Encapsulates the command and settings data for a simultaneous movement of
     one or more fiber positioners.
