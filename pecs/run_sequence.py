@@ -563,7 +563,7 @@ try:
             descriptive_dict = move.to_dict(sparse=True, posids=posids)
             logger.info(f'Move command: {descriptive_dict}')
             if move.is_uniform:
-                logger.info(f'Requested positioners: {sorted(set(kwargs["request"]["DEVICE_ID"]))}')
+                logger.info(f'Requested positioners: {posids}')
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)
