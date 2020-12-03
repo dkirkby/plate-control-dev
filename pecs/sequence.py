@@ -82,18 +82,23 @@ class Sequence(object):
     Typical operations you can do on a list work here (indexing, slices, del, etc).
     However, all elements must have type Move (see class lower in this module).
     
-        short_name ... string, brief name for the test
-        long_name  ... string, optional longer descriptive name for the test
-        details ... string, optional additional string to explain the test's purpose, etc
+        short_name   ... string, brief name for the test
+        long_name    ... string, optional longer descriptive name for the test
+        details      ... string, optional additional string to explain the test's purpose, etc
+        pos_settings ... optional dict of positioner settings to apply during the sequence
         
     After initialization, populate the sequence using the "add_move" function.
     '''
-    def __init__(self, short_name, long_name='', details=''):
+    def __init__(self, short_name, long_name='', details='', pos_settings=None):
         self.moves = []
         self.short_name = short_name
         self.long_name = str(long_name)
         self.details = str(details)
         self.creation_date = get_datestr()
+        pos_settings = {} if pos_settings is None else pos_settings
+        self.pos_settings = pos_settings
+    
+    save_as_metadata = ['short_name', 'long_name', 'details', 'creation_date', 'pos_settings']
 
     @property
     def normalized_short_name(self):
@@ -110,11 +115,13 @@ class Sequence(object):
         table = Table.read(path, **kwargs)
         table = Sequence._validate_table(table)
         basename = os.path.basename(path)
-        fallback_short_name = os.path.splitext(basename)[0]
-        fallback_details = f'Read in from {path} on {get_datestr()}'
-        fallback_creation_date = 'unknown_date'
-        seq = Sequence(short_name=fallback_short_name, details=fallback_details)
-        seq.creation_date = fallback_creation_date
+        fallbacks = {'short_name': os.path.splitext(basename)[0],
+                     'long_name': '',
+                     'details': f'Read in from {path} on {get_datestr()}',
+                     'pos_settings': {},
+                     }
+        seq = Sequence(**fallbacks)
+        seq.creation_date = 'unknown_date'
         for key, value in table.meta.items():
             setattr(seq, key, value)  # overrides the fallback values where possible
         move_idxs = sorted(set(table[move_idx_key]))
@@ -122,9 +129,6 @@ class Sequence(object):
             subtable = table[m == table[move_idx_key]]
             kwargs = {key: subtable[key][0] for key in Move.single_keys}
             kwargs.update({key: subtable[key].tolist() for key in Move.multi_keys})
-            other_keys = set(subtable.columns) - (Move.single_keys | Move.multi_keys)
-            pos_settings = {key: subtable[key][0] for key in other_keys if key in pos_defaults}
-            kwargs['pos_settings'] = pos_settings
             if len(subtable) == 1:
                 for key, val in kwargs.items():
                     if isinstance(val, list) and len(val) == 1:
@@ -155,9 +159,7 @@ class Sequence(object):
             this_table = Table(this_dict)
             tables.append(this_table)
         table = vstack(tables)
-        not_meta = {'moves'}
-        meta = set(vars(self)) - not_meta
-        table.meta = {k:v for k,v in vars(self).items() if k in meta}
+        table.meta = {key: getattr(self, key) for key in Sequence.save_as_metadata}
         return table
     
     def get_posids(self):
@@ -170,16 +172,55 @@ class Sequence(object):
             posids.remove('any')
         return posids
     
+    @property
+    def pos_settings(self):
+        '''Copy of internal dict, containing all pos settings. Will be some
+        subset of key/value pairs like those in pos_defaults.'''
+        return self._pos_settings.copy()
+    
+    @pos_settings.setter
+    def pos_settings(self, settings):
+        '''Settings dict, may contain any subset of pos_defaults keys.'''
+        self._pos_settings = self._validate_pos_settings(settings)
+    
+    def merge(self, other):
+        '''Return a new sequnce, which merges this one with another. A number of
+        restrictions apply. The two sequences must be:
+            - same number of moves
+            - same pos_settings
+            - within each move, must have:
+                - unique posids
+                - same command
+                - same allow_corr
+        '''
+        assert isinstance(other, Sequence)
+        new = Sequence(short_name=pc.join_notes(self.short_name, other.short_name),
+                       long_name=pc.join_notes(self.long_name, other.long_name),
+                       details=pc.join_notes(self.details, other.details),
+                       )
+        assert len(self) == len(other), 'merge of non-equal length sequences is not defined'
+        assert self.pos_settings == other.pos_settings, 'merge of differing pos_settings is not defined'
+        for i in range(len(self)):
+            A = self[i]
+            B = other[i]
+            assert not A.is_uniform and not B.is_uniform, 'merge of move with undifferentiated posids is not defined'
+            for key in Move.single_keys:
+                assert getattr(A, key) == getattr(B, key), f'merge of moves with differing values for "{key}" is not defined'
+            assert len(set(A.posids) & set(B.posids)) == 0, 'merge of moves with overlapping posids is not defined'
+            move = Move(command=A.command,
+                        target0=A.target0 + B.target0,
+                        target1=A.target1 + B.target1,
+                        posids=A.posids + B.posids,
+                        log_note=A._log_note + B._log_note,
+                        allow_corr=A.allow_corr
+                        )
+            new.append(move)
+        return new
+    
     def __str__(self):
         s = self._meta_str()
         s += '\n'
         table = self.to_table()
-        used_settings = set()
-        for move in self:
-            used_settings |= set(move.non_default_pos_settings)
-        removals = set(pos_defaults) - used_settings
-        for name in removals:
-            table.remove_column(name)
         align = []
         for col in table.columns:
             if col.lower() in {'log_note'}:
@@ -211,52 +252,10 @@ class Sequence(object):
             s += f'\nCreated: {self.creation_date}'
         if self.details:
             s += f'\n{self.details}'
+        s += f'\nSettings: {self.pos_settings}'
         s += f'\nTotal moves = {len(self)}'
         return s
     
-    # Standard sequence functions
-    def __iter__(self):
-        self.__idx = 0
-        return self
-        
-    def __next__(self):
-        if self.__idx < len(self):
-            move = self.moves[self.__idx]
-            self.__idx += 1
-            return move
-        else:
-            raise StopIteration
-    
-    def __len__(self):
-        return len(self.moves)
-    
-    def __getitem__(self, key):
-        return self.moves[key]
-        
-    def __setitem__(self, key, value):
-        self._validate_move(value)
-        self.moves[key] = value
-
-    def __delitem__(self, key):
-        del self.moves[key]
-        
-    def __contains__(self, value):
-        return value in self.moves
-    
-    def index(self, value):
-        for i in range(len(self)):
-            if self[i] == value:
-                return i
-        raise ValueError(f'{object.__repr__(self)} is not in sequence')
-    
-    def count(self, value):
-        matches = [True for x in self if value == x]
-        return len(matches)
-    
-    def append(self, value):
-        self._validate_move(value)
-        self.moves.append(value)
-        
     def _validate_move(self, move):
         assert isinstance(move, Move), f'{move} must be an instance of Move class'
         move.register_sequence_name_getter(lambda: self.normalized_short_name)
@@ -304,50 +303,77 @@ class Sequence(object):
             new[move_idx_key] = range(len(new))
         return new
     
-    def merge(self, other):
-        '''Return a new sequnce, which merges this one with another. A number of
-        restrictions apply. The two sequences must be:
-            - same number of moves
-            - within each move, must have:
-                - unique posids
-                - same command
-                - same allow_corr
-                - same pos_settings
-        '''
-        assert isinstance(other, Sequence)
-        new = Sequence(short_name=pc.join_notes(self.short_name, other.short_name),
-                       long_name=pc.join_notes(self.long_name, other.long_name),
-                       details=pc.join_notes(self.details, other.details),
-                       )
-        assert len(self) == len(other), 'merge of non-equal length sequences is not defined'
-        for i in range(len(self)):
-            A = self[i]
-            B = other[i]
-            assert not A.is_uniform and not B.is_uniform, 'merge of move with undifferentiated posids is not defined'
-            for key in Move.single_keys | {'pos_settings'}:
-                assert getattr(A, key) == getattr(B, key), f'merge of moves with differing values for "{key}" is not defined'
-            assert len(set(A.posids) & set(B.posids)) == 0, 'merge of moves with overlapping posids is not defined'
-            move = Move(command=A.command,
-                        target0=A.target0 + B.target0,
-                        target1=A.target1 + B.target1,
-                        posids=A.posids + B.posids,
-                        log_note=A._log_note + B._log_note,
-                        pos_settings=A.pos_settings,
-                        allow_corr=A.allow_corr
-                        )
-            new.append(move)
+    @staticmethod
+    def _validate_pos_settings(settings):
+        '''Returns a new, validated pos_settings dict, with possible type casts
+        of values.'''
+        new = settings.copy()
+        for key, value in settings.items():
+            assert key in pos_defaults
+            example = pos_defaults[key]
+            expected_type =  type(example)
+            if is_bool(value):
+                new[key] = bool(value)
+            elif is_number(value) and is_float(example):
+                    new[key] = float(value)
+            elif is_int(value):
+                new[key] = int(value)
+            assert isinstance(new[key], expected_type)
         return new
     
+    # Standard sequence functions
+    def __iter__(self):
+        self.__idx = 0
+        return self
+        
+    def __next__(self):
+        if self.__idx < len(self):
+            move = self.moves[self.__idx]
+            self.__idx += 1
+            return move
+        else:
+            raise StopIteration
+    
+    def __len__(self):
+        return len(self.moves)
+    
+    def __getitem__(self, key):
+        return self.moves[key]
+        
+    def __setitem__(self, key, value):
+        self._validate_move(value)
+        self.moves[key] = value
+
+    def __delitem__(self, key):
+        del self.moves[key]
+        
+    def __contains__(self, value):
+        return value in self.moves
+    
+    def index(self, value):
+        for i in range(len(self)):
+            if self[i] == value:
+                return i
+        raise ValueError(f'{object.__repr__(self)} is not in sequence')
+    
+    def count(self, value):
+        matches = [True for x in self if value == x]
+        return len(matches)
+    
+    def append(self, value):
+        self._validate_move(value)
+        self.moves.append(value)
+
+    
 class Move(object):
-    '''Encapsulates the command and settings data for a simultaneous movement of
-    one or more fiber positioners.
+    '''Encapsulates the command data for a simultaneous movement of one or more
+    fiber positioners.
     
         command      ... move command string as described in petal.request_targets()
         target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
         target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
         posids       ... optional sequence of which positioner ids should be commanded
         log_note     ... optional string (uniformly applied) or sequence of strings (per device) to store alongside log data in this move
-        pos_settings ... optional dict of positioner settings to apply during the move
         allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
         
     Multiple positioners, same targets:
@@ -366,8 +392,7 @@ class Move(object):
         Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
         or set both to home both axes.
     '''
-    def __init__(self, command, target0, target1, posids='any', log_note='', pos_settings=None, allow_corr=True):
-        pos_settings = {} if pos_settings is None else pos_settings
+    def __init__(self, command, target0, target1, posids='any', log_note='', allow_corr=True):
         if is_string(posids):
             assert command in local_commands, f'cannot apply a non-local command {command} to multiple positioners'
             for x in [target0, target1]:
@@ -388,7 +413,6 @@ class Move(object):
             assert target0 or target1, 'for a homing command, need to set target0 to 1 for theta ' + \
                                        'homing, target1 to 1 for phi homing, or both simultaneously'
         self.command = command
-        self.pos_settings = pos_settings
         self.allow_corr = bool(allow_corr)
         self._sequence_name_getter = None
     
@@ -450,46 +474,7 @@ class Move(object):
             posids = self.posids
         elif self.is_uniform:
             return [notes[0]] * len(posids)
-        return [notes[self.posids.index(posid)] for posid in posids]
-    
-    @staticmethod
-    def _validate_pos_settings(settings):
-        '''Returns a new, validated pos_settings dict, with possible type casts
-        of values.'''
-        new = settings.copy()
-        for key, value in settings.items():
-            assert key in pos_defaults
-            example = pos_defaults[key]
-            expected_type =  type(example)
-            if is_bool(value):
-                new[key] = bool(value)
-            elif is_number(value) and is_float(example):
-                    new[key] = float(value)
-            elif is_int(value):
-                new[key] = int(value)
-            assert isinstance(new[key], expected_type)
-        return new
-    
-    @property
-    def pos_settings(self):
-        '''Dict containing all pos settings. Will be shaped like pos_defaults.'''
-        d = pos_defaults.copy()
-        d.update(self._pos_settings)
-        return d
-    
-    @pos_settings.setter
-    def pos_settings(self, settings):
-        '''Settings dict, may contain any subset of pos_defaults keys.'''
-        self._pos_settings = self._validate_pos_settings(settings)
-    
-    @property
-    def non_default_pos_settings(self):
-        '''Dict containing only those pos settings which have non-default values
-        (as defined in pos_defaults).
-        '''
-        p = self._pos_settings
-        d = {key: p[key] for key in p if pos_defaults[key] != p[key]}
-        return d        
+        return [notes[self.posids.index(posid)] for posid in posids]        
     
     def __len__(self):
         return len(self.posids)
@@ -529,8 +514,6 @@ class Move(object):
             data[key] = [getattr(self, key)] * len(self)
         for key in self.multi_keys:
             data[key] = getattr(self, key)
-        for key, val in self.pos_settings.items():
-            data[key] = [val] * len(self)
         key_order = key_order + sorted(set(data) - set(key_order))
         data = {key: data[key] for key in key_order}
         if posids != 'any':
@@ -542,7 +525,7 @@ class Move(object):
             for key, value in data.items():
                 data[key] = [value[i] for i in selection]
         if sparse:
-            for key in self.single_keys | set(self.pos_settings):
+            for key in self.single_keys:
                 data[key] = data[key][0] if len(data[key]) > 0 else []
             for key in self.multi_keys:
                 if len(set(data[key])) == 1:
