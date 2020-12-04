@@ -663,9 +663,8 @@ class Petal(object):
         # debugging code, will save the move table dictionaries
         # as they are when sent to petalcontroller
         debug_table = AstropyTable(hw_tables)
-        for key in debug_table.columns:
-            if debug_table.dtype[key] == 'O':  # indicates a list
-                debug_table[key] = [str(x) for x in debug_table[key]]
+        for key in ['motor_steps_P', 'motor_steps_T', 'move_time', 'postpause', 'speed_mode_P', 'speed_mode_T']:
+            debug_table[key] = [str(x) for x in debug_table[key]]
         debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
         exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
         debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{exp_str}{pc.filename_timestamp_str()}.csv')
