@@ -225,7 +225,7 @@ def cache_current_pos_settings(posids):
     current = {}
     for key in pos_settings:
         current[key] = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
-    reshaped = {key:[] for key in set(current) | 'POS_ID'}
+    reshaped = {key:[] for key in set(current) | {'POS_ID'}}
     for posid in posids:
         reshaped['POS_ID'].append(posid)
         for key in current:
