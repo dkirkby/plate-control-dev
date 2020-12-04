@@ -240,9 +240,10 @@ def retrieve_cached_pos_settings(path):
     apply_pos_settings function.'''
     frame = pd.read_csv(path)
     settings = {}
+    keys = frame.columns.tolist()
     for idx, row in frame.iterrows():
         posid = row['POS_ID']
-        these_settings = {key: row[key] for key in row.columns if key != 'POS_ID'}
+        these_settings = {key: row[key] for key in keys if key != 'POS_ID'}
         settings[posid] = these_settings
     return settings
 
