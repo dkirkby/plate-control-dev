@@ -35,7 +35,7 @@ parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
-parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents value. Defaults to values specified in sequence file. This arg gives you two ways to override: (a) integer between 1 and 100 --> uses that value for all positioners, or (b) argue 0 to use existing values for each pos, taken from online system')
+parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents (duty cycle) for the duration of the test. Overrides any values in the online system or sequence file. Must be an integer between 1 and 100')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -47,7 +47,7 @@ assert uargs.prepark in park_options, f'invalid park option, must be one of {par
 assert uargs.postpark in park_options, f'invalid park option, must be one of {park_options}'
 uargs.prepark = None if uargs.prepark in ['None', 'False'] else uargs.prepark
 uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
-assert uargs.motor_current == None or 0 <= uargs.motor_current <= 100, f'out of range argument {uargs.motor_current} for motor current parameter'
+assert uargs.motor_current == None or 0 < uargs.motor_current <= 100, f'out of range argument {uargs.motor_current} for motor current parameter'
 
 # read sequence file
 import sequence
@@ -205,35 +205,33 @@ motor_current_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
 motor_settings = motor_current_settings | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
 
-# overrides of positioner settings
+# hanlde any overrides of positioner settings
 use_online_value = 'use_online_value'
-pos_settings_overrides = {}
-currents_txt = 'Using motor currents: '
-if uargs.motor_current == None:
-    new = {}
-    currents_txt += 'as-specified in the sequence file'
-elif uargs.motor_current == 0:
-    new = {key: use_online_value for key in motor_current_settings}
-    currents_txt += 'as-specified for each individual positioner in the online system'
-else:
+pos_settings = seq.pos_settings.copy()
+seq_has_motor_currents = any(key in motor_current_settings for key in seq.pos_settings)
+if uargs.motor_current:
     new = {key: uargs.motor_current for key in motor_current_settings}
-    currents_txt += f'uniformly set at the run_sequence command line, value={uargs.motor_current}'
-logger.info(currents_txt)
-pos_settings_overrides.update(new)
+    pos_settings.update(new)
+    logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
+logger.info(f'Positioner settings for this test: {pos_settings}')
 
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
-    '''Gathers current positioner settings and caches them to disk. Returns a
-    file path.
+    '''Gathers current positioner settings and caches them to disk. Only does so
+    for those which will actually be changed by pos_settings. Returns a file path.
     '''
     cache_name = f'{log_timestamp}_pos_settings_cache.ecsv'
     cache_path = os.path.join(log_dir, cache_name)
-    settings_by_petal = pecs.ptlm.batch_get_posfid_val(posids, list(sequence.pos_defaults.keys()))
-    settings = {}
-    for setting in settings_by_petal.values():
-        settings.update(setting)
-    frame = pd.DataFrame.from_dict(settings, orient='index')
-    frame.to_csv(cache_path)
+    current = {}
+    for key in pos_settings:
+        current[key] = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
+    reshaped = {key:[] for key in set(current) | 'POS_ID'}
+    for posid in posids:
+        reshaped['POS_ID'].append(posid)
+        for key in current:
+            reshaped[key].append(current[key][posid])
+    frame = pd.DataFrame(data=reshaped)
+    frame.to_csv(cache_path, index=False)
     return cache_path
 
 def retrieve_cached_pos_settings(path):
@@ -244,20 +242,21 @@ def retrieve_cached_pos_settings(path):
     settings = {}
     for idx, row in frame.iterrows():
         posid = row['POS_ID']
-        these_settings = {key: row[key] for key in sequence.pos_defaults}
+        these_settings = {key: row[key] for key in row.columns if key != 'POS_ID'}
         settings[posid] = these_settings
     return settings
 
 def apply_pos_settings(settings):
     '''Push new settings values to the positioners in posids. The dict settings
     should have keys = posids, and values = sub-dictionaries. Each sub-dict
-    should have keys / value types like pos_defaults in the sequence module.
+    should have keys / value types like some subset of pos_defaults in the sequence
+    module.
     
     Nothing will be committed to the posmoves database (settings will be stored
     only in memory, and can be reset by reinitializing the petal software.
     '''
     if not settings:
-        logger.warning(f'apply_pos_settings: called with null arg settings={settings}')
+        logger.info('apply_pos_settings: none to apply')
         return
     motor_update_petals = set()
     for posid, these_settings in settings.items():
@@ -289,24 +288,6 @@ def apply_pos_settings(settings):
                     ' parameters. Now pushing new settings to petal controllers on petals' +
                     f' {motor_update_petals}')
         pecs.ptlm.set_motor_parameters(participating_petals=list(motor_update_petals))
-        
-def update_with_pos_overrides(settings):
-    '''Return copy of settings dict, to which any global overrides have been applied.
-    Input shuld have keys/values formatted like sequence.pos_defaults.
-    '''
-    new = settings.copy()
-    if not pos_settings_overrides:
-        return new
-    prefix = 'Overriding a positioner setting: '
-    width = max([len(key) for key in pos_settings_overrides]) + 4
-    fill = '.'
-    for key, value in pos_settings_overrides.items():
-        if value != use_online_value:
-            new[key] = value
-        elif key in new:
-            del new[key]
-        logger.info(f'{prefix}{key + " ":{fill}<{width}} set to {value}')
-    return new                
 
 def calc_poslocXY_errors(requests, results):
     '''Calculates positioning errors based on initial requested targets and
@@ -466,7 +447,6 @@ if pecs_on:
     else:
         logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
                     f'new phi limits: {new_phi_limits}')
-last_pos_settings = None
 real_moves = pecs_on and not uargs.no_movement
 cooldown_margin = 1.0  # seconds
 cycle_time = uargs.cycle_time + cooldown_margin if real_moves else 2.0
@@ -502,11 +482,7 @@ def park(park_option, is_prepark=True):
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
-    pos_settings = sequence.pos_defaults
-    pos_settings = update_with_pos_overrides(pos_settings)
-    logger.info(f'Positioner settings during parking: {pos_settings}')
     logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
-    all_pos_settings = {posid: pos_settings for posid in get_posids()}
     if real_moves:
         kwargs = {'posids': all_to_park,
                   'mode': 'normal',
@@ -521,7 +497,6 @@ def park(park_option, is_prepark=True):
             pecs.tp_frac = 1.0
             if orig_tp_frac != pecs.tp_frac:
                 logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
-        apply_pos_settings(all_pos_settings)
         pecs.park_and_measure(**kwargs)
         if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
             pecs.tp_frac = orig_tp_frac
@@ -585,7 +560,6 @@ try:
                                             target1=[-targ_errs[posid][1] for posid in posids],
                                             posids=posids,
                                             log_note=move.get_log_notes(posids),
-                                            pos_settings=move.pos_settings,
                                             allow_corr=move.allow_corr)
                 request = submove.make_request(posids=posids, log_note=extra_log_note)
                 if submove_num == 0:
@@ -601,18 +575,10 @@ try:
                 logger.warning(f'Skipping {move_with_submove_txt} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
-            new_settings = move.pos_settings
-            new_settings = update_with_pos_overrides(new_settings)
             descriptive_dict = move.to_dict(sparse=True, posids=posids)
-            descriptive_dict = update_with_pos_overrides(descriptive_dict)
-            logger.info(f'Move settings: {descriptive_dict}')
+            logger.info(f'Move command: {descriptive_dict}')
             if move.is_uniform:
-                logger.info(f'Requested positioners: {sorted(set(kwargs["request"]["DEVICE_ID"]))}')
-            if new_settings != last_pos_settings:
-                all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
-                if pecs_on:
-                    apply_pos_settings(all_settings)
-                last_pos_settings = new_settings
+                logger.info(f'Requested positioners: {posids}')
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)

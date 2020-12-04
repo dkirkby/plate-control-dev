@@ -2076,6 +2076,8 @@ class Petal(object):
             if err:
                 self.printfunc(err)
                 m.display(self.printfunc)
+        if self.schedule_stats.is_enabled():
+            self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
 
     def _postmove_cleanup(self):
