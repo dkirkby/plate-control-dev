@@ -135,7 +135,8 @@ class PosScheduleStage(object):
                         finish = start + times[p]
                         if finish > new_max_time:
                             start = new_max_time - times[p]
-                        self.move_tables[p].set_prepause(0,start)
+                        self.move_tables[p].insert_new_row(0)
+                        self.move_tables[p].set_prepause(0, start)
                     group = []
                     group_time = 0
 
