@@ -263,12 +263,22 @@ class PosState(object):
 
     def store(self, key, val, register_if_altered=True):
         """Store a value to memory. This is the correct way to store values, as
-        it contains some checks on tolerance values.
-
-        no longer default to nominal value, just reject, and keep current val.
-        added boolean return to indicate outcome of storing posstate
-
-        (NEVER EVER write directly to state._val dictionary)
+        it contains some checks on tolerance values. (You should NEVER EVER write
+        directly to the state._val dictionary!)
+        
+        Returns a boolean stating whether the store operation was accepted. This
+        will be False in cases where:
+            
+            - invalid key
+            - value outside an allowed range
+            - value is identical to existing value
+            
+        Special handling is applied to the note fields, 'LOG_NOTE' and 'CALIB_NOTE'.
+        For these, the argued value string is appended to the existing note, rather
+        than replacing it. (This simplifies syntax for the numerous cases where multiple
+        notes are getting added at differing steps in the code. One can clear a note
+        with the special functions clear_log_notes and clear_calib notes. A blank note
+        string is ignored.)
         
         Normally, if a value is changed, then the state will register itself
         with petal as having been altered. That way petal knows to push its
@@ -287,7 +297,8 @@ class PosState(object):
                     f'{key} rejected, outside nominal range {nom} ± {tol}')
                 # val = nom
                 return False
-        old_val = self._val[key]
+        if self._val[key] == val:
+            return False  # no change, hence not "accepted"
         if key == 'LOG_NOTE':
             self._append_log_note(val, is_calib_note=False)
         elif key == 'CALIB_NOTE':
@@ -295,7 +306,7 @@ class PosState(object):
         else:
             self._val[key] = val  # set value if all checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
-        if self._val[key] != old_val and register_if_altered:
+        if register_if_altered:
             if pc.is_calib_key(key):
                 self._register_altered_calib()
             elif not pc.is_constants_key(key):
