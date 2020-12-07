@@ -277,7 +277,7 @@ class PECS:
             # participating_petals=None gets responses from all
             # not just selected petals
             exppos = (self.ptlm.get_positions(
-                          return_coord='QS',
+                          return_coord='QS', drop_devid=False,
                           participating_petals=self.illuminated_ptl_roles)
                       .sort_values(by='DEVICE_ID').reset_index(drop=True))
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
@@ -294,8 +294,9 @@ class PECS:
                                         exptime=self.exptime, match_radius=match_radius,
                                         matched_only=matched_only,
                                         all_fiducials=self.all_fiducials,centers=centers)
+            self.print('Finished FVC.measure')
             # Positions is a dictionary (from np.rec_array). Is empty when no posiitoners are present
-            assert positions, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            assert not(positions.empty), 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
             this_meapos = pd.DataFrame(positions).rename(columns=
                             {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
             if np.any(['P' in device_id for device_id in this_meapos.index]):
@@ -476,7 +477,9 @@ class PECS:
 
     def turn_on_fids(self):
         if self._parse_yn(input('Turn on fiducials (y/n): ')):
-            responses = self.ptlm.set_fiducials(setting='on')
+            responses = self.ptlm.set_fiducials(setting='on',
+                            participating_petals=list(self.ptlm.Petals.keys()))
+            # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
         self.print(f'Petals report fiducials in the following states: {responses}')
@@ -499,7 +502,7 @@ class PECS:
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')
             expserv = SimpleProxy('EXPOSURESERVER')
-            retcode = expserv._send_command('distribute', source=destination)
+            retcode = expserv._send_command('distribute', source=destination, expid=self.exp.id)
             self.print(f'ExposureServer.distribute returned code: {retcode}')
             if retcode == 'SUCCESS':
                 self.print(f'symlink created for: {destination}')
@@ -657,7 +660,7 @@ class PECS:
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
         # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+        exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
                                           participating_petals=self.ptl_roles)
                   .set_index('DEVICE_ID')[['X1', 'X2']])
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
@@ -670,30 +673,17 @@ class PECS:
         a new frame that now includes new columns (or replaces existing columns)
         for coordinate system 2. E.g. you could start with only 'Q' and 'S' in
         frame, and then 'obsX' and 'obsY' will be added.
+
+        DOES NOT change frame
         '''
-        # I know, I know... the implementation is hacky madness... But it's very
-        # hard to predict how these pandas frames behave going in and out of opaque
-        # interfaces through PetalMan to PetalApp and back. Meanwhile I need to move
-        # on with other work. I so much wish we could have just had normal python
-        # dicts and lists getting passed around.
-        u_col = []
-        v_col = []
-        def breakup(cs):
-            if cs == 'QS':
-                return 'Q', 'S'
-            if cs == 'obsXY':
-                return 'obsX', 'obsY'
-        u1, v1 = breakup(cs1)
-        u2, v2 = breakup(cs2)
-        for posid in frame.index:
-            vals1 = [frame.loc[posid][u1], frame.loc[posid][v1]]
-            vals2 = self.ptlm.ptltrans(f'{cs1}_to_{cs2}', vals1, cast=True)
-            if isinstance(vals2, dict):
-                vals2 = list(vals2.values())[0]
-            vals2 = vals2.flatten()
-            u_col += [vals2[0]]
-            v_col += [vals2[1]]
-        new = frame.copy()
-        new[u2] = u_col
-        new[v2] = v_col
-        return new
+        if not(frame.index.name == 'DEVICE_ID'):
+            df = frame.set_index('DEVICE_ID')
+            reset_index = True
+        else:
+            df = frame.copy()
+            reset_index = False
+        ret = self.ptlm.batch_transform(df, cs1, cs2)
+        df = pd.concat([x for x in ret.values()])
+        if reset_index:
+            df.reset_index(inplace=True)
+        return df

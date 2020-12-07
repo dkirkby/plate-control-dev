@@ -17,6 +17,14 @@ import os
 import random
 import numpy as np
 from astropy.table import Table as AstropyTable
+
+# For using simulated petals at KPNO (PETAL90x)
+# Set KPNO_SIM to True
+KPNO_SIM = True
+
+if KPNO_SIM:
+    from DOSlib.positioner_index import PositionerIndex
+
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
     from DBSingleton import DBSingleton
@@ -176,12 +184,16 @@ class Petal(object):
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(fidid,
-                                   logging=self.local_log_on, device_type='fid',
-                                   printfunc=self.printfunc, petal_id=self.petal_id,
-                                   alt_move_adder=self._add_to_altered_states,
-                                   alt_calib_adder=self._add_to_altered_calib_states)
-            self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+            try:
+                self.states[fidid] = posstate.PosState(fidid,
+                                       logging=self.local_log_on, device_type='fid',
+                                       printfunc=self.printfunc, petal_id=self.petal_id,
+                                       alt_move_adder=self._add_to_altered_states,
+                                       alt_calib_adder=self._add_to_altered_calib_states)
+                self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+            except Exception as e:
+                self.printfunc('Fidid %r. Exception: %s' % (fidid, str(e)))
+                continue
 
         # pos flags setup
         if FLAGS_AVAILABLE:
@@ -253,6 +265,8 @@ class Petal(object):
                                      gamma=self.alignment['gamma'])
 
     def init_posmodels(self, posids=None):
+        if KPNO_SIM:
+            posindex = PositionerIndex()
         # positioners setup
         if posids is None:  # posids are not supplied, only alingment changed
             assert hasattr(self, 'posids')  # re-use self.posids
@@ -272,6 +286,10 @@ class Petal(object):
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
+            if KPNO_SIM:
+                pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
+                self.posmodels[posid].state.store('BUS_ID', 'can%d' % pos[0]['BUS_ID'])
+                self.posmodels[posid].state.store('CAN_ID', pos[0]['CAN_ID'])
         self.posids = set(self.posmodels.keys())
         self.canids = {posid:self.posmodels[posid].canid for posid in self.posids}
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
@@ -286,11 +304,14 @@ class Petal(object):
         kwargs = {'printfunc': self.printfunc, 'use_neighbor_loc_dict': True}
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            kwargs['config'] = self.anticol_settings
+            if isinstance(self.anticol_settings, str):
+                self.collider = poscollider.PosCollider(configfile=self.anticol_settings)
+                self.anticol_settings = self.collider.config
+            else:
+                self.collider = poscollider.PosCollider(config=self.anticol_settings)
         else:
-            kwargs['configfile'] = collider_file
-        self.collider = poscollider.PosCollider(**kwargs)
-        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
+            self.collider = poscollider.PosCollider(configfile=collider_file)
+            self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
@@ -866,7 +887,7 @@ class Petal(object):
             self.printfunc('set_fiducials: calling comm.all_fiducials_off')
             ret = self.comm.all_fiducials_off()
             if 'FAILED' in ret:
-                self.printfunc('WARNING: set_fiducials: calliing comm.all_fiducials_off failed: %s' % str(ret))
+                self.printfunc('WARNING: set_fiducials: calling comm.all_fiducials_off failed: %s' % str(ret))
             else:
                 all_off = True
         if fidids == 'all':
@@ -960,6 +981,16 @@ class Petal(object):
             if hasattr(self, 'ops_state_sv'):
                 self.ops_state_sv.write('READY')
             return 'OBSERVING' # bypass everything below if in petal sim mode - sim should always be observing
+        if hw_state == 'OBSERVING':
+            conf = self.comm.pbget('CONF_FILE')
+            if not isinstance(conf, dict):
+                self.printfunc(f'WARNING: pbget CONF_FILE returned {conf}')
+                raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
+            canbusses = conf['can_bus_list']
+            ready = self.comm.check_can_ready(canbusses)
+            if not(ready) or 'FAILED' in ready:
+                self.printfunc(f'WARNING: check_can_ready returned {ready}')
+                raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
         todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
         for key, value in pc.PETAL_OPS_STATES[self._last_state].items():
             old_state = self.comm.pbget(key)
@@ -1095,6 +1126,23 @@ class Petal(object):
         else:
             return 'Not in petal'
 
+    def batch_get_posfid_val(self, uniqueids, keys):
+        """Retrives a batch of state values useful for calling from external scripts
+           INPUT: uniqueids ... list, list of posids/fidids to retrive values for
+                  keys ... list, state keys to retrieve
+           OUTPUT: values ... dict (keyed by uniqueid) of dicts with keys keys
+        """
+        values = {}
+        devids = set(self.posids) | set(self.fidids)
+        for devid in uniqueids:
+            if devid in devids:
+                values[devid] = {}
+                for key in keys:
+                    values[devid][key] = self.get_posfid_val(devid, key)
+            else:
+                self.printfunc(f'DEBUG: {devid} not in petal')
+        return values
+
     def set_posfid_val(self, device_id, key, value, check_existing=False, comment=''):
         """Sets a single value to a positioner or fiducial. In the case of a 
         fiducial, this call does NOT turn the fiducial physically on or off.
@@ -1123,6 +1171,24 @@ class Petal(object):
             comment_field = 'CALIB_NOTE' if pc.is_calib_key(key) else 'LOG_NOTE'
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
+
+    def batch_set_posfid_val(self, settings):
+        """ Sets several values for several positioners or fiducials.
+            INPUT: settings ... dict (keyed by devid) of dicts {state key:value}
+                                same as output of batch_get_posfid_val
+            OUTPUT: accepts ... dict (keyed by devid) of dicts {state key:bool}
+                                where the bool indicates if the value was accepted
+
+            NOTE: no comments accepted - one cannot set keys in pc.require_comment_to_store
+        """
+        devids = set(self.posids) | set(self.fidids)
+        accepts ={}
+        for devid, sets in settings.items():
+            if devid in devids:
+                accepts[devid] = {}
+                for setting, value in sets.items():
+                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value)
+        return accepts
     
     def get_posids_with_commit_pending(self):
         '''Returns set of all posids for which there is a commit to DB pending.

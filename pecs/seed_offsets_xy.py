@@ -27,21 +27,22 @@ MODE for updates and old values.
 import os
 import pandas as pd
 import posconstants as pc
-from petaltransforms import PetalTransforms
 from pecs import PECS
 
-seed = PECS(interactive=True)
+seed = PECS(interactive=True, no_expid=True)
 print('Seeding offsets XY...')
-# array of shape (3, 543) in nominal ptlXY
-ptlXYZ = (pd.read_csv(pc.positioner_locations_file)
-          [['X', 'Y', 'Z']].values.T)
-pos = PetalTransforms.ptlXYZ_to_flatXY(ptlXYZ)
+nominals = pd.read_csv(pc.positioner_locations_file)
+nominals.set_index('device_location_id', inplace=True)
 updates = []
 for posid, row in seed.posinfo.iterrows():
     update = {'DEVICE_ID': posid, 'MODE': 'seed_offsets_xy'}
     device_loc, petal_loc = row['DEVICE_LOC'], row['PETAL_LOC']
-    role = seed._pcid2role(petal_loc)
-    x, y = pos[0, device_loc], pos[1, device_loc]
+    if max(seed.pcids) > 899:
+        role = seed._pcid2role(900+petal_loc) #sim mode
+    else:
+        role = seed._pcid2role(petal_loc)
+    x = nominals['FLAT_X'][device_loc]
+    y = nominals['FLAT_Y'][device_loc]
     update = seed.ptlm.collect_calib(update, tag='OLD_',
                                      participating_petals=role)[role]
     seed.ptlm.set_posfid_val(posid, 'OFFSET_X', x, participating_petals=role)

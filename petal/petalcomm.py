@@ -334,3 +334,12 @@ class PetalComm(object):
         returns petal controller information
         """
         return self._call_device('get', what)
+
+    def check_can_ready(self, can_bus_list):
+        """
+        Petalcontroller checks that canbus is up in the linux kernal.
+        """
+        try:
+            return self._call_device('check_can_ready', can_bus_list)
+        except Exception as e:
+            return 'FAILED: could not check can ready: %s' % str(e)
