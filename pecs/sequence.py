@@ -455,11 +455,14 @@ class Move(object):
     
     @log_note.setter
     def log_note(self, note):
+        '''Set with a single string (will be uniformly applied in case of multiple targets)
+        or a list of strings, of same length as number of targets.'''
         if is_string(note):
             self._log_note = [note] * len(self.posids)
         else:
+            assert isinstance(note, (list, tuple)), f'invalid collection type {type(note)} for log note'
             assert len(note) == len(self.posids)
-            self._log_note = list(note)
+            self._log_note = [str(x) for x in note]
     
     def get_log_notes(self, posids='any'):
         '''Returns list of log note values for the collection posids, in
