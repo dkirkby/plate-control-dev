@@ -40,7 +40,8 @@ try:
     from DOSlib.util import raise_error
 except ImportError:
     def raise_error(*args, **kwargs):
-        raise RuntimeError(*args, **kwargs)
+        print('RAISE_ERROR: args: %r, kwargs: *r' % (args, kwargs))
+        raise RuntimeError(*args)  ##, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
     from DOSlib.flags import POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK, ENABLED_RESET_MASK, NON_PETAL_MASK
@@ -980,7 +981,7 @@ class Petal(object):
                 raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
             canbusses = conf['can_bus_list']
             ready = self.comm.check_can_ready(canbusses)
-            if not(ready) or 'FAILED' in ready:
+            if not(ready) or 'FAILED' in str(ready):
                 self.printfunc(f'WARNING: check_can_ready returned {ready}')
                 raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
         todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
