@@ -304,14 +304,14 @@ class Petal(object):
         kwargs = {'printfunc': self.printfunc, 'use_neighbor_loc_dict': True}
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            if isinstance(self.anticol_settings, str):
-                self.collider = poscollider.PosCollider(configfile=self.anticol_settings)
-                self.anticol_settings = self.collider.config
+            if pc.is_string(self.anticol_settings):
+                kwargs['configfile'] = self.anticol_settings
             else:
-                self.collider = poscollider.PosCollider(config=self.anticol_settings)
+                kwargs['config'] = self.anticol_settings
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file)
-            self.anticol_settings = self.collider.config
+            kwargs['configfile'] = collider_file
+        self.collider = poscollider.PosCollider(**kwargs)
+        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
