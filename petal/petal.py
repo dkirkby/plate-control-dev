@@ -20,7 +20,7 @@ from astropy.table import Table as AstropyTable
 
 # For using simulated petals at KPNO (PETAL90x)
 # Set KPNO_SIM to True
-KPNO_SIM = True
+KPNO_SIM = False
 
 if KPNO_SIM:
     from DOSlib.positioner_index import PositionerIndex
