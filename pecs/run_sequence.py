@@ -568,18 +568,20 @@ try:
                 if pecs_on:
                     request = request.merge(pecs.posinfo, on='DEVICE_ID')
                 kwargs = {'request': request, 'num_meas': uargs.num_meas}
+                descriptive_dict = submove.to_dict(sparse=True, posids=posids)
             elif move.command in sequence.homing_commands:
                 if pecs_on:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
+                submove = move  # just for consistency of operations below
             else:
                 logger.warning(f'Skipping {move_with_submove_txt} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
-            descriptive_dict = move.to_dict(sparse=True, posids=posids)
+            descriptive_dict = submove.to_dict(sparse=True, posids=posids)
             logger.info(f'Move command: {descriptive_dict}')
-            if move.is_uniform:
-                logger.info(f'Requested positioners: {posids}')
+            if submove.is_uniform:
+                logger.info(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)
