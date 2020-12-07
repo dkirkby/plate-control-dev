@@ -988,7 +988,7 @@ class Petal(object):
                 raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
             canbusses = conf['can_bus_list']
             ready = self.comm.check_can_ready(canbusses)
-            if not(ready) or 'FAILED' in ready:
+            if not(ready) or ('FAILED' in str(ready)):
                 self.printfunc(f'WARNING: check_can_ready returned {ready}')
                 raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
         todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
