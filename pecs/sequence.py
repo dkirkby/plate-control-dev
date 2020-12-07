@@ -428,7 +428,7 @@ class Move(object):
     def is_uniform(self):
         '''Boolean whether the same uniform move command and target is to be done on
         any positioner.'''
-        return self.posids == ['any']
+        return self.posids == ['any'] or len(self.posids) <= 1
     
     @property
     def log_note(self):
