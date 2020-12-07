@@ -472,7 +472,8 @@ class Petal(object):
             table.set_prepause(0, prepause)
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
             table.store_orig_command(string=cmd_str, val1=request["target"][0], val2=request["target"][1])
-            table.append_log_note(request['log_note'])
+            prepause_note = '' if not prepause else f'prepause {prepause}'
+            table.append_log_note(pc.join_notes(request['log_note'], prepause_note))
             table.allow_exceed_limits = True
             if 'postmove_cleanup_cmds' in request:
                 for axisid, cmd_str in request['postmove_cleanup_cmds'].items():
