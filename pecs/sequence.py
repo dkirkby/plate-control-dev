@@ -455,14 +455,11 @@ class Move(object):
     
     @log_note.setter
     def log_note(self, note):
-        if self.has_multiple_targets:
-            if is_string(note):
-                self._log_note = [note] * len(self.posids)
-            else:
-                assert len(note) == len(self.posids)
-                self._log_note = list(note)
+        if is_string(note):
+            self._log_note = [note] * len(self.posids)
         else:
-            self._log_note = [note] if is_string(note) else list(note)[0]
+            assert len(note) == len(self.posids)
+            self._log_note = list(note)
     
     def get_log_notes(self, posids='any'):
         '''Returns list of log note values for the collection posids, in
