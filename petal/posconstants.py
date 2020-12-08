@@ -164,7 +164,8 @@ default_t_guess_tol = 30.0  # deg
 _off_center_threshold_mm = 0.5  # radial distance off-center
 _ctrd_phi_theta_change_tol_mm = 0.1 # allowable max positioning error induced by sudden theta change while centered phi
 _nom_max_r = nominals['LENGTH_R1']['value'] + nominals['LENGTH_R2']['value']
-phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
+_min_length_r2 = nominals['LENGTH_R2']['value'] - nominals['LENGTH_R2']['tol']
+phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / _min_length_r2 * deg_per_rad)
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Hardware (operations) States
