@@ -250,7 +250,7 @@ def make_sequence_for_one_petal(table):
     # generate sequence
     print('\nGENERATING MOVE SEQUENCE')
     print(f'n_moves = {uargs.num_moves}\n')
-    seq = sequence.Sequence(short_name='', long_name='', details='')  # strings will be properly filled after merging all sequences
+    seq = sequence.Sequence(short_name=f'temp_ptl{petal_id:02}', long_name='', details='')  # strings will be properly filled after merging all sequences
     set_posTP({posid: (0, 150) for posid in ptl.posids})  # inital values like typical "parked" position
     n_collisions_resolved = []
     for m in range(uargs.num_moves):
@@ -285,7 +285,8 @@ def make_sequence_for_one_petal(table):
                              )
         seq.append(move)
     seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value into the sequence meta data
-    return seq
+    path = seq.save(pc.dirs['temp_files'])
+    return path 
 
 # single/multiprocess switching
 n_processes_max = 1 if uargs.debug_mode else uargs.n_processes_max
@@ -307,7 +308,8 @@ def imap(function, iterable_data):
 if __name__ == '__main__':
     big_seq = None
     results = imap(make_sequence_for_one_petal, tables.values())
-    for seq in results:
+    for path in results:
+        seq = sequence.Sequence.read(path)
         big_seq = seq if big_seq == None else big_seq.merge(seq)
     timestamp = pc.compact_timestamp()
     details = f'Generated with settings: {uargs}'
