@@ -283,7 +283,8 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False)
+        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False,
+                                        participating_petals=self.illuminated_ptl_roles)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
