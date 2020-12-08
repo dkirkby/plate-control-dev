@@ -281,7 +281,6 @@ def make_sequence_for_one_petal(table):
                              target1=[sel['targets'][posid][1] for posid in posids_with_targ],
                              posids=posids_with_targ,
                              log_note='',
-                             pos_settings={},
                              allow_corr=True,
                              )
         seq.append(move)
