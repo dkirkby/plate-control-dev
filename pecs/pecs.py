@@ -296,8 +296,11 @@ class PECS:
                                         matched_only=matched_only,
                                         all_fiducials=self.all_fiducials,centers=centers)
             self.print('Finished FVC.measure')
-            # Positions is a dictionary (from np.rec_array). Is empty when no posiitoners are present
-            assert not(positions.empty), 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            
+            # Positions is either a pandas dataframe or else a dictionary (from np.rec_array).
+            # Is may empty when no posiitoners are present. Sometimes I've also seen a list...                
+            assert len(positions) > 0, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            
             this_meapos = pd.DataFrame(positions).rename(columns=
                             {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
             if np.any(['P' in device_id for device_id in this_meapos.index]):

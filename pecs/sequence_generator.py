@@ -280,6 +280,38 @@ long_suffix = 'with fastest available creep speed under firmware v5.0'
 seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['creep'], options))
 seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['creep'], options))
 
+# Simplest-possible test for SCALE of moves
+details = '''Setup: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON.
+Moves: Several moves at cruise speed "forward" then "backward", with no creep.
+Purpose: Determine whether the positioner has scale error in its output ratio.'''
+options = {'FINAL_CREEP_ON': False,
+           'ANTIBACKLASH_ON': False,
+           'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+          }
+prefix = 'scale'
+long_suffix = 'cruise-only, forward and back'
+for axis in {'THETA', 'PHI'}:
+    seq = sequence.Sequence(short_name=f'motortest {prefix} {axis[0]}',
+                                long_name=f'output {prefix} motor test, {long_suffix}',
+                                details=details,
+                                pos_settings=options,
+                                )
+    if axis == 'THETA':
+        forward_deltas = [10 for i in range(4)]
+        reverse_deltas = [-x for x in forward_deltas]
+        deltas = forward_deltas + reverse_deltas + reverse_deltas + forward_deltas
+        i = 0
+    else:
+        forward_deltas = [-8 for i in range(5)]
+        reverse_deltas = [-x for x in forward_deltas]
+        deltas = forward_deltas + reverse_deltas
+        i = 1
+    for j in range(len(deltas)):
+        target = [0,0]
+        target[i] = deltas[j]
+        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note='', allow_corr=False)
+        seq.append(move)
+    seqs.append(seq)
 
 # SAVE ALL TO DISK
 # ----------------
@@ -307,7 +339,7 @@ for path in paths:
     seq = sequence.Sequence.read(path)
     print(seq,'\n')
     if 'MOTORTEST' in path:
-        axis = 0 if 'THETA' in seq.normalized_short_name else 1
+        axis = 0 if 'THETA' in seq.normalized_short_name or 'SCALE_T' in seq.normalized_short_name else 1
         deltas = [getattr(move, f'target{axis}') for move in seq]
         cumsum = np.cumsum(deltas).tolist()
         print('num test points: '  + str(len(deltas)))

@@ -428,7 +428,7 @@ class Move(object):
     def is_uniform(self):
         '''Boolean whether the same uniform move command and target is to be done on
         any positioner.'''
-        return self.posids == ['any']
+        return self.posids == ['any'] or len(self.posids) <= 1
     
     @property
     def log_note(self):
@@ -455,14 +455,14 @@ class Move(object):
     
     @log_note.setter
     def log_note(self, note):
-        if self.has_multiple_targets:
-            if is_string(note):
-                self._log_note = [note] * len(self.posids)
-            else:
-                assert len(note) == len(self.posids)
-                self._log_note = list(note)
+        '''Set with a single string (will be uniformly applied in case of multiple targets)
+        or a list of strings, of same length as number of targets.'''
+        if is_string(note):
+            self._log_note = [note] * len(self.posids)
         else:
-            self._log_note = [note] if is_string(note) else list(note)[0]
+            assert isinstance(note, (list, tuple)), f'invalid collection type {type(note)} for log note'
+            assert len(note) == len(self.posids)
+            self._log_note = [str(x) for x in note]
     
     def get_log_notes(self, posids='any'):
         '''Returns list of log note values for the collection posids, in
@@ -559,7 +559,7 @@ class Move(object):
             target0 = self.target0[0]
             target1 = self.target1[0]
             final_log_note = possible_notes[0]
-        request_data = {'DEVICE_ID': posids,
+        request_data = {'DEVICE_ID': sorted_posids,
                         'COMMAND': self.command,
                         'X1': target0,
                         'X2': target1,

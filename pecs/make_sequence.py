@@ -19,6 +19,7 @@ parser.add_argument('-i', '--infile', type=str, default=None, help='optional, ei
 parser.add_argument('-o', '--outdir', type=str, default='.', help='optional, path to directory where to save output file, defaults to current dir')
 parser.add_argument('-m', '--comment', type=str, default='', help='optional, comment string (must enclose in "") that will be included in output file metadata')
 parser.add_argument('-np', '--n_processes_max', type=int, default=None,  help='max number of processors to use')
+parser.add_argument('-d', '--debug_mode', action='store_true',  help='restricts processors and any other debug options')
 uargs = parser.parse_args()
 
 import os
@@ -57,7 +58,7 @@ if calibs_file_path == None:
     outdir = pc.dirs['temp_files']
     get_calibs_comment = 'auto-retrieval of calibrations by make_sequence.py'
     print('\nGENERATING NEW CALIBRATIONS FILE')
-    cmd = f'python get_calibrations.py -m "{get_calibs_comment}" -o {outdir} -ptl {uargs.petal_id}'
+    cmd = f'python get_calibrations.py -m "{get_calibs_comment}" -o {outdir} -ptl {uargs.petal_ids}'
     err = os.system(cmd)
     assert not(err), f'error calling \'{cmd}\''
 if calibs_file_path in {None, 'cache'}:
@@ -88,8 +89,10 @@ for petal_id in petal_ids:
 
 # define multi-processable function for generating sequences
 def make_sequence_for_one_petal(table):
-    assert len(set(table['PETAL_ID'])) == 1, 'table should contain only one, uniform petal_id'
-    
+    petal_ids = set(table['PETAL_ID'])
+    assert len(petal_ids) == 1, 'table should contain only one, uniform petal_id'
+    petal_id = petal_ids.pop()
+
     # ensure single, unique set of parameters per positioner
     all_posids = set(table['POS_ID'])
     params_dict = {key:[] for key in required}
@@ -106,7 +109,7 @@ def make_sequence_for_one_petal(table):
     device_locs = params['DEVICE_LOC']
     invalid_locs = set(params['DEVICE_LOC']) - possible_locs
     assert len(invalid_locs) == 0, f'invalid device locations in input file: {invalid_locs}'
-    assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {uargs.petal_id}'
+    assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {petal_id}'
     
     # select which positioners get move commands
     if uargs.posids == 'all':
@@ -134,8 +137,8 @@ def make_sequence_for_one_petal(table):
     params.sort('POS_ID')
     
     # initialize a simulated petal instance
-    print(f'Now initializing petal {uargs.petal_id}, will take a few seconds...')
-    ptl = petal.Petal(petal_id        = uargs.petal_id,
+    print(f'Now initializing petal {petal_id}, will take a few seconds...')
+    ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
                       posids          = params['POS_ID'].tolist(),
                       fidids          = set(),
@@ -247,7 +250,7 @@ def make_sequence_for_one_petal(table):
     # generate sequence
     print('\nGENERATING MOVE SEQUENCE')
     print(f'n_moves = {uargs.num_moves}\n')
-    seq = sequence.Sequence(short_name='', long_name='', details='')  # strings will be properly filled after merging all sequences
+    seq = sequence.Sequence(short_name=f'temp_ptl{petal_id:02}', long_name='', details='')  # strings will be properly filled after merging all sequences
     set_posTP({posid: (0, 150) for posid in ptl.posids})  # inital values like typical "parked" position
     n_collisions_resolved = []
     for m in range(uargs.num_moves):
@@ -276,14 +279,14 @@ def make_sequence_for_one_petal(table):
         move = sequence.Move(command='poslocXY',
                              target0=[sel['targets'][posid][0] for posid in posids_with_targ],
                              target1=[sel['targets'][posid][1] for posid in posids_with_targ],
-                             device_loc=[ptl.posmodels[posid].deviceloc for posid in posids_with_targ],
+                             posids=posids_with_targ,
                              log_note='',
-                             pos_settings={},
                              allow_corr=True,
                              )
         seq.append(move)
     seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value into the sequence meta data
-    return seq
+    path = seq.save(pc.dirs['temp_files'])
+    return path 
 
 # single/multiprocess switching
 n_processes_max = 1 if uargs.debug_mode else uargs.n_processes_max
@@ -305,7 +308,8 @@ def imap(function, iterable_data):
 if __name__ == '__main__':
     big_seq = None
     results = imap(make_sequence_for_one_petal, tables.values())
-    for seq in results:
+    for path in results:
+        seq = sequence.Sequence.read(path)
         big_seq = seq if big_seq == None else big_seq.merge(seq)
     timestamp = pc.compact_timestamp()
     details = f'Generated with settings: {uargs}'
