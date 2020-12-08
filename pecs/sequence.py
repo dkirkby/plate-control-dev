@@ -559,7 +559,7 @@ class Move(object):
             target0 = self.target0[0]
             target1 = self.target1[0]
             final_log_note = possible_notes[0]
-        request_data = {'DEVICE_ID': posids,
+        request_data = {'DEVICE_ID': sorted_posids,
                         'COMMAND': self.command,
                         'X1': target0,
                         'X2': target1,
