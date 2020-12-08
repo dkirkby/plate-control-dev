@@ -302,7 +302,7 @@ for axis in {'THETA', 'PHI'}:
         deltas = forward_deltas + reverse_deltas + reverse_deltas + forward_deltas
         i = 0
     else:
-        forward_deltas = [8 for i in range(5)]
+        forward_deltas = [-8 for i in range(5)]
         reverse_deltas = [-x for x in forward_deltas]
         deltas = forward_deltas + reverse_deltas
         i = 1
