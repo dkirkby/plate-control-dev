@@ -89,8 +89,10 @@ for petal_id in petal_ids:
 
 # define multi-processable function for generating sequences
 def make_sequence_for_one_petal(table):
-    assert len(set(table['PETAL_ID'])) == 1, 'table should contain only one, uniform petal_id'
-    
+    petal_ids = set(table['PETAL_ID']))
+    assert len(petal_ids) == 1, 'table should contain only one, uniform petal_id'
+    petal_id = petal_ids.pop()
+
     # ensure single, unique set of parameters per positioner
     all_posids = set(table['POS_ID'])
     params_dict = {key:[] for key in required}
@@ -107,7 +109,7 @@ def make_sequence_for_one_petal(table):
     device_locs = params['DEVICE_LOC']
     invalid_locs = set(params['DEVICE_LOC']) - possible_locs
     assert len(invalid_locs) == 0, f'invalid device locations in input file: {invalid_locs}'
-    assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {uargs.petal_id}'
+    assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {petal_id}'
     
     # select which positioners get move commands
     if uargs.posids == 'all':
@@ -135,8 +137,8 @@ def make_sequence_for_one_petal(table):
     params.sort('POS_ID')
     
     # initialize a simulated petal instance
-    print(f'Now initializing petal {uargs.petal_id}, will take a few seconds...')
-    ptl = petal.Petal(petal_id        = uargs.petal_id,
+    print(f'Now initializing petal {petal_id}, will take a few seconds...')
+    ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
                       posids          = params['POS_ID'].tolist(),
                       fidids          = set(),
