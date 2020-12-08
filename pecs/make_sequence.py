@@ -19,6 +19,7 @@ parser.add_argument('-i', '--infile', type=str, default=None, help='optional, ei
 parser.add_argument('-o', '--outdir', type=str, default='.', help='optional, path to directory where to save output file, defaults to current dir')
 parser.add_argument('-m', '--comment', type=str, default='', help='optional, comment string (must enclose in "") that will be included in output file metadata')
 parser.add_argument('-np', '--n_processes_max', type=int, default=None,  help='max number of processors to use')
+parser.add_argument('-d', '--debug_mode', action='store_true',  help='restricts processors and any other debug options')
 uargs = parser.parse_args()
 
 import os
