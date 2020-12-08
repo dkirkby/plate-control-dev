@@ -89,7 +89,7 @@ for petal_id in petal_ids:
 
 # define multi-processable function for generating sequences
 def make_sequence_for_one_petal(table):
-    petal_ids = set(table['PETAL_ID']))
+    petal_ids = set(table['PETAL_ID'])
     assert len(petal_ids) == 1, 'table should contain only one, uniform petal_id'
     petal_id = petal_ids.pop()
 
@@ -279,7 +279,7 @@ def make_sequence_for_one_petal(table):
         move = sequence.Move(command='poslocXY',
                              target0=[sel['targets'][posid][0] for posid in posids_with_targ],
                              target1=[sel['targets'][posid][1] for posid in posids_with_targ],
-                             device_loc=[ptl.posmodels[posid].deviceloc for posid in posids_with_targ],
+                             posids=posids_with_targ,
                              log_note='',
                              pos_settings={},
                              allow_corr=True,
