@@ -1736,7 +1736,7 @@ class Petal(object):
         s += stats_str
         return s
     
-    def quick_query(self, key=None, op='', value='', posids='all', mode='compact'):
+    def quick_query(self, key=None, op='', value='', posids='all', mode='compact', skip_unknowns=False):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1791,7 +1791,7 @@ class Petal(object):
                 operand = float(value)
         except:
             assert False, f'{err_prefix} invalid type {type(value)} for value {value}'
-        posids = self._validate_posids_arg(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=skip_unknowns)
         if key in position_keys:
             def getter(posid):
                 expected = self.posmodels[posid].expected_current_position
