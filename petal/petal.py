@@ -1483,7 +1483,7 @@ class Petal(object):
             pos_flags = {posid: pc.decipher_posflags(flag)[0] for posid, flag in pos_flags.items()}
         return pos_flags
     
-    def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False, comment=None):
+    def set_keepouts(self, posids, radT=None, radP=None, angT=None, angP=None, classify_retracted=None, comment=None):
         '''Convenience function to set parameters affecting positioner collision
         envelope(s). One or more posids may be argued. The other args will be
         uniformly applied to ALL argued posids.
@@ -1512,6 +1512,7 @@ class Petal(object):
                'KEEPOUT_EXPANSION_THETA_ANGULAR': angT,
                'KEEPOUT_EXPANSION_PHI_ANGULAR': angP,
                'CLASSIFIED_AS_RETRACTED': classify_retracted}
+        new = {key: value for key, value in new.items() if value != None}
         msg_prefix = 'set_keepouts:'
         err_prefix = f'{msg_prefix} error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
@@ -1521,7 +1522,7 @@ class Petal(object):
             except:
                 assert False, f'{err_prefix} non-numeric {key} {val}'
             assert np.isfinite(val), f'{err_prefix} non-finite {key} {val}'
-        assert isinstance(classify_retracted, bool), f'{err_prefix} non-boolean classify_retracted {classify_retracted}'
+        assert classify_retracted == None or isinstance(classify_retracted, bool), f'{err_prefix} non-boolean classify_retracted {classify_retracted}'
         changed = set()
         for key, val in new.items():
             changed_this_key = set()
