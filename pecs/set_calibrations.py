@@ -13,7 +13,9 @@ valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
               'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P',
               'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
-fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
+fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR',
+                'NUM_POINTS_IN_FIT_STATIC', 'NUM_POINTS_IN_FIT_DYNAMIC',
+                'NUM_OUTLIERS_EXCLUDED_STATIC', 'NUM_OUTLIERS_EXCLUDED_DYNAMIC'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
 boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
