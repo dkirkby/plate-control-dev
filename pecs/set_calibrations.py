@@ -182,7 +182,7 @@ for row in table:
                     kwargs = kwargs.copy()
                     kwargs['key'] = 'CTRL_ENABLED'
                     kwargs['value'] = new_ctrl_enabled
-                    kwargs['comment'] = f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
+                    kwargs['comment'] = pc.join_notes(kwargs['comment'], f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}')
                     updates += [kwargs]
             for kwargs in updates:
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
