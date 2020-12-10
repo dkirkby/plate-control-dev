@@ -135,6 +135,11 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
+#handle_fvc_feedback defaults
+err_thresh = False # tracing error over which to disable, False means none
+up_tol = 0.065 # mm over which to apply tp updates
+up_frac = 1.0 # amount of update to apply to posTP
+
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
