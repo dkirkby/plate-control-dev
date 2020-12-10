@@ -179,11 +179,11 @@ for row in table:
                 ctrl_enabled = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'CTRL_ENABLED', participating_petals=role)
                 new_ctrl_enabled = not(value) & fiber_intact
                 if ctrl_enabled != new_ctrl_enabled:
-                    kwargs = kwargs.copy()
-                    kwargs['key'] = 'CTRL_ENABLED'
-                    kwargs['value'] = new_ctrl_enabled
-                    kwargs['comment'] = pc.join_notes(kwargs['comment'], f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}')
-                    updates += [kwargs]
+                    kwargs2 = kwargs.copy()
+                    kwargs2['key'] = 'CTRL_ENABLED'
+                    kwargs2['value'] = new_ctrl_enabled
+                    kwargs2['comment'] = f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
+                    updates += [kwargs2]
             for kwargs in updates:
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
