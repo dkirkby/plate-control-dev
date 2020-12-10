@@ -2407,13 +2407,12 @@ class Petal(object):
                 for fid in self.fidids:
                     self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
         #Reset values
-        self._remove_posid_from_sent_tables('all')
-        self._initialize_pos_flags() # Reset posflags
+        self._cancel_move(reset_flags=False) 
+        # Reset posflags, leave disabled flags alone for record
+        self._initialize_pos_flags(enabled_only=True)
         self._apply_all_state_enable_settings()
-        self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
         self.commit(mode='both', log_note='auto-committed during petal configure') # commit uncommitted changes to DB
-        self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
 
     def _remove_posid_from_sent_tables(self, posid):
