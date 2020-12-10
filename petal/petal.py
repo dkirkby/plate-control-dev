@@ -44,7 +44,8 @@ except ImportError:
         raise RuntimeError(*args)  ##, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
-    from DOSlib.flags import POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK, ENABLED_RESET_MASK, NON_PETAL_MASK
+    from DOSlib.flags import (POSITIONER_FLAGS_MASKS, REQUEST_RESET_MASK,
+                      ENABLED_RESET_MASK, NON_PETAL_MASK, FVC_MASK, DOS_MASK)
     FLAGS_AVAILABLE = True
 except ImportError:
     FLAGS_AVAILABLE = False
@@ -202,6 +203,8 @@ class Petal(object):
             self.reset_mask = REQUEST_RESET_MASK
             self.enabled_mask = ENABLED_RESET_MASK
             self.non_petal_mask = NON_PETAL_MASK
+            self.fvc_mask = FVC_MASK
+            self.dos_mask = DOS_MASK
             self.missing_flag = 0
         else:
             self.printfunc('WARNING: DOSlib.flags not imported! Flags will not be set!')
@@ -209,6 +212,8 @@ class Petal(object):
             self.reset_mask = 0
             self.enabled_mask = 0
             self.non_petal_mask = 0
+            self.fvc_mask = 0
+            self.dos_mask = 0
             self.missing_flag = 0
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
@@ -1747,7 +1752,7 @@ class Petal(object):
             op ... string like '>' or '==', etc. Can leave blank to simply retrieve all values.
                    assume '==' if a value is argued but no op
             value ... the operand to compare against, usually a number for most keys
-            posids ... 'all' or iterator of positioner id strings
+            posids ... 'all', 'enabled', 'disabled' or iterator of positioner id strings
             mode ... 'compact', 'expanded', 'iterable' ... controls return type
             
         Call with no arguments, to get a list of valid keys and ops.
@@ -2000,6 +2005,12 @@ class Petal(object):
         '''Handles / validates a user argument of posids. Returns a set.'''
         if posids == 'all':
             posids = self.posids
+        elif posids in ['enabled', 'disabled']:
+            setting = True if posids == 'enabled' else False
+            posids = set()
+            for pos in self.posids:
+                if self.get_posfid_val(pos, 'CTRL_ENABLED') == setting:
+                    posids.add(pos)
         elif pc.is_string(posids):
             posids = {posids}
         else:
