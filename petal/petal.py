@@ -316,8 +316,9 @@ class Petal(object):
             else:
                 kwargs['config'] = self.anticol_settings
         else:
-            self.collider = poscollider.PosCollider(**kwargs)
-            self.anticol_settings = self.collider.config
+            kwargs['configfile'] = collider_file
+        self.collider = poscollider.PosCollider(**kwargs)
+        self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
