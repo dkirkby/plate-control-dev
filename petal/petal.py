@@ -2255,6 +2255,7 @@ class Petal(object):
                 if len(posids_to_retry) == 0:
                     msg += ' No communicable positioners remaining to reschedule.'
                 self.printfunc(msg)
+        all_failed_send = failed_send_posids | previous_failed
         return all_failed_send
 
     def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
