@@ -20,7 +20,7 @@ from astropy.table import Table as AstropyTable
 
 # For using simulated petals at KPNO (PETAL90x)
 # Set KPNO_SIM to True
-KPNO_SIM = True
+KPNO_SIM = False
 
 if KPNO_SIM:
     from DOSlib.positioner_index import PositionerIndex
@@ -311,13 +311,12 @@ class Petal(object):
         kwargs = {'printfunc': self.printfunc, 'use_neighbor_loc_dict': True}
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            if isinstance(self.anticol_settings, str):
-                self.collider = poscollider.PosCollider(configfile=self.anticol_settings)
-                self.anticol_settings = self.collider.config
+            if pc.is_string(self.anticol_settings):
+                kwargs['configfile'] = self.anticol_settings
             else:
-                self.collider = poscollider.PosCollider(config=self.anticol_settings)
+                kwargs['config'] = self.anticol_settings
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file)
+            self.collider = poscollider.PosCollider(**kwargs)
             self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
@@ -419,7 +418,7 @@ class Petal(object):
             return set(requests.keys())
         return requests
 
-    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False):
+    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False, prepause=0):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
         amounts at their theta and phi shafts.
 
@@ -463,6 +462,9 @@ class Petal(object):
                                    to pass back accepted requests, in cases where external call is
                                    made to request_direct_dtdp()
 
+            prepause ... wait this long before moving (useful for debugging)
+
+
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
 
@@ -481,6 +483,8 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
+        max_prepause = 60  # sec
+        assert 0 <= prepause <= max_prepause, f'prepause={prepause} sec is out of allowed range'
         self._initialize_pos_flags(ids = {posid for posid in requests})
         denied = set()
         for posid, request in requests.items():
@@ -492,9 +496,11 @@ class Petal(object):
             table = posmovetable.PosMoveTable(request['posmodel'])
             table.set_move(0, pc.T, request['target'][0])
             table.set_move(0, pc.P, request['target'][1])
+            table.set_prepause(0, prepause)
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
             table.store_orig_command(string=cmd_str, val1=request["target"][0], val2=request["target"][1])
-            table.append_log_note(request['log_note'])
+            prepause_note = '' if not prepause else f'prepause {prepause}'
+            table.append_log_note(pc.join_notes(request['log_note'], prepause_note))
             table.allow_exceed_limits = True
             if 'postmove_cleanup_cmds' in request:
                 for axisid, cmd_str in request['postmove_cleanup_cmds'].items():
@@ -801,26 +807,27 @@ class Petal(object):
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
         self.limit_angle = old_limit
 
-    def quick_direct_dtdp(self, posids='', dtdp=[0,0], log_note='', should_anneal=True):
+    def quick_direct_dtdp(self, posids='', dtdp=[0,0], log_note='', should_anneal=True, prepause=0):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
         method is intended for expert usage only. You can argue an iterable collection of posids if
         you want, though note they will all get the same (dt,dp) sent to them.
 
-        INPUTS:     posids    ... either a single posid or a list of posids (note sets don't work at DOS Console interface)
+        INPUTS:     posids    ... either a single posid or a list of posids or 'all' (note sets don't work at DOS Console interface)
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
                     should_anneal ... see comments in schedule_moves() function
+                    prepause ... wait this long before moving (useful for debugging)
         """
         requests = {}
-        posids = {posids} if isinstance(posids, str) else set(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         err_prefix = 'quick_direct_dtdp: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert len(dtdp) == 2, f'{err_prefix} dtdp arg len = {len(dtdp)} != 2'
         assert all(np.isfinite(dtdp)), f'{err_prefix} non-finite target {dtdp}'
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
-        self.request_direct_dtdp(requests)
+        self.request_direct_dtdp(requests, prepause=prepause)
         self.schedule_send_and_execute_moves(None, should_anneal)
         
     default_dance_sequence = [(3,0), (0,1), (-3,0), (0,-1)]
@@ -1485,7 +1492,7 @@ class Petal(object):
             pos_flags = {posid: pc.decipher_posflags(flag)[0] for posid, flag in pos_flags.items()}
         return pos_flags
     
-    def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False, comment=None):
+    def set_keepouts(self, posids, radT=None, radP=None, angT=None, angP=None, classify_retracted=None, comment=None):
         '''Convenience function to set parameters affecting positioner collision
         envelope(s). One or more posids may be argued. The other args will be
         uniformly applied to ALL argued posids.
@@ -1514,6 +1521,7 @@ class Petal(object):
                'KEEPOUT_EXPANSION_THETA_ANGULAR': angT,
                'KEEPOUT_EXPANSION_PHI_ANGULAR': angP,
                'CLASSIFIED_AS_RETRACTED': classify_retracted}
+        new = {key: value for key, value in new.items() if value != None}
         msg_prefix = 'set_keepouts:'
         err_prefix = f'{msg_prefix} error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
@@ -1523,7 +1531,7 @@ class Petal(object):
             except:
                 assert False, f'{err_prefix} non-numeric {key} {val}'
             assert np.isfinite(val), f'{err_prefix} non-finite {key} {val}'
-        assert isinstance(classify_retracted, bool), f'{err_prefix} non-boolean classify_retracted {classify_retracted}'
+        assert classify_retracted == None or isinstance(classify_retracted, bool), f'{err_prefix} non-boolean classify_retracted {classify_retracted}'
         changed = set()
         for key, val in new.items():
             changed_this_key = set()
