@@ -9,6 +9,7 @@ pecs/fvc_measure.py -text
 pecs/fvc_sim.py -text
 pecs/get_calibrations.py -text
 pecs/make_sequence.py -text
+pecs/move_to_range.py -text
 pecs/pecs.py -text
 pecs/poscalibplot_from_df.py -text
 pecs/run_sequence.py -text
