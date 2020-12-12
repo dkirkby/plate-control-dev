@@ -684,7 +684,7 @@ class Petal(object):
         else:
             self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
             response = self.comm.send_tables(hw_tables)
-        failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
+        failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
         if n_retries == 0 or not failed_posids:
             frozen = self.schedule.get_frozen_posids()
             for posid in frozen:
@@ -760,8 +760,8 @@ class Petal(object):
         moves, all in one shot.
         """
         self.schedule_moves(anticollision, should_anneal)
-        failed_posids = self.send_and_execute_moves()
-        return failed_posids
+        failed_posids, n_retries = self.send_and_execute_moves()
+        return failed_posids, n_retries
 
     def send_and_execute_moves(self):
         """Convenience wrapper to send and execute the pending moves (that have already
@@ -2257,7 +2257,7 @@ class Petal(object):
                     msg += ' No communicable positioners remaining to reschedule.'
                 self.printfunc(msg)
         all_failed_send = failed_send_posids | previous_failed
-        return all_failed_send
+        return all_failed_send, n_retries
 
     def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
         """Receives a list of positioners that the petalcontroller reports it
