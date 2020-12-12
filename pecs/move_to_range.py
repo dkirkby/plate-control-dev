@@ -83,6 +83,7 @@ for i in range(uargs.iterations):
                 target_for_those_below = limits[1] + uargs.padding
                 selected.loc[above_mask, columns[axis]] = target_for_those_above
     selected['COMMAND'] = command
+    selected['LOG_NOTE'] = 'Moving to specified limits for test setup; move_to_range.py'
     # Now selected is a proper move request
     cs.move_measure(selected, test_tp=True)
 
