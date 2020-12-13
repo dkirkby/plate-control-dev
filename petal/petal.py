@@ -661,7 +661,7 @@ class Petal(object):
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('send_move_tables: no tables to send')
-            return set()
+            return set(), n_retries
         for tbl in hw_tables:
             self._posids_where_tables_were_just_sent.add(tbl['posid'])
         if self.simulator_on:
