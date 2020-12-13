@@ -50,7 +50,7 @@ def check_if_out_of_limits():
         return violating_pos
 
 
-if uargs.prep:
+if uargs.prepark:
     cs.park_and_measure('all', test_tp=True)
 else:
     cs.fvc_measure(test_tp=True)
@@ -75,12 +75,12 @@ for i in range(uargs.iterations):
                     selected.loc[below_mask, columns[axis]] = target_for_those_below
                 else:
                     # Only have upper limit - target past it
-                    target_for_those_above = limits[0] - uargs.padding
+                    target_for_those_above = limits[0] - uargs.angle_padding
                     selected.loc[above_mask, columns[axis]] = target_for_those_above
             else:
                 # Only have lower limit (since we know both aren't None)
                 below_mask = selected[columns[axis]] < limits[1]
-                target_for_those_below = limits[1] + uargs.padding
+                target_for_those_below = limits[1] + uargs.angle_padding
                 selected.loc[above_mask, columns[axis]] = target_for_those_above
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits for test setup; move_to_range.py'
