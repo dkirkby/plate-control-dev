@@ -51,8 +51,6 @@ from pecs import PECS
 pecs = PECS(interactive=True)
 pecs.logger = logger
 logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
-enabled_posids = set(pecs.get_enabled_posids('all', include_posinfo=False))
-allowed_to_fix = set(pecs.get_enabled_posids('sub', include_posinfo=False))
 pecs.tp_tol = 0.0   # correct POS_T, POS_P for FVC measurements above this err value
 pecs.tp_frac = 1.0  # when correcting POS_T, POS_P, do so by this fraction of err distance
 
@@ -63,7 +61,10 @@ common_move_meas_kwargs = {'match_radius': uargs.match_radius,
                            'num_meas': uargs.num_meas,
                            }
 
-# neighbor listings
+# global collections
+enabled_posids = set(pecs.get_enabled_posids('all', include_posinfo=False))
+allowed_to_fix = set(pecs.get_enabled_posids('sub', include_posinfo=False))
+unambig = set()  # stores all posids that have been resolved
 neighbor_data = pecs.ptlm.app_get("collider.pos_neighbors")
 neighbors = {}
 for these in neighbor_data.values():
@@ -86,10 +87,16 @@ def disambig(n_try):
         Set of posids that are still in ambiguous zone. Disabled positioners are
         *excluded* from this set, regardless of what zone they are in.
     '''
+    logger.info(f'Starting disambiguation iteration {uargs.num_tries - n_try + 1} of {uargs.num_tries}')
+
     # get ambiguous and unambiguous posids
+    global unambig
     ambig_dict = pecs.quick_query('in_theta_hardstop_ambiguous_zone', posids=enabled_posids)
-    all_ambig = {posid for posid, val in ambig_dict.items() if val == True}
+    in_ambig_zone = {posid for posid, val in ambig_dict.items() if val == True}
+    all_ambig = in_ambig_zone - unambig  # because previous parking moves may have put already-resolved pos into ambig theta territory
+    unambig |= enabled_posids - all_ambig
     logger.info(f'{len(all_ambig)} enabled positioner(s) are in theta hardstop ambiguous zone: {all_ambig}')
+    logger.info(f'{len(unambig)} enabled positioner(s) are unambiguous')
     do_not_fix = all_ambig - allowed_to_fix
     ambig = all_ambig & allowed_to_fix
     if do_not_fix:
@@ -100,7 +107,6 @@ def disambig(n_try):
     logger.info(f'Will attempt to resolve {len(ambig)} posid(s): {ambig}')
     
     # targets for unambiguous pos
-    unambig = enabled_posids - all_ambig
     active_posids = ambig | unambig
     locT_current = pecs.quick_query(key='poslocT', posids=active_posids)
     locT_targets = {posid: locT_current[posid] for posid in unambig}
@@ -171,7 +177,13 @@ if __name__ == '__main__':
     logger.info('Disambiguation loops complete.')
     if ambig:
         details = pecs.ptlm.quick_table(posids=ambig, coords=['posintTP', 'poslocTP'], as_table=False, sort='POSID')
-        logger.warning(f'{len(ambig)} positioners remain *unresolved*. Details:\n{details}')
+        if pc.is_string(details):
+            details_str = details
+        else:
+            details_str = ''
+            for petal_id, table_str in details.items():
+                details_str += f'\n{petal_id}\n{table_str}\n'
+        logger.warning(f'{len(ambig)} positioners remain *unresolved*. Details:\n{details_str}')
     else:
         logger.info('All selected ambiguous cases were resolved!')
 
