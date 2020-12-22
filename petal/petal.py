@@ -40,7 +40,7 @@ try:
     from DOSlib.util import raise_error
 except ImportError:
     def raise_error(*args, **kwargs):
-        print('RAISE_ERROR: args: %r, kwargs: *r' % (args, kwargs))
+        print('RAISE_ERROR: args: %r, kwargs: %r' % (args, kwargs))
         raise RuntimeError(*args)  ##, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
