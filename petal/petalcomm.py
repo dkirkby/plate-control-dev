@@ -4,6 +4,28 @@ import time
 import Pyro4
 import sys
 from DOSlib.advertise import Seeker
+import posconstants as pc
+
+# interface / error handling cases for sending and executing move tables by petalcontroller
+send_fail_return_format = {'cleared': dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
+                           'no_response': dict,  # failed pos, which didn't respond on CAN bus. collection may overlap with cleared or unknown
+                           'unknown': dict,  # failed pos, which might or might not currently have tables loaded
+                           }  # subdicts have keys = busid strings like 'can11' etc and values = canid ints
+rate_fail_return_format = {'current_rate': int,  # foo per hour
+                           'sec_until_ready': int,  # min time (seconds) we must wait until ready again to execute
+                           }
+send_and_exec_cases = {
+    'SUCCESS': None,
+    'PARTIAL SUCCESS: all required moves': send_fail_return_format,  # any returned pos are in the failed-but-not-required category
+    'FAILED: sending tables': send_fail_return_format,  # return collections will contain some *required* pos for which tables failed to send
+    'FAILED: power off': [],  # list includes only the power supplies that are disabled
+    'FAILED: canbus off': [],  # list includes only the can buses that are disabled
+    'FAILED: move rate limit': rate_fail_return_format,
+    'FAILED: power supply reset rate limit': rate_fail_return_format,
+    'FAILED: temperature limit': {},  # keys = canids, values = temperatures. only includes the cases that exceed an acceptance threshold value
+    }
+valid_power_supplies = {'PS1', 'PS2'}
+valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
 
 class PetalComm(object):
     """
@@ -156,44 +178,61 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_tables(self, move_tables, pc_cmd='send_tables_ex'):
+    def send_and_execute_tables(self, move_tables):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
+        
+        In cases of SUCCESS or PARTIAL SUCCESS, petalcontroller shall immediately
+        send the synchronized start signal upon completion of loading all tables.
 
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
             
-            pc_cmd ... optional override of the function name to use when sending
-                       to petalcontroller.py. After 2020-06-08 (tag v4.18 and up),
-                       use 'send_tables_ex'. For petalcontroller.py versions prior
-                       to that, use 'send_tables'.
-            
         OUTPUT:
-            tuple ... 1st element: string with first token being 'SUCCESS' or 'FAILED'
-                  ... 2nd element: dict with keys = busid and values = list of canids,
-                      for any failed cases. The dict will not necessarily contain
-                      entries for all possible busids.
+            tuple[0] ... string
+            tuple[1] ... None or list or dict, depending on case defined by tuple[0]
+            
+        There are several valid output cases. Their identifying key strings and
+        value formats are explicitly defined in posconstants.py. These cases ARE
+        validated here, so higher level code does not need to double-check whether
+        they conform to the interface given in posconstants.
         """
-        valid_cmds = {'send_tables', 'send_tables_ex'}
         try:
-            assert pc_cmd in valid_cmds, f'pc_cmd {pc_cmd} invalid'
-            return self._call_device(pc_cmd, move_tables)
+            output = self._call_device('send_and_execute_tables', move_tables_ex=move_tables)
+            pc.validate_send_and_exec(output)
+            return output
         except Exception as e:
-            return 'FAILED: Can not send move tables. Exception: %s' % str(e)
-
-    def execute_sync(self, mode):
-        """
-        Send the command to synchronously begin move sequences to all positioners
-        on the petal simultaneously.
-        mode can be either hard or soft
-        """
-        if str(mode).lower() not in ['hard','soft']:
-            return 'FAILED: Invalid value for mode argument'
-        try:
-            return self._call_device('execute_sync', str(mode).lower())
-        except Exception as e:
-            return 'FAILED: Can not execute sync command. Exception: %s' % str(e)
+            msg = 'FAILED: Could not send_and_execute move tables, in an undefined way.'
+            msg += ' I.e. petalcomm did not receive an error value from petalcontroller'
+            msg += f' in a format it could understand. Exception: {e}'
+            return msg
+            
+    @staticmethod
+    def validate_send_and_exec(output):
+        '''Validates output from send_and_execute_tables() provided by petalcontroller.
+        Throws an assertion if invalid, otherwise silent.
+        '''
+        def assert2(test):
+            f'petalcontroller return data not understood:\n{output}'
+        assert2(len(output) == 2)
+        assert2(isinstance(output, (tuple, list)))
+        errstr = output[0]
+        data = output[1]
+        assert2(errstr in send_and_exec_cases)
+        expected_fmt = send_and_exec_cases[errstr]
+        expected_type = type(expected_fmt)
+        assert2(type(data) == expected_type)
+        if errstr == 'SUCCESS':
+            assert2(data == send_and_exec_cases[errstr])
+        elif errstr == 'FAILED: power off':
+            assert2(all(x in valid_power_supplies for x in data))
+        elif errstr == 'FAILED: canbus off':
+            assert2(all(x in valid_canbus_ids for x in data))
+        elif expected_type == dict and len(expected_fmt) > 0:
+            for k, v in expected_fmt.items():
+                assert2(k in data)
+                assert2(type(v) == type(data[k]))
 
     def move(self, bus_id, can_id, direction, mode, motor, angle):
         """
