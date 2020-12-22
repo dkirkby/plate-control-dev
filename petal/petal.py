@@ -647,15 +647,60 @@ class Petal(object):
         self.__current_schedule_moves_should_anneal = should_anneal
         
         self.schedule.schedule_moves(anticollision, should_anneal)
+            
+    def set_motor_parameters(self):
+        """Send the motor current and period settings to the positioners.
+        
+        INPUTS:  None
+        """
+        if self.simulator_on:
+            if self.verbose:
+                self.printfunc('Simulator skips sending motor parameters to positioners.')
+            return
+        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+        currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
+        periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
+        enabled = self.enabled_posmodels(self.posids)
+        for posid, posmodel in enabled.items():
+            canid = posmodel.canid
+            busid = posmodel.busid
+            p = {key:posmodel.state._val[key] for key in parameter_keys}
+            currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+            currents_by_busid[busid][canid] = [currents, currents]
+            periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+            if self.verbose:
+                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+        self.comm.pbset('currents', currents_by_busid)
+        self.comm.pbset('periods', periods_by_busid)
+        self.printfunc(f'Set motor parameters for {len(enabled)} positioners')
 
-    def send_move_tables(self, n_retries=1, previous_failed=None):
+    def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
+        """Convenience wrapper to schedule, send, and execute the pending requested
+        moves, all in one shot.
+        """
+        self.schedule_moves(anticollision, should_anneal)
+        failed_posids, n_retries = self.send_and_execute_moves()
+        return failed_posids, n_retries
+
+    def send_and_execute_moves(self, n_retries=1, previous_failed=None):
         """Send move tables that have been scheduled out to the positioners.
+        When all tables are loaded on positioners, immediately commence the
+        movements.
         
-        The argument n_retries is for internal usage when handling error
-        cases, where move tables need to be rescheduled and resent.
-        
-        Returns a set containing any posids for which sending the table failed
-                and the number of retries remaining.
+        Upon return from petalcontroller, do clean-up and logging tasks, to keep
+        track of the moves that are being done. These tasks are performed in parallel
+        while the robots are physically moving, and we assume the positioners behave
+        deterministically, and true to what petalcontroller's return arguments claim
+        they will do.
+                
+        INPUTS:
+            n_retries ... for internal usage when handling error cases, where move
+                          tables need to be rescheduled and resent
+                          
+        OUTPUTS:
+            tuple[0] ... set containing any posids for which sending the table failed
+            tuple[1] ... number of retries remaining
         """
         self.printfunc(f'send_move_tables called (n_retries={n_retries})')
         hw_tables = self._hardware_ready_move_tables()
@@ -706,43 +751,7 @@ class Petal(object):
             exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
             filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}.csv'
             debug_path = os.path.join(pc.dirs['temp_files'], filename)
-            debug_table.write(debug_path, overwrite=True)
-            
-        return failed_posids, n_retries      
-            
-    def set_motor_parameters(self):
-        """Send the motor current and period settings to the positioners.
-        
-        INPUTS:  None
-        """
-        if self.simulator_on:
-            if self.verbose:
-                self.printfunc('Simulator skips sending motor parameters to positioners.')
-            return
-        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-        currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
-        periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
-        enabled = self.enabled_posmodels(self.posids)
-        for posid, posmodel in enabled.items():
-            canid = posmodel.canid
-            busid = posmodel.busid
-            p = {key:posmodel.state._val[key] for key in parameter_keys}
-            currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-            currents_by_busid[busid][canid] = [currents, currents]
-            periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-            if self.verbose:
-                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
-                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
-        self.comm.pbset('currents', currents_by_busid)
-        self.comm.pbset('periods', periods_by_busid)
-        self.printfunc(f'Set motor parameters for {len(enabled)} positioners')
-
-    def execute_moves(self):
-        """Command the positioners to do the move tables that were sent out to them.
-        Then do clean-up and logging routines to keep track of the moves that were done.
-        
-        INPUTS:  None
-        """
+            debug_table.write(debug_path, overwrite=True)        
         self.printfunc('execute_moves called')
         if self.simulator_on:
             if self.verbose:
@@ -754,24 +763,13 @@ class Petal(object):
             self._wait_while_moving()
         self._remove_posid_from_sent_tables('all')
         self.printfunc('execute_moves: Done')
-
-    def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
-        """Convenience wrapper to schedule, send, and execute the pending requested
-        moves, all in one shot.
-        """
-        self.schedule_moves(anticollision, should_anneal)
-        failed_posids, n_retries = self.send_and_execute_moves()
         return failed_posids, n_retries
+    
+    def send_move_tables(self):
+        assert False, 'BUG!! This call to send_move_tables is deprecated! Use send_and_execute_moves() instead.'
 
-    def send_and_execute_moves(self):
-        """Convenience wrapper to send and execute the pending moves (that have already
-        been scheduled).
-            
-        INPUTS:  None
-        """
-        failed_posids, n_retries = self.send_move_tables()
-        self.execute_moves()
-        return failed_posids, n_retries
+    def execute_moves(self):
+        assert False, 'BUG!! This call to execute_moves is deprecated! Use send_and_execute_moves() instead.'
 
     def quick_move(self, posids='', cmd='', target=[None, None],
                    log_note='', anticollision='default', should_anneal=True,
