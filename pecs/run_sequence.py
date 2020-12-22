@@ -13,7 +13,7 @@ script_name = os.path.basename(__file__)
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='Path to sequence file, readable by sequence.py. For some common pre-cooked sequences, run sequence_generator.py.')
-parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "freeze" or None. Default is "adjust"')
+parser.add_argument('-a', '--anticollision', type=str, default='adjust', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "adjust"')
 parser.add_argument('-p', '--enable_phi_limit', action='store_true', help='turns on minimum phi limit for move targets, default is False')
 parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
 parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
@@ -35,17 +35,19 @@ parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f
 parser.add_argument('-post', '--postpark', type=str, default=default_park, help=f'str, controls final parking move, after running the sequence. Valid options are: {park_options}, default is {default_park}')
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
+parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents (duty cycle) for the duration of the test. Overrides any values in the online system or sequence file. Must be an integer between 1 and 100')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
-assert uargs.anticollision in {'adjust', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
+assert uargs.anticollision in {'adjust', 'adjust_requested_only', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
 assert 0 <= uargs.num_corr <= max_corr, f'out of range argument {uargs.num_corr} for num_corr parameter'
 assert uargs.prepark in park_options, f'invalid park option, must be one of {park_options}'
 assert uargs.postpark in park_options, f'invalid park option, must be one of {park_options}'
 uargs.prepark = None if uargs.prepark in ['None', 'False'] else uargs.prepark
 uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
+assert uargs.motor_current == None or 0 < uargs.motor_current <= 100, f'out of range argument {uargs.motor_current} for motor current parameter'
 
 # read sequence file
 import sequence
@@ -61,8 +63,8 @@ assert start_move <= final_move, f'start_move {start_move} > final_move {final_m
 is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
-import logging
-import time
+import simple_logger
+import traceback # Log excepted exceptions
 try:
     import posconstants as pc
 except:
@@ -75,32 +77,20 @@ log_dir = pc.dirs['sequence_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-def clear_loggers():
-    '''Mysteriously (to me) this doesn't seem to work on the second run of script in
-    the same ipython/debugger session, but does seem to work on the third... Weird,
-    not gonna bother trying to track it down --- just adds duplicate printouts.'''
-    for h in logger.handlers:
-        logger.removeHandler(h)
-clear_loggers()
-fh = logging.FileHandler(filename=log_path, mode='a', encoding='utf-8')
-sh = logging.StreamHandler()
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
-formatter.converter = time.gmtime
-fh.setFormatter(formatter)
-sh.setFormatter(formatter)
-logger.addHandler(fh)
-logger.addHandler(sh)
+logger = simple_logger.start_logger(log_path)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
-logger.info(f'Log file: {log_path}')
 logger.info(f'Input file: {uargs.infile}')
 subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
 logger.info(f'Contents:\n\n{seq}{subseq_str}')
+assert2 = simple_logger.assert2
+input2 = simple_logger.input2
 
+# other imports
 import sys
+import time
+
 def quit_query(question):
-    response = input(f'\n{question} (y/n) >> ')
+    response = input2(f'\n{question} (y/n) >> ')
     if 'n' in response.lower():
         logger.info('User rejected the sequence prior to running. Now quitting.')
         sys.exit(0)
@@ -110,43 +100,30 @@ logger.info(f'Number of correction submoves: {uargs.num_corr}')
 logger.info(f'Number of fvc images per measurement: {uargs.num_meas}')
 logger.info(f'Minimum move cycle time: {uargs.cycle_time} sec')
 
-def assert2(test, message):
-    '''Like an assert, but cleaner handling of logging.'''
-    if not test:
-        logger.error(message)
-        logger.warning('Now quitting, so user can check inputs.')
-        assert False  # for ease of jumping back into the error state in ipython debugger
-
 # set up PECS (online control system)
 try:
     from pecs import PECS
     kwargs = {'interactive': True}
-    specified_locs = seq.get_device_locs()
-    if any(specified_locs):
-        kwargs['device_locs'] = specified_locs
+    specified_posids = seq.get_posids()
+    if any(specified_posids):
+        kwargs['posids'] = specified_posids
     pecs = PECS(**kwargs)
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     _get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
     get_all_enabled_posids = lambda: list(pecs.get_enabled_posids('all', include_posinfo=False))
-    _, all_posinfo = pecs.get_enabled_posids(posids='all', include_posinfo=True)
-    all_posinfo = all_posinfo.reset_index()
-    temp = all_posinfo[['DEVICE_LOC','DEVICE_ID']].to_dict(orient='list')
-    all_loc2id = {temp['DEVICE_LOC'][i]: temp['DEVICE_ID'][i] for i in range(len(all_posinfo))}
 except:
     # still a useful case, for testing some portion of the script offline
     logger.warning('PECS initialization failed (hint: double-check whether you need to join instance in this terminal')
     pecs_on = False
-    device_locs = seq.get_device_locs()
-    if len(device_locs) == 0:
-        device_locs = range(10)
-    all_loc2id = {i:f'DUMMY{i:05d}' for i in device_locs}
-    _dummy_posids = list(all_loc2id.values())
-    _get_posids = lambda: _dummy_posids
-    temp = sorted(_get_posids())
-    
-all_id2loc = {val: key for key, val in all_loc2id.items()}
+    specified_posids = list(seq.get_posids())
+    max_posids_for_debug = 10
+    if len(specified_posids) == 0:
+        specified_posids = [f'DUMMY{i:05d}' for i in range(max_posids_for_debug)]
+    if len(specified_posids) > max_posids_for_debug:
+        specified_posids = specified_posids[:max_posids_for_debug]
+    _get_posids = lambda: specified_posids
 
 class NoPosidsError(Exception):
     pass
@@ -168,30 +145,6 @@ except NoPosidsError:
                  ' Suggested things to check: CTRL_ENABLED flags, posfid power,' +
                  ' canbus status, petal ops_state. Now quitting.')
     sys.exit(0)
-    
-_loc2id_cache = {}  # reduces overhead for function below
-_id2loc_cache = {}  # reduces overhead for function below
-def get_map(key='loc', posids=[]):
-    '''Returns dict with containing positioner locations and corresponding ids.
-    By default, positioners will be only those delivered dynamically by get_posids().
-    
-    INPUTS:  key ... 'loc' --> output has keys = locations, values = posids
-                     'ids' --> output has keys = posids, values = locations
-             posids ... (optional) collection of posids, to skip get_posids() call
-    
-    OUTPUT:  dict, with keys/values as determined by key arg above
-    '''
-    posids = posids if posids else get_posids()
-    if key == 'loc':
-        global _loc2id_cache
-        if set(_loc2id_cache.values()) != set(posids):
-            _loc2id_cache = {k:v for k,v in all_loc2id.items() if v in posids}
-        return _loc2id_cache
-    else:
-        global _id2loc_cache
-        if set(_id2loc_cache.values()) != set(posids):
-            _id2loc_cache = {k:v for k,v in all_id2loc.items() if k in posids}
-        return _id2loc_cache
 
 if pecs_on:
     these = len(get_posids())
@@ -241,7 +194,6 @@ def trans(posid, method, *args, **kwargs):
     result = ptlcall('postrans', posid, method, *args, **kwargs) 
     return result
 
-
 # general settings for the move measure function
 if uargs.match_radius == None and pecs_on:
     uargs.match_radius = pecs.match_radius
@@ -249,25 +201,36 @@ move_meas_settings = {key: uargs.__dict__[key] for key in ['match_radius', 'chec
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
 # motor settings (must be made known to petal.py and FIPOS)
-motor_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
+motor_current_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
+motor_settings = motor_current_settings | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
+
+# hanlde any overrides of positioner settings
+use_online_value = 'use_online_value'
+pos_settings = seq.pos_settings.copy()
+seq_has_motor_currents = any(key in motor_current_settings for key in seq.pos_settings)
+if uargs.motor_current:
+    new = {key: uargs.motor_current for key in motor_current_settings}
+    pos_settings.update(new)
+    logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
+logger.info(f'Positioner settings for this test: {pos_settings}')
 
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
-    '''Gathers current positioner settings and caches them to disk. Returns a
-    file path.
+    '''Gathers current positioner settings and caches them to disk. Only does so
+    for those which will actually be changed by pos_settings. Returns a file path.
     '''
     cache_name = f'{log_timestamp}_pos_settings_cache.ecsv'
     cache_path = os.path.join(log_dir, cache_name)
-    settings = []
+    current = {}
+    for key in pos_settings:
+        current[key] = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
+    reshaped = {key:[] for key in set(current) | {'POS_ID'}}
     for posid in posids:
-        these_settings = {'POS_ID': posid}
-        these_settings.update(sequence.pos_defaults.copy())
-        for key in sequence.pos_defaults:
-            value = ptlcall('get_posfid_val', posid, key)
-            these_settings[key] = value
-        settings.append(these_settings)
-    frame = pd.DataFrame(data=settings)
+        reshaped['POS_ID'].append(posid)
+        for key in current:
+            reshaped[key].append(current[key][posid])
+    frame = pd.DataFrame(data=reshaped)
     frame.to_csv(cache_path, index=False)
     return cache_path
 
@@ -277,22 +240,24 @@ def retrieve_cached_pos_settings(path):
     apply_pos_settings function.'''
     frame = pd.read_csv(path)
     settings = {}
+    keys = frame.columns.tolist()
     for idx, row in frame.iterrows():
         posid = row['POS_ID']
-        these_settings = {key: row[key] for key in sequence.pos_defaults}
+        these_settings = {key: row[key] for key in keys if key != 'POS_ID'}
         settings[posid] = these_settings
     return settings
 
 def apply_pos_settings(settings):
     '''Push new settings values to the positioners in posids. The dict settings
     should have keys = posids, and values = sub-dictionaries. Each sub-dict
-    should have keys / value types like pos_defaults in the sequence module.
+    should have keys / value types like some subset of pos_defaults in the sequence
+    module.
     
     Nothing will be committed to the posmoves database (settings will be stored
     only in memory, and can be reset by reinitializing the petal software.
     '''
     if not settings:
-        logger.warning(f'apply_pos_settings: called with null arg settings={settings}')
+        logger.info('apply_pos_settings: none to apply')
         return
     motor_update_petals = set()
     for posid, these_settings in settings.items():
@@ -308,12 +273,16 @@ def apply_pos_settings(settings):
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
             value = these_settings[key]                
-            val_accepted = ptlcall('set_posfid_val', posid, key, value, check_existing=True)
-            if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
-                assert2(False, f'unable to set {key}={value} for {posid}')
-            elif val_accepted == True:  # again, distinct from the None case
-                if key in motor_settings:
-                    motor_update_petals.add(role)
+    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
+    for accepted in accepted_by_petal.values():
+        for posid, these_accepted in accepted.items():
+            for key, val_accepted in these_accepted.items():
+                value = settings[posid][key]
+                if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
+                    assert2(False, f'unable to set {key}={value} for {posid}')
+                elif val_accepted == True:  # again, distinct from the None case
+                    if key in motor_settings:
+                        motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
         logger.info('apply_pos_settings: Positioner settings include change(s) to motor' +
@@ -341,11 +310,17 @@ def calc_poslocXY_errors(requests, results):
     combo = requests.merge(useful_results, on='DEVICE_ID')
     targ_errs = {}
     trac_errs = {}
+    df = combo.set_index('DEVICE_ID')
+    ret = pecs.ptlm.batch_transform(df, 'obsXY', 'poslocXY')
+    df = pd.concat([x for x in ret.values()]).rename(columns={'poslocX': 'x_meas', 'poslocY': 'y_meas'})
+    ret = pecs.ptlm.batch_transform(df, 'posintTP', 'poslocXY')
+    df = pd.concat([x for x in ret.values()]).rename(columns={'poslocX': 'x_trac', 'poslocY': 'y_trac'})
+    combo = df.reset_index()
     for row in combo.iterrows():
         data = row[1]
         posid = data['DEVICE_ID']
-        xy_meas = trans(posid, 'obsXY_to_poslocXY', (data['obsX'], data['obsY']))
-        xy_trac = trans(posid, 'posintTP_to_poslocXY', (data['posintT'], data['posintP']))
+        xy_meas = (data['x_meas'], data['y_meas'])
+        xy_trac = (data['x_trac'], data['y_trac'])
         command = data['COMMAND']
         uv_targ = [data['X1'], data['X2']]
         assert2(command in sequence.abs_commands, 'error calc when initial request was a delta ' +
@@ -354,6 +329,7 @@ def calc_poslocXY_errors(requests, results):
             xy_targ = uv_targ
         else:
             conversion = f'{command}_to_poslocXY'
+            # Need to think how best to do in batch
             xy_targ = trans(posid, conversion, uv_targ)
         targ_err_x = xy_meas[0] - xy_targ[0]
         targ_err_y = xy_meas[1] - xy_targ[1]
@@ -433,8 +409,12 @@ def get_parkable_neighbors(posids):
     '''
     parkable_neighbors = set()
     all_enabled = get_all_enabled_posids()
+    ret = pecs.ptlm.batch_get_neighbors(posids)
+    all_neighbors = {}
+    for neigh in ret.values():
+        all_neighbors.update(neigh)
     for posid in posids:
-        neighbors = ptlcall('get_positioner_neighbors', posid)
+        neighbors = all_neighbors[posid]
         enabled_neighbors = set(neighbors) & set(all_enabled)
         parkable_neighbors |= enabled_neighbors
     
@@ -468,7 +448,6 @@ if pecs_on:
     else:
         logger.info(f'Phi limits changed. Old phi limits: {old_phi_limits}, ' +
                     f'new phi limits: {new_phi_limits}')
-last_pos_settings = None
 real_moves = pecs_on and not uargs.no_movement
 cooldown_margin = 1.0  # seconds
 cycle_time = uargs.cycle_time + cooldown_margin if real_moves else 2.0
@@ -504,6 +483,7 @@ def park(park_option, is_prepark=True):
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
+    logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
     if real_moves:
         kwargs = {'posids': all_to_park,
                   'mode': 'normal',
@@ -513,13 +493,23 @@ def park(park_option, is_prepark=True):
         kwargs.update(move_meas_settings)
         if 'anticollision' in kwargs:
             del kwargs['anticollision']  # not an arg to park_and_measure
+        if uargs.test_tp:
+            orig_tp_frac = pecs.tp_frac
+            pecs.tp_frac = 1.0
+            if orig_tp_frac != pecs.tp_frac:
+                logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
         pecs.park_and_measure(**kwargs)
+        if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
+            pecs.tp_frac = orig_tp_frac
+            logger.info(f'Restored tp update error fraction to {pecs.tp_frac}')
     if any(seq) and is_prepark:
         do_pause()
     logger.info('Parking complete\n')
-        
+
 # do the sequence
 logger.info('Beginning the move sequence\n')
+# storage for exceptions
+exception_here = None
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
@@ -528,15 +518,12 @@ try:
     for m in range(start_move, final_move + 1):
         move = seq[m]
         posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
-        device_loc_unordered = set(get_map(key='loc', posids=posids))
         move_counter += 1
         move_num_text = f'target {move_counter} of {num_moves} (sequence_move_idx = {m})'
-        if not move.is_defined_for_all_locations(device_loc_unordered):
-            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioner locations.\n')
+        if not move.is_defined_for_all_positioners(posids):
+            logger.warning(f'Skipping {move_num_text}, because targets not defined for some positioners.\n')
             continue
         logger.info(f'Preparing {move_num_text} on {len(posids)} positioner{"s" if len(posids) > 1 else ""}.')
-        descriptive_dict = move.to_dict(sparse=True, device_loc=device_loc_unordered)
-        logger.info(f'Move settings are {descriptive_dict}\n')
         correction_not_defined = move.command not in sequence.general_commands
         correction_not_allowed = not move.allow_corr
         not_correctable = correction_not_allowed or correction_not_defined 
@@ -547,7 +534,7 @@ try:
             logger.info(f'Correction move skipped ({reason})')
         n_corr = 0 if not_correctable else uargs.num_corr
         targ_errs = None
-        calc_errors = True
+        calc_errors = move.command not in sequence.delta_commands | sequence.homing_commands
         initial_request = None
         for submove_num in range(1 + n_corr):
             extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
@@ -567,49 +554,37 @@ try:
                     if any(no_err_val):
                         logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
                                     f' missing error results. Excluded posids: {no_err_val}')
-                    device_loc_map = get_map(key='ids', posids=posids)
-                    # note below how order is preserved for target0, target1, and device_loc
+                    # note below how order is preserved for target0 and target1
                     # lists, on the assumption that get_posids() returns a list
-                    device_locs = [device_loc_map[posid] for posid in posids]
                     submove = sequence.Move(command='poslocdXdY',
                                             target0=[-targ_errs[posid][0] for posid in posids],
                                             target1=[-targ_errs[posid][1] for posid in posids],
-                                            device_loc=device_locs,
-                                            log_note=move.get_log_notes(device_locs),
-                                            pos_settings=move.pos_settings,
+                                            posids=posids,
+                                            log_note=move.get_log_notes(posids),
                                             allow_corr=move.allow_corr)
-                request = submove.make_request(loc2id_map=get_map('loc'), log_note=extra_log_note)
+                request = submove.make_request(posids=posids, log_note=extra_log_note)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
                     request = request.merge(pecs.posinfo, on='DEVICE_ID')
                 kwargs = {'request': request, 'num_meas': uargs.num_meas}
+                descriptive_dict = submove.to_dict(sparse=True, posids=posids)
             elif move.command in sequence.homing_commands:
-                calc_errors = False
                 if pecs_on:
                     move_measure_func = pecs.rehome_and_measure
                 kwargs = move.make_homing_kwargs(posids=posids, log_note=extra_log_note)
+                submove = move  # just for consistency of operations below
             else:
                 logger.warning(f'Skipping {move_with_submove_txt} due to unexpected command {move.command}\n')
                 continue
             kwargs.update(move_meas_settings)
-            new_settings = move.pos_settings
-            if new_settings != last_pos_settings:
-                all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
-                if pecs_on:
-                    apply_pos_settings(all_settings)
-                last_pos_settings = new_settings
+            descriptive_dict = submove.to_dict(sparse=True, posids=posids)
+            logger.info(f'Move command: {descriptive_dict}')
+            if submove.is_uniform:
+                logger.info(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)
-                
-                # To be implemented: Some method of storing the submeas strings to
-                # the online DB. Can replace the verbose printout below. For now,
-                # I just want to be sure that the sub-measurements are logged *somewhere*.
-                if uargs.num_meas > 1:
-                    submeas = pecs.summarize_submeasurements(results)
-                    logger.info(f'sub-measurements: {submeas}') 
-    
                 prev_posids = posids
                 posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
                 if len(prev_posids) != len(posids):
@@ -639,10 +614,18 @@ except StopIteration:
     logger.info('Safely aborting the sequence.')
 except NoPosidsError:
     logger.error('All positioners have become disabled. Aborting the sequence.')
-logger.info(f'Sequence "{seq.short_name}" complete!')
+except Exception as e:
+    exception_here = e
+    logger.error('The sequence crashed! See traceback below:')
+    logger.critical(traceback.format_exc())
+    logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
+if exception_here is None:
+    logger.info(f'Sequence "{seq.short_name}" complete!')
 
 # cleanup after running sequence
 if pecs_on:
+    # Trigger FVCCollector to backup FVC images, should not wait for collection to finish
+    pecs.fvc_collect()
     # restore the original pos settings
     orig_settings = retrieve_cached_pos_settings(cache_path)
     logger.info(f'Retrieved original positioner settings from {cache_path}')
@@ -660,9 +643,8 @@ if pecs_on:
     # restore old phi limit angles
     if new_phi_limits != old_phi_limits:
         if isinstance(old_phi_limits, dict):
-            # 2020-07-13 [JHS] I'm unclear if the keys here are supposed to be role or
-            # pcid. Might be a bug, but hard for me to test at LBNL because only one petal.
-            # Frankly I'm not even 100% sure if it's a dict in the case of multiple petals.
+            # 2020-10-27 [KF] old_phi_limits will be a dict with rolename keys (PETALx)
+            # if the petals had different limits. Otherwise will be a single value.
             roles_angles = [(role, angle) for role, angle in old_phi_limits.items()]
         else:
             roles_angles = [(None, old_phi_limits)]
@@ -678,4 +660,8 @@ if pecs_on:
 
 # final thoughts...
 logger.info(f'Log file: {log_path}')
-clear_loggers()
+simple_logger.clear_logger()
+
+# raise exception from loop if we have one
+if exception_here is not None:
+    raise(exception_here)

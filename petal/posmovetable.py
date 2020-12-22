@@ -338,7 +338,7 @@ class PosMoveTable(object):
     # row manipulations
     def insert_new_row(self, index):
         newrow = PosMoveRow()
-        self.rows.insert(index,newrow)
+        self.rows.insert(index, newrow)
         if index > len(self.rows):
             self.insert_new_row(index) # to fill in any blanks up to index
         self._reset_total_time_estimate()

@@ -10,7 +10,6 @@ class PosModel(object):
 
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
-
     def __init__(self, state=None, petal_alignment=None):
         if not(state):
             self.state = posstate.PosState()
@@ -30,8 +29,10 @@ class PosModel(object):
         
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
-        self._abs_shaft_speed_cruise_T   = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
-        self._abs_shaft_speed_cruise_P   = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
+        self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance))
+        self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
 
     def refresh_cache(self):
         """Reloads state parameters with cached values."""
@@ -73,7 +74,12 @@ class PosModel(object):
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
         return self.state._val['CTRL_ENABLED']
-
+    
+    @property
+    def classified_as_retracted(self):
+        """Returns whether the positioner has been classified as retracted or not."""
+        return self.state._val['CLASSIFIED_AS_RETRACTED']
+    
     @property
     def expected_current_posintTP(self):
         """Returns the internally-tracked expected position of the
@@ -176,6 +182,38 @@ class PosModel(object):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
         """
         return self._abs_shaft_speed_cruise_P
+    
+    @property
+    def abs_shaft_spinupdown_distance_T(self):
+        '''Acceleration / deceleration distance on theta axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_T
+
+    @property
+    def abs_shaft_spinupdown_distance_P(self):
+        '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
+        return self._abs_shaft_spinupdown_distance_P
+    
+    @property
+    def theta_hardstop_ambiguous_zone(self):
+        '''Returns a 1x2 tuple of (AMBIG_MIN, AMBIG_MAX), describing the range in which a measured
+        a measured theta value could mean it's in fact on *either* side of the hardstop (in which case
+        the situation must be resolved by some physical motion). The output values are always returned
+        as positive numbers within the range [0, 360]. So like (+170, +190).'''
+        full_range = self.full_range_posintT
+        ambig_min = (full_range[0] - pc.theta_hardstop_ambig_tol) % 360 
+        ambig_max = (full_range[1] + pc.theta_hardstop_ambig_tol) % 360 
+        for key in {'ambig_min', 'ambig_max'}:
+            assert 0 <= eval(key) <= 360, f'{self.posid} ambig_min={eval(key)} is not within [0,360]. full_range={full_range}'
+        return (ambig_min, ambig_max)
+    
+    @property
+    def in_theta_hardstop_ambiguous_zone(self):
+        '''Returns boolean whether positioner is currently in the ambiguous either-side-of-the-hardstop
+        zone.'''
+        ambig_range = self.theta_hardstop_ambiguous_zone
+        t_test = self.axis[pc.T].pos
+        t_test %= 360
+        return ambig_range[0] <= t_test <= ambig_range[1]
 
     def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the
@@ -260,7 +298,7 @@ class PosModel(object):
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
         self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
-        self.state.append_log_note(cleanup_table['log_note'])
+        self.state.store('LOG_NOTE', cleanup_table['log_note'])
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.

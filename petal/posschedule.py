@@ -27,8 +27,8 @@ class PosSchedule(object):
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self._requests = {} # keys: posids, values: target request dictionaries
-        self.stage_order = ['direct','retract','rotate','extend','expert','final']
-        self.RRE_stage_order = ['retract','rotate','extend']
+        self.stage_order = ['direct', 'debounce_polygons', 'retract', 'rotate', 'extend', 'expert', 'final']
+        self.RRE_stage_order = ['retract', 'rotate', 'extend']
         self.stages = {name:posschedulestage.PosScheduleStage(
                                 collider         = self.collider,
                                 stats            = self.stats,
@@ -59,13 +59,26 @@ class PosSchedule(object):
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
         self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
-        self._all_received_requested_posids = set()  # every posid that received a request, whether accepted or not (diferent)
+        self._all_requested_posids = {'regular': set(), 'expert': set()}  # every posid that received a request, whether accepted or not
 
     @property
     def collider(self):
         return self.petal.collider
+    
+    @property
+    def regular_requests_accepted(self):
+        return {self.has_regular_request_already(posid) for posid in self._requests}
+    
+    @property
+    def expert_requests_accepted(self):
+        return set(self.stages['expert'].move_tables.keys())
+    
+    def has_regular_request_already(self, posid):
+        if posid in self._requests and not self._requests[posid]['is_dummy']:
+            return True
+        return False
 
-    def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=False):
+    def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=True):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the
         coordinate system indicated by uv_type.
@@ -86,40 +99,35 @@ class PosSchedule(object):
 
         A schedule can only contain 1 target request per positioner at a time.
         
-        The special argument allow_initial_interference takes a boolean. In all
-        normal cases leave it False (the default). In rare expert calls it may
-        be used, for extracting collided positioners from one another (cases
-        where it is known ahead of time that anticollision will be set to None
-        in the next call to schedule_moves).
+        The special argument allow_initial_interference takes a boolean. It allows
+        us to immediately reject requests to positioners with intially overlapping
+        keepout polygons. [JHS] As of 2020-10-29, I think it best in general to *not*
+        reject such requests, and let the scheduling code handle the thornier questions
+        like "are we barely overlapping, and should move anyway".
 
-        Return value is True if the request was accepted and False if denied.
+        Returns an error value == None if the request was accepted, or an
+        explanatory string if the request was denied.
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
             timer_start = time.perf_counter()
             self.stats.add_request()
-        self._all_received_requested_posids.add(posid)
-        def print_denied(string):
-            denied_prefix = str(posid) + ': Target request denied. '
-            self.printfunc(denied_prefix + str(string))
+        self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
-        if self.already_requested(posid):
-            print_denied('Cannot request more than one target per positioner in a given schedule.')
+        target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
+        if self.has_regular_request_already(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
-            return False
+            return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
         if self._deny_request_because_disabled(posmodel):
-            print_denied('Positioner is disabled.')
-            return False
+            return self._denied_str(target_str, POS_DISABLED_MSG)
         if self._deny_request_because_starting_out_of_range(posmodel):
-            print_denied(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
-                         f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
-            return False
+            return self._denied_str(target_str, f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
+                                 f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
         if not allow_initial_interference:
             interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
             if interfering_neighbors:
-                print_denied(f'Interference at initial position with {interfering_neighbors}')
-                return False
+                return self._denied_str(target_str, f'Interference at initial position with {interfering_neighbors}')
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
         
@@ -161,25 +169,21 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            print_denied('Bad uv_type: ' + str(uv_type))
-            return False
+            return self._denied_str(target_str, 'Bad uv_type')
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
-            print_denied(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
-            return False
+            return self._denied_str(target_str, 'Target not reachable.')
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
-        if self._deny_request_because_limit(posmodel, targt_poslocTP):
-            print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
-                         f'"expert" petal limit_angle at poslocP={self.petal.limit_angle}.')
-            return False
+        limit_err = self._deny_request_because_limit(posmodel, targt_poslocTP)
+        if limit_err:
+            return self._denied_str(target_str, limit_err)
+        if self.should_check_petal_boundaries:
+            bounds_err = self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP)
+            if bounds_err:
+                return self._denied_str(target_str, bounds_err)
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
-            print_denied(f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-            return False
-        if self.should_check_petal_boundaries:
-            if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
-                print_denied('Target exceeds a fixed boundary.')
-                return False
+            return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
                        'posmodel': posmodel,
@@ -194,7 +198,7 @@ class PosSchedule(object):
         if stats_enabled:
             self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
-        return True
+        return None
 
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -207,15 +211,26 @@ class PosSchedule(object):
           None      ... Expert use only.
 
           'freeze'  ... If any collisions are found, the colliding positioner
-                        is frozen at its original position. This setting is
-                        suitable for small correction moves.
+                        is frozen prior to the requested target position. This
+                        setting is suitable for small correction moves.
 
           'adjust'  ... If any collisions are found, the motion paths of the
                         colliding positioners are adjusted to attempt to avoid
                         each other. If this fails, the colliding positioner
                         is frozen at its original position. This setting is
                         suitable for gross retargeting moves.
-
+                        
+                        Occasionally, there is a neighbor positioner with no
+                        requested target in the desired path of one with a target.
+                        In this case, the 'adjust' algorithm is allowed to move
+                        that neighbor out of the way, and then restore it back
+                        to its starting position.
+            
+          'adjust_requested_only'
+                    ... Same as 'adjust', however no automatic
+                        "get out of the way" moves will be done on unrequested
+                        neighbors.
+        
         If there were ANY pre-existing move tables in the list (for example, hard-
         stop seeking tables directly added by an expert user or expert function),
         then the requests list is ignored. The only changes to move tables are
@@ -230,24 +245,31 @@ class PosSchedule(object):
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        num_requests_received = len(self._all_received_requested_posids)
-        self.printfunc(f'num target requests received = {num_requests_received}')
-        if num_requests_received > 0:
-            self.printfunc(f'num target requests accepted = {len(self._requests)}')
-            rejected_posids = self._all_received_requested_posids - set(self._requests)
-            self.printfunc(f'num target requests rejected = {len(rejected_posids)}')
-            if rejected_posids:
-                self.printfunc(f'pos with rejected request(s): {rejected_posids}')
-        self.printfunc(f'num expert move tables = {len(self.stages["expert"].move_tables)}')
+        for kind in ['regular', 'expert']:
+            received = self._all_requested_posids[kind]
+            accepted = set(self._requests.keys()) if kind == 'regular' else self.get_posids_with_expert_tables()
+            rejected = received - accepted
+            if len(received) > 0:
+                prefix = f'num {kind} target requests'
+                self.printfunc(f'{prefix} received = {len(received)}')
+                self.printfunc(f'{prefix} accepted = {len(accepted)}')
+                self.printfunc(f'{prefix} rejected = {len(rejected)}')
+                if rejected:
+                    self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
+        scheduling_timer_start = time.perf_counter()
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
             self._fill_enabled_but_nonmoving_with_dummy_requests()
             if anticollision == 'adjust':
-                self._schedule_requests_with_path_adjustments(should_anneal) # there is only one possible anticollision method for this scheduling method
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
+            elif anticollision == 'adjust_requested_only':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
         self._combine_stages_into_final()
+        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
+        finalcheck_timer_start = time.perf_counter()
         final = self.stages['final']
         if anticollision:
             c, _, p = self._check_final_stage(msg_prefix='Penultimate')
@@ -263,13 +285,17 @@ class PosSchedule(object):
                 for posid in colliding_sweeps:
                     these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
                     adjusted.update(these_adjusted)
-                    frozen.update(frozen)
-                self.printfunc(f'Adjusted posids: {adjusted}')
-                self.printfunc(f'Frozen posids: {frozen}')
+                    frozen.update(these_frozen)
+                prefix = 'Following from \'penultimate\' check:'
+                self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
+                self.printfunc(f'{prefix} frozen posids --> {frozen}')
                 c, _, p = self._check_final_stage(msg_prefix='Final',
-                                                  msg_suffix=' (should always be zero)')
+                                                  msg_suffix=' (should always be zero)',
+                                                  assert_no_unresolved=True)
                 colliding_sweeps, collision_pairs = c, p # for readability
+        self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
+        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
@@ -297,30 +323,28 @@ class PosSchedule(object):
         anneal_time_sum = sum(t for t in self.anneal_time.values())
         return anneal_time_sum * safety_factor
 
-    def already_requested(self, posid):
-        """Returns boolean whether a request has already been registered in the
-        schedule for the argued positioner.
-        """
-        return posid in self._requests
-
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
         freezing is available as an anticollision method for such externally-made
         tables. If any tables have been added by this method, then any target requests
         will be ignored upon scheduling. Generally, this method should only be used
         by an expert user.
+        
+        Returns an error string or None if no error.
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
             timer_start = time.perf_counter()
+        self._all_requested_posids['expert'].add(move_table.posid)
         if self._deny_request_because_disabled(move_table.posmodel):
-            if self.verbose:
-                self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
-            return
+            sched_table = move_table.for_schedule()
+            target_str = f'expert_net_dtdp=({sched_table["net_dT"][-1]:.3f}, {sched_table["net_dP"][-1]:.3f})'
+            return self._denied_str(target_str, POS_DISABLED_MSG)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
             self.stats.add_expert_table_time(time.perf_counter() - timer_start)
+        return None
             
     def expert_mode_is_on(self):
         """Returns boolean stating whether scheduling is in expert mode. This is
@@ -348,13 +372,70 @@ class PosSchedule(object):
         return self._expert_added_tables_sequence
 
     def get_frozen_posids(self):
-        '''Returns set of any posids whose move tables are marked as frozen.
+        '''Returns set of any posids whose final move tables do not achieve the
+        targets in their requests. This is *slower* and *more complete* than simply
+        checking the "is_frozen" property of sweeps (which only really work within
+        a substage --- may not capture the effects of multiple sequential stages).
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
-        for stage in self.stages.values():
-            frozen |= stage.get_frozen_posids()
+        posids = set(self._requests) & set(self.move_tables)
+        err = {}
+        for posid in posids:
+            request = self._requests[posid]
+            sched_table = self.move_tables[posid].for_schedule()
+            net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
+            net_scheduled = [sched_table['net_dT'][-1], sched_table['net_dP'][-1]]
+            err[posid] = [abs(net_requested[i] - net_scheduled[i]) for i in [0, 1]]
+            err[posid] = [min(e, abs(e - 360)) for e in err[posid]]  # wrapped angle cases
+            if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
+                frozen.add(posid)
         return frozen
+
+    def get_posids_with_expert_tables(self):
+        '''Returns set of any posids for which an "expert" table has been added.
+        '''
+        return {table.posid for table in self._expert_added_tables_sequence}
+    
+    def get_overlaps(self, posids):
+        '''Returns dict with keys=posids and values=sets of any neighbors with
+        overlapping polygons (in the current, initial configuration). Positioners
+        with no overlaps are excluded from the returned dict.'''
+        overlaps = {}
+        for posid in sorted(posids):
+            model = self.collider.posmodels[posid]
+            these = self._check_init_or_final_neighbor_interference(model, final_poslocTP=None)
+            if these:
+                overlaps[posid] = these
+        return overlaps
+    
+    def get_details_str(self, posids, label=''):
+        '''Returns string describing details of move tables and sweeps for
+        positioners in the final stage. The argued posids should be a set.
+        '''
+        if pc.is_string(posids):
+            posids = {posids}
+        else:
+            posids = set(posids)
+        neighbors = set()
+        for posid in posids:
+            neighbors |= self.collider.pos_neighbors[posid]
+        neighbors -= posids
+        label = label if label else 'argued posids'
+        s = f'{label}: {posids}\n'
+        s += f'neighbors: {neighbors}\n'
+        display_posids = (posids | neighbors) & set(self.move_tables)
+        for posid in display_posids:
+            suffix = label.upper() if posid in posids else 'NEIGHBOR'
+            s += f'\n---- {posid} [{suffix}] ----'
+            self.move_tables[posid].for_hardware() # dummy call, to ensure inclusion of final creep rows in next display line
+            s += '\n' + self.move_tables[posid].display(printfunc=None)
+            s += '\n' + self.move_tables[posid].display_for('schedule', printfunc=None)
+            s += '\n' + self.move_tables[posid].display_for('hardware', printfunc=None)
+            s += f'\nsweep for: {posid}'
+            s += '\n' + str(self.stages['final'].sweeps[posid])
+            s += '\n'
+        return s
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -362,7 +443,8 @@ class PosSchedule(object):
         """
         should_freeze = not(not(anticollision))
         if should_freeze:
-            self.printfunc('anticollision method --> \'freeze\', due to presence of expert move tables')
+            if anticollision != 'freeze':
+                self.printfunc('anticollision method {anticollision} overriden with \'freeze\', due to presence of expert move tables')
             if self.stats.is_enabled():
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')
@@ -421,23 +503,102 @@ class PosSchedule(object):
             if self.stats.is_enabled() and adjustment_performed:
                 self.stats.add_to_num_adjustment_iters(1)
 
-    def _schedule_requests_with_path_adjustments(self, should_anneal=True):
+    def _debounce_polygons(self):
+        '''Looks for cases where positioners have initial overlap with neighbors.
+        In cases where the polygons are just barely touching, this function attempts
+        to schedule initial small moves(s) to get the polygons free of one another.
+        These moves go into the 'debounce_polygons' stage. Returns a dict with
+        keys = posid and values = any adjusted starting POS_T, POS_P (so that later
+        stages know where this debounce move puts the robots.)
+        '''
+        user_requests = self.get_requests(include_dummies=False)
+        requested_posids = user_requests.keys()
+        overlaps_dict = self.get_overlaps(requested_posids)
+        if len(overlaps_dict) == 0:
+            return {}
+        overlapping = set(overlaps_dict)
+        for overlapping_neighbors in overlaps_dict.values():
+            overlapping |= overlapping_neighbors
+        overlapping -= pc.case.fixed_case_names
+        stage = self.stages['debounce_polygons']
+        skip = pc.num_timesteps_ignore_overlap
+        db = pc.debounce_polys_distance
+        models = {posid: self.collider.posmodels[posid] for posid in overlapping}
+        spinupdown_distances  = {model.abs_shaft_spinupdown_distance_T for model in models.values()}
+        spinupdown_distances |= {model.abs_shaft_spinupdown_distance_P for model in models.values()}
+        backlash_distances  = {model.state._val['BACKLASH'] for model in models.values()}
+        err_msg_prefix = f'posschedule.py: posconstants.debounce_polys_distance = {db:.3f} is insufficient'
+        assert db >= 2*max(spinupdown_distances), f'{err_msg_prefix}, < 2*max(spinupdown) = {2*max(spinupdown_distances):.3f}'
+        assert db >= max(backlash_distances), f'{err_msg_prefix}, < max(backlash) = {max(backlash_distances):.3f}'
+        delta_options = [(0, db), (db, 0), (-db, 0), (db, db), (-db, db)]
+        # delta_options = [(0,-db)]  # uncomment this line for debugging ONLY, to induce more likely failures of debouncing for close polygons
+        enabled = self.petal.all_enabled_posids()
+        unresolved = overlapping
+        for deltas in delta_options:
+            if not unresolved:
+                break
+            posids_to_adjust = unresolved & enabled & overlapping
+            start_tp = {posid: self._requests[posid]['start_posintTP'] for posid in posids_to_adjust}
+            dtdp = {posid: deltas for posid in start_tp}
+            
+            # [JHS] Comments on use of stage here:
+            # 1. Each time we initialize_move_tables, only updating the ones for which a new delta is proposed.
+            # 2. No annealing allowed! (would mess up the "skip first x timesteps" during collision checking)
+            stage.initialize_move_tables(start_tp, dtdp, update_only=True)
+            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, skip=skip)
+            unresolved = set(colliding_sweeps)
+        adjustments_failed = unresolved & enabled & overlapping
+        if any(adjustments_failed):
+            for posid in adjustments_failed:
+                stage.del_table(posid)
+                if posid in requested_posids & overlapping:
+                    req = user_requests[posid]
+                    target_str = f'{req["command"]}=({req["cmd_val1"]:.3f}, {req["cmd_val2"]:.3f})'
+                    explanation = f'Interference at initial position with {overlaps_dict[posid]}. Could ' + \
+                                  f'not resolve within {skip} timestep{"s" if skip != 1 else ""} ({skip*self.collider.timestep:.3f} ' + \
+                                  f'sec) by debouncing polygons (jog distances = {db} deg).'
+                    deny_msg = self._denied_str(target_str, explanation)
+                    self.petal._print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
+                del self._requests[posid]
+            self._fill_enabled_but_nonmoving_with_dummy_requests()  # to repopulate deletions
+        resolved = overlapping - set(colliding_sweeps)
+        resolved_overlaps_dict = self.get_overlaps(resolved)
+        final_posintTP = {}
+        for posid in resolved & enabled:
+            sched_table = stage.move_tables[posid].for_schedule()
+            dT = sched_table["net_dT"][-1]
+            dP = sched_table["net_dP"][-1]
+            msg = f'Debounced initial polygon overlap with {resolved_overlaps_dict[posid]} using dtdp=({dT:.3f}, {dP:.3f})'
+            self._requests[posid]['log_note'] = pc.join_notes(self._requests[posid]['log_note'], msg)
+            self.printfunc(f'{posid}: {msg}')
+            final_posintTP[posid] = (stage.start_posintTP[posid][0] + dT,
+                                     stage.start_posintTP[posid][1] + dP)
+        return final_posintTP
+
+    def _schedule_requests_with_path_adjustments(self, should_anneal=True, adjust_requested_only=False):
         """Gathers data from requests dictionary and populates the 'retract',
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
+        debounced_start_posintTP = self._debounce_polygons()
         stats_enabled = self.stats.is_enabled()
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
         retracted_poslocP = self.collider.Eo_phi  # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to
+        no_auto_adjust = set()
+        if adjust_requested_only:
+            no_auto_adjust = {posid for posid, req in self._requests.items() if req['is_dummy']}            
         for posid, request in self._requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
             # always safely handled from stage to stage.
             posmodel = self.petal.posmodels[posid]
             trans = posmodel.trans
-            this_start_posintTP = request['start_posintTP']
+            if posid in debounced_start_posintTP:
+                this_start_posintTP = debounced_start_posintTP[posid]
+            else:
+                this_start_posintTP = request['start_posintTP']
             this_start_poslocTP = trans.posintTP_to_poslocTP(this_start_posintTP)
             start_posintTP['retract'][posid] = this_start_posintTP
             if this_start_poslocTP[pc.P] > self.collider.Eo_phi or request['start_posintTP'] == request['targt_posintTP']:
@@ -456,11 +617,11 @@ class PosSchedule(object):
                 last_tp = start_posintTP[last_name][posid]
                 this_dtdp = dtdp[last_name][posid]
                 return trans.addto_posintTP(last_tp, this_dtdp, range_wrap_limits='targetable')
-            dtdp['retract'][posid] = calc_dtdp('retract',posid)
-            start_posintTP['rotate'][posid] = calc_next_tp('retract',posid)
-            dtdp['rotate'][posid] = calc_dtdp('rotate',posid)
-            start_posintTP['extend'][posid] = calc_next_tp('rotate',posid)
-            dtdp['extend'][posid] = calc_dtdp('extend',posid)
+            dtdp['retract'][posid] = calc_dtdp('retract', posid)
+            start_posintTP['rotate'][posid] = calc_next_tp('retract', posid)
+            dtdp['rotate'][posid] = calc_dtdp('rotate', posid)
+            start_posintTP['extend'][posid] = calc_next_tp('rotate', posid)
+            dtdp['extend'][posid] = calc_dtdp('extend', posid)
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
@@ -477,7 +638,7 @@ class PosSchedule(object):
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        adjusted, frozen = stage.adjust_path(posid, freezing)
+                        adjusted, frozen = stage.adjust_path(posid, freezing=freezing, do_not_move=no_auto_adjust)
                         for p in frozen:
                             if not_the_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
@@ -546,8 +707,8 @@ class PosSchedule(object):
         against whatever requested final neighbor positions already exist in the
         schedule.
         
-        Returns either empty set (no interference) or the posids of all
-        interfering neighbors.
+        Returns either empty set (no interference) or the posids (or boundary names)
+        of all interfering neighbors.
         """        
         use_final = final_poslocTP != None
         posid = posmodel.posid
@@ -581,23 +742,36 @@ class PosSchedule(object):
     def _deny_request_because_out_of_bounds(self, posmodel, target_poslocTP):
         """Checks for case where a target request is definitively unreachable
         due to being beyond a fixed petal or GFA boundary.
+        
+        Returns '' if ok otherwise an error string describing the denial reason.
         """
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_poslocTP)
         if out_of_bounds:
-            self.petal.pos_flags[posmodel.posid] |= self.petal.get('BOUNDARYVIOLATION', self.petal.missing_flag)
-            return True
-        return False
+            self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('BOUNDARYVIOLATION', self.petal.missing_flag)
+            return f'Target exceeds fixed boundary "{pc.case.names[out_of_bounds]}".'
+        return ''
 
-    def _deny_request_because_limit(self, posmodel, target_poslocTP):
+    def _deny_request_because_limit(self, posmodel, poslocTP):
+        '''Check for cases where angle exceeds phi limit. This limit may either
+        be imposed globally across the petal, or due ot a positioner being
+        classified as retracted.
+        
+        Returns '' if ok otherwise an error string describing the denial reason.
         '''
-        Check for cases where target exceeds angle limit set by experts.
-        Useful to avoid needed to worry about anticollision.
-        '''
+        err = ''
+        limit_angle = None
         if self.petal.limit_angle:
-            if target_poslocTP[1] < self.petal.limit_angle:
-                self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
-                return True
-        return False
+            limit_angle = self.petal.limit_angle
+        if posmodel.classified_as_retracted:
+            limit_angle = self.collider.Eo_phi if limit_angle == None else max(self.collider.Eo_phi, limit_angle)
+        if limit_angle == None or poslocTP[1] >= limit_angle:
+            return err
+        # [JHS] 2020-10-20 "EXPERTLIMIT" flag below does not capture the distinction between
+        # denying due to global limit vs denying due to classified as retracted. But at least
+        # if not flagging the precise cause, it does still flag the same effect.
+        self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('EXPERTLIMIT', self.petal.missing_flag)
+        err = f'Target poslocP={poslocTP[1]:.3f} is outside phi limit angle={limit_angle:.1f}.'
+        return err
     
     def _deny_request_because_starting_out_of_range(self, posmodel):
         '''Checks for case where an out-of-range initial POS_T or POS_P (the
@@ -635,10 +809,11 @@ class PosSchedule(object):
                     else:
                         final.move_tables[posid].extend(table)
                         
-    def _check_final_stage(self, msg_prefix='', msg_suffix=''):
+    def _check_final_stage(self, msg_prefix='', msg_suffix='', assert_no_unresolved=False):
         """Checks the special "final" schedule stage for collisions.
         
         Inputs: Some prefix and suffix text may be argued for printed messages customization.
+                assert_all_resolved ... if True, will print details and throw an assert if detect any unresolved collisions
         
         Outputs: colliding_sweeps ... dictionary of any colliding sweeps (keys are posids)
                  all_sweeps       ... dictionary of all sweeps checked (keys are posids)
@@ -652,6 +827,13 @@ class PosSchedule(object):
         self.printfunc(msg_prefix + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + msg_suffix)
         collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
         self.printfunc(msg_prefix + ' collision pairs: ' + str(collision_pairs))
+        colliding = set(colliding_sweeps)
+        if assert_no_unresolved and colliding:
+            self.printfunc(self.get_details_str(colliding, label='colliding'))
+            err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+            self.printfunc(err_str)
+            self.petal.enter_pdb()
+            # assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
         return colliding_sweeps, all_sweeps, collision_pairs
 
     def _schedule_moves_check_final_sweeps_continuity(self):
@@ -671,7 +853,7 @@ class PosSchedule(object):
             self.stats.add_final_collision_check(collision_pairs)
             colliding_posids = set(colliding_sweeps.keys())
             colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
-            self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+            self.stats.add_unresolved_colliding_at_stage('final', colliding_posids, colliding_tables, colliding_sweeps)
 
     def _schedule_moves_store_requests_info(self):
         """Goes through the move tables, matching up original request information
@@ -696,8 +878,9 @@ class PosSchedule(object):
                 table.display()
             table.append_log_note(log_note_addendum)
                 
-    def _schedule_moves_finish_logging(self, anim_tables={}):
+    def _schedule_moves_finish_logging(self, anim_tables=None):
         """Final logging and animation steps for the schedule_moves() function."""
+        anim_tables = {} if anim_tables is None else anim_tables
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
@@ -769,3 +952,8 @@ class PosSchedule(object):
         if diff_abs[0] > tol or diff_abs[1] > tol:
             return False
         return True
+    
+    def _denied_str(self, target_str, msg_str):
+        return f'Target request denied: {target_str}. {msg_str}'
+
+POS_DISABLED_MSG = 'Positioner is disabled.'

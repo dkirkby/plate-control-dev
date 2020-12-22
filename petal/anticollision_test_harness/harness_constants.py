@@ -74,12 +74,13 @@ def compact_timestamp(nowtime=None, basetime=1582915648):
     return padded
 
 # Timing profiler wrapper function
-n_stats_lines = 20
 statsfile = os.path.join(pc.dirs['temp_files'],'stats_harness')
-def profile(evaluatable_string):
+def profile(evaluatable_string, sorting='cumtime', n_lines=20):
+    assert sorting in {'ncalls', 'tottime', 'percall', 'cumtime', 'percall'}
     print(evaluatable_string)
     cProfile.run(evaluatable_string,statsfile)
     p = pstats.Stats(statsfile)
     p.strip_dirs()
-    p.sort_stats('cumtime')
-    p.print_stats(n_stats_lines)
+    p.sort_stats(sorting)
+    p.print_stats(n_lines)
+    return p

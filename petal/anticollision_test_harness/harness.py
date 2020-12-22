@@ -46,7 +46,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_mille' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_single' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -211,9 +211,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 hw_move_args = {'command': command,
                                 'target0': [],
                                 'target1': [],
-                                'device_loc': [],
+                                'posids': [],
                                 'log_note': runstamp,
-                                'pos_settings': {},
                                 'allow_corr': True}
             for loc_id, data in move_request_data.items():
                 data['command'] = update_command_format(data['command'])
@@ -225,7 +224,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                     if export_targets_this_submove:
                         hw_move_args['target0'].append(target[0])
                         hw_move_args['target1'].append(target[1])
-                        hw_move_args['device_loc'].append(loc_id)
+                        hw_move_args['posids'].append(posid)
                     trans = ptl.posmodels[posid].trans
                     results_row = {key:None for key in expected_results.columns}
                     results_row['move_idx'] = m - 1
@@ -315,4 +314,6 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.states[posid].store(key, value, register_if_altered=False)
         ptl.states[posid].write()
     loop += 1
-
+    
+ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=0)
+ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=30)

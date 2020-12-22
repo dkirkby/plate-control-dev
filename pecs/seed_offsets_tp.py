@@ -6,13 +6,16 @@ import pandas as pd
 from pecs import PECS
 import posconstants as pc
 
-seed = PECS(interactive=True)
+seed = PECS(interactive=True, no_expid=True)
 print(f'Seeding offsetsTP for PCIDs: {seed.pcids}')
 updates = []
 for posid, row in seed.posinfo.iterrows():
     update = {'DEVICE_ID': posid, 'MODE': 'seed_offsets_tp'}
     petal_loc = row['PETAL_LOC']
-    role = seed._pcid2role(petal_loc)
+    if max(seed.pcids) > 899:
+        role = seed._pcid2role(900+petal_loc) #sim mode
+    else:
+        role = seed._pcid2role(petal_loc)
     update = seed.ptlm.collect_calib(update, tag='OLD_',
                                      participating_petals=role)[role]
     seed.ptlm.set_posfid_val(posid, 'OFFSET_T',
@@ -24,7 +27,7 @@ for posid, row in seed.posinfo.iterrows():
     update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     updates.append(update)
-seed.ptlm.commit(mode='calib', log_note='seed_offsets_tp')
+seed.ptlm.commit(mode='calib', calib_note='seed_offsets_tp')
 updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
 path = os.path.join(pc.dirs['calib_logs'],
                     f'{pc.filename_timestamp_str()}-seed_offsets_tp.csv')

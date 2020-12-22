@@ -59,11 +59,13 @@ for directory in dirs.values():
         os.makedirs(directory, exist_ok=True)
         
 # File locations
-positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v14.csv')
+positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v18.csv')
 small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
+default_collider_filename = '_collision_settings_DEFAULT.conf'
 def get_keepouts_cache_path(petal_id):
     filename = f'keepouts_cache_petal_id_{petal_id}.ecsv'
     return os.path.join(dirs['temp_files'], filename)
+fp_calibs_path_cache = os.path.join(dirs['temp_files'], 'latest_fp_calibs.txt')
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
@@ -133,10 +135,17 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
+#handle_fvc_feedback defaults
+err_thresh = False # tracing error over which to disable, False means none
+up_tol = 0.065 # mm over which to apply tp updates
+up_frac = 1.0 # amount of update to apply to posTP
+
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
+theta_hardstop_ambig_tol = 5.0 # deg, for determining when within ambiguous zone of theta hardstops
+theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
@@ -160,7 +169,8 @@ default_t_guess_tol = 30.0  # deg
 _off_center_threshold_mm = 0.5  # radial distance off-center
 _ctrd_phi_theta_change_tol_mm = 0.1 # allowable max positioning error induced by sudden theta change while centered phi
 _nom_max_r = nominals['LENGTH_R1']['value'] + nominals['LENGTH_R2']['value']
-phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / nominals['LENGTH_R2']['value'] * deg_per_rad)
+_min_length_r2 = nominals['LENGTH_R2']['value'] - nominals['LENGTH_R2']['tol']
+phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / _min_length_r2 * deg_per_rad)
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Hardware (operations) States
@@ -187,8 +197,8 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                              'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                              'PS2_EN':('off', 1.0)}),
                     'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                           'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
-                                           'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
+                                           'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                           'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                            'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
                                            'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
                                            #GFA CCD OFF
@@ -198,8 +208,8 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                            'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
                                            'PS2_EN': ('off', 1.0)}),
                     'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                               'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power ON
-                                               'GFAPWR_EN':('off', 60.0), #GFA Power Enable ON
+                                               'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                               'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                                'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
                                                'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
                                                #GFA CCD ON
@@ -226,14 +236,23 @@ keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_ANGULAR']
 keepout_keys = keepout_expansion_keys + ['CLASSIFIED_AS_RETRACTED']
 
-# other "calib" keys, meaning keys that for whatever historical reason, were
-# separated into the calib tables in the online db
-extra_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
-                        'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P'}
+# other "calib" keys, meaning keys that for whatever historical or other reason,
+# are kept in the "calib" tables in the online db rather than "moves"
+other_pos_calib_keys = {'TOTAL_LIMIT_SEEKS_T', 'TOTAL_LIMIT_SEEKS_P',
+                        'LAST_PRIMARY_HARDSTOP_DIR_T', 'LAST_PRIMARY_HARDSTOP_DIR_P',
+                        'CALIB_NOTE', 'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'FIBER_INTACT'}
 fiducial_calib_keys = {'DUTY_STATE', 'DUTY_DEFAULT_ON', 'DUTY_DEFAULT_OFF'}
+posmodel_range_names = {'targetable_range_posintT', 'targetable_range_posintP',
+                        'full_range_posintT', 'full_range_posintP',
+                        'theta_hardstop_ambiguous_zone'}
+posmodel_keys = {'in_theta_hardstop_ambiguous_zone',
+                 'abs_shaft_speed_cruise_T', 'abs_shaft_speed_cruise_P',
+                 'abs_shaft_spinupdown_distance_T', 'abs_shaft_spinupdown_distance_P'}
+for name in posmodel_range_names:
+    posmodel_keys |= {f'max_{name}', f'min_{name}'}
 
 # test for whether certain posstate keys are classified as "calibration" vals
-calib_keys = set(nominals.keys()) | set(keepout_keys) | extra_pos_calib_keys | fiducial_calib_keys
+calib_keys = set(nominals.keys()) | set(keepout_keys) | other_pos_calib_keys | fiducial_calib_keys
 def is_calib_key(key):
     return key.upper() in calib_keys
 
@@ -251,8 +270,6 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
                   "CURR_CRUISE": 70,
                   "CURR_HOLD": 0,
                   "CURR_SPIN_UP_DOWN": 70,
-                  "DEVICE_CLASSIFIED_NONFUNCTIONAL": False,
-                  "FIBER_INTACT": True,
                   "FINAL_CREEP_ON": True,
                   "GEAR_TYPE_P": "namiki",
                   "GEAR_TYPE_T": "namiki",
@@ -274,13 +291,19 @@ constants_keys = {"ALLOW_EXCEED_LIMITS": False,
 def is_constants_key(key):
     return key.upper() in constants_keys
 
+# data fields which must *always* be accompanied by a comment
+require_comment_to_store = {'CTRL_ENABLED',
+                            'DEVICE_CLASSIFIED_NONFUNCTIONAL',
+                            'FIBER_INTACT'}
+
 # state data fields associated with "late" committing to database
-late_commit_defaults = {'OBS_X':None,
-                        'OBS_Y':None,
-                        'PTL_X':None,
-                        'PTL_Y':None,
-                        'PTL_Z':None,
-                        'FLAGS':None}
+late_commit_defaults = {'OBS_X': None,
+                        'OBS_Y': None,
+                        'PTL_X': None,
+                        'PTL_Y': None,
+                        'PTL_Z': None,
+                        'FLAGS': None,
+                        'POSTSCRIPT': None}
 
 # ordered lists of motor parameters (in order that petalcontroller expects them)
 # interface is funky, for example the doubling in some cases for the two motors
@@ -314,8 +337,21 @@ def is_cached_in_posmodel(key):
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 # move command strings
-valid_move_commands = {'QS', 'dQdS', 'obsXY', 'obsdXdY', 'ptlXY', 'poslocXY',
-                       'poslocdXdY', 'poslocTP', 'posintTP', 'dTdP'}
+delta_move_commands = {'dQdS', 'obsdXdY', 'poslocdXdY', 'dTdP'}
+abs_move_commands = {'QS', 'obsXY', 'ptlXY', 'poslocXY', 'poslocTP', 'posintTP'}
+valid_move_commands = abs_move_commands | delta_move_commands
+
+# common formatting / split-up names
+coord_formats = {key: '6.1f' for key in ['posintTP', 'poslocTP']}
+coord_formats.update({key: '7.3f' for key in ['poslocXY']})
+coord_formats.update({key: '8.3f' for key in ['QS', 'flatXY', 'obsXY', 'ptlXY']})
+coord_pair2single = {c: (c[:-1], c[:-2] + c[-1]) for c in coord_formats}
+coord_formats.update({s[i]: coord_formats[c] for i in [0,1] for c, s in coord_pair2single.items()})
+single_coords = set(coord_formats) - set(coord_pair2single)
+coord_single2pair = {}
+for pair_key, coord_tuple in coord_pair2single.items():
+    for single_key in coord_tuple:
+        coord_single2pair[single_key] = pair_key
 
 def decipher_posflags(flags, sep=';', verbose=True):
     '''translates posflag to readable reasons, bits taken from petal.py
@@ -339,6 +375,7 @@ def decipher_posflags(flags, sep=';', verbose=True):
 
     return [decipher_flag(flag, sep, verbose) for flag in flags]
 
+
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in
     detail in DESI-0899.
@@ -357,18 +394,26 @@ class collision_case(object):
                       self.IV:  'circular keepout',
                       self.GFA: 'GFA',
                       self.PTL: 'PTL'}
+        self.fixed_case_names = {self.names[c] for c in self.fixed_cases}
 case = collision_case()
 
 # Collision resolution methods
 nonfreeze_adjustment_methods = ['pause',
-                                'extend_A','retract_A',
-                                'extend_B','retract_B',
-                                'rot_ccw_A','rot_cw_A',
-                                'rot_ccw_B','rot_cw_B',
-                                'repel_ccw_A','repel_cw_A',
-                                'repel_ccw_B','repel_cw_B']
+                                'extend_A', 'retract_A',
+                                'extend_B', 'retract_B',
+                                'rot_ccw_A', 'rot_cw_A',
+                                'rot_ccw_B', 'rot_cw_B',
+                                'repel_ccw_A', 'repel_cw_A',
+                                'repel_ccw_B', 'repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
-num_timesteps_clearance_margin = 2 # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
+useless_with_unmoving_neighbor = {'pause'} | {m for m in nonfreeze_adjustment_methods if 'repel' in m}
+useless_with_fixed_boundary = useless_with_unmoving_neighbor | {m for m in nonfreeze_adjustment_methods if 'extend' in m}
+num_timesteps_clearance_margin = 2  # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
+
+# Initial polygon debouncing settings
+num_timesteps_ignore_overlap = 1  # ignore collisions during these first few timesteps (just during debounce stage)
+debounce_polys_distance = 5  # deg, for attempts to slightly step one polygon off another when barely touching
+
 
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
@@ -554,3 +599,115 @@ def is_float(x):
 
 def is_string(x):
     return isinstance(x, (str, np.str))
+
+def is_boolean(x):
+    return x in [True, False, 0, 1] or str(x).lower() in ['true', 'false', '0', '1']
+
+def is_none(x):
+    return x in [None, 'None', 'none', 'NONE']
+
+def is_collection(x):
+    if isinstance(x, (dict, list, tuple, set)):
+        return True
+    if is_integer(x) or is_float(x) or is_string(x) or is_boolean(x):
+        return False
+    return '__len__' in dir(x)
+
+def boolean(x):
+    '''Cast input to boolean.'''
+    if x in [True, False]:
+        return x
+    if x == None or is_integer(x) or is_float(x):
+        return bool(x)
+    if is_string(x):
+        return x.lower() not in {'false', '0', 'none', 'null', 'no', 'n'}
+    if is_collection(x):
+        return len(x) > 0
+    assert False, f'posconstants.boolean(): undefined interpretation for {x}'
+
+# style info for plotting positioners
+plot_styles = {
+    'ferrule':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'phi arm':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'central body':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+        
+    'positioner element unbold':
+        {'linestyle' : '--',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.6',
+         'facecolor' : 'none'},
+
+    'collision':
+        {'linestyle' : '-',
+         'linewidth' : 2,
+         'edgecolor' : 'red',
+         'facecolor' : 'none'},
+
+    'frozen':
+        {'linestyle' : '-',
+         'linewidth' : 2,
+         'edgecolor' : 'blue',
+         'facecolor' : 'none'},                            
+
+    'line t0':
+        {'linestyle' : '-.',
+         'linewidth' : 0.5,
+         'edgecolor' : 'gray',
+         'facecolor' : 'none'},
+        
+    'arm lines':
+        {'linestyle' : '--',
+         'linewidth' : 0.7,
+         'edgecolor' : 'black',
+         'facecolor' : 'none'},        
+
+    'Eo':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+        
+    'Eo bold':
+        {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'Ei':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+
+    'Ee':
+        {'linestyle' : '-',
+         'linewidth' : 0.5,
+         'edgecolor' : '0.9',
+         'facecolor' : 'none'},
+
+    'PTL':
+        {'linestyle' : '--',
+         'linewidth' : 1,
+         'edgecolor' : '0.5',
+         'facecolor' : 'none'},
+
+    'GFA':
+        {'linestyle' : '--',
+         'linewidth' : 1,
+         'edgecolor' : '0.5',
+         'facecolor' : 'none'}
+    }

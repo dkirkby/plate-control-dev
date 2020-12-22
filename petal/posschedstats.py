@@ -88,6 +88,9 @@ class PosSchedStats(object):
                         'schedule_moves calc time':[],
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
+                        'max num table rows':[],
+                        'avg num table rows':[],
+                        'std num table rows':[],
                         }
         self.avoidances = {}
         self._latest_saved_row = None
@@ -117,6 +120,13 @@ class PosSchedStats(object):
     def set_num_move_tables(self, n):
         """Record number of move tables in the current schedule."""
         self.numbers['n move tables'][-1] = n
+        
+    def add_hardware_move_tables(self, tables):
+        """Records stats (not necessarily each whole table) on tables."""
+        lengths = [t['nrows'] for t in tables]
+        self.numbers['max num table rows'][-1] = max(lengths)
+        self.numbers['avg num table rows'][-1] = np.mean(lengths)
+        self.numbers['std num table rows'][-1] = np.std(lengths)
         
     def add_collisions_found(self, collision_pair_ids):
         """Add collisions that have been found in the current schedule.
@@ -180,6 +190,16 @@ class PosSchedStats(object):
         for collision_pairs in this_dict.values():
             count += len(collision_pairs)
         return count
+    
+    @property
+    def unresolved_posids(self):
+        '''Returns set of posids that were recorded as unresolved after final
+        collision check. For the latest schedule_id.
+        '''
+        unresolved = self.unresolved[self.latest]
+        if 'final' in unresolved:
+            return unresolved['final']
+        return {}
         
     def add_request(self):
         """Increment requests count."""

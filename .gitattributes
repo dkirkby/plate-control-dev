@@ -1,11 +1,18 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+pecs/1p_calib.py -text
 pecs/arc_calibration.py -text
+pecs/disambiguate_theta.py -text
+pecs/dummy_rc_calib.py -text
+pecs/expert_set_pos_vals.py -text
 pecs/fptestdata.py -text
+pecs/fvc_measure.py -text
 pecs/fvc_sim.py -text
+pecs/get_calibrations.py -text
 pecs/grid_calibration.py -text
 pecs/make_sequence.py -text
+pecs/move_to_range.py -text
 pecs/onepoint_offsetsTP.py -text
 pecs/onepoint_posintTP.py -text
 pecs/pecs.py -text
@@ -21,6 +28,7 @@ pecs/seed_offsets_xy.py -text
 pecs/sequence.py -text
 pecs/sequence_generator.py -text
 pecs/set_calibrations.py -text
+pecs/simple_logger.py -text
 pecs/update_posTP_from_measXY.py -text
 pecs/xy_targets_generator.py -text
 pecs/xytest.py -text
@@ -53,6 +61,7 @@ petal/posanimator.py -text
 petal/poscollider.pyx -text
 petal/posconstants.py -text
 petal/positioner_locations_0530v14.csv -text
+petal/positioner_locations_0530v18.csv -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
 petal/posschedstats.py -text

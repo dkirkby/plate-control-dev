@@ -11,10 +11,16 @@ script_name = os.path.basename(__file__)
 format_info = 'For data model and procedures to generate these values, see DESI-5732.'
 valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
-              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P'}
-fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
+              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P',
+              'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR',
+                'NUM_POINTS_IN_FIT_STATIC', 'NUM_POINTS_IN_FIT_DYNAMIC',
+                'NUM_OUTLIERS_EXCLUDED_STATIC', 'NUM_OUTLIERS_EXCLUDED_DYNAMIC'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
+boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+float_keys = (valid_keys | fit_err_keys) - boolean_keys
+no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
@@ -31,7 +37,7 @@ def dbkey_for_key(key):
 import argparse
 doc = f'{__doc__} Input CSV file must contain a POS_ID column. Input should'
 doc += f' contain all or any subset of the following parameter columns: {valid_keys}.'
-doc += f' For every parameter column there must be a corresponding boolean column'
+doc +=  ' For every parameter column there must be a corresponding boolean column'
 doc += f' prefixed with "{commit_prefix}", stating in each row whether that value is'
 doc += f' intended to be saved to the online db. {format_info}'
 parser = argparse.ArgumentParser(description=doc)
@@ -44,12 +50,11 @@ from astropy.table import Table
 table = Table.read(args.infile)
 
 # set up a log file
-import logging
-import time
+import simple_logger
 try:
     import posconstants as pc
 except:
-    import sys
+    import os, sys
     path_to_petal = '../petal'
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
@@ -59,45 +64,27 @@ except:
 # to be absolutely sure we have a record
 # can cut back to one, once we are confident of logs getting properly saved at KPNO
 log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
-
 log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
 log_paths = [os.path.join(d, log_name) for d in log_dirs]
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-[logger.removeHandler(h) for h in logger.handlers]
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
-formatter.converter = time.gmtime
-for p in log_paths:
-    fh = logging.FileHandler(filename=p, mode='a', encoding='utf-8')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-sh = logging.StreamHandler()
-sh.setFormatter(formatter)
-logger.addHandler(sh)
+logger = simple_logger.start_logger(log_paths)
 logger.info(f'Running {script_name} to set positioner calibration parameters.')
 logger.info(f'Input file is: {args.infile}')
-for path in log_paths:
-    logger.info(f'Logging to {path}')
 logger.info(f'Table contains {len(table)} rows')
 if args.simulate:
     logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
+assert2 = simple_logger.assert2
+input2 = simple_logger.input2
+
+# deal with astropy's idiotic handling of booleans as strings
+for key in boolean_keys & set(table.columns):
+    table[key] = [pc.boolean(x) for x in table[key]]
     
-def assert2(test, message):
-    '''Like an assert, but cleaner handling of logging.'''
-    if not test:
-        logger.error(message)
-        logger.warning('Now quitting, so user can check inputs.')
-        assert False  # for ease of jumping back into the error state in ipython debugger
-        
-def input2(message):
-    '''Wrapper for input which will log the interaction.'''
-    logger.info(f'PROMPT: {message}')
-    user_input = input('>>> ')
-    logger.info(f'USER ENTERED >>> {user_input}')
-    return user_input
+# deal with astropy's annoying restrictions on integer values
+for key in float_keys & set(table.columns):
+    table[key] = [float(x) for x in table[key]]
 
 # validate the table format
-assert 'POS_ID' in table.columns, 'No POS_ID column found in input table'
+assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
 for key in set(table.columns):  # set op provides a copy
     remapped_key = dbkey_for_key(key)
     if key != remapped_key:
@@ -118,21 +105,10 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_column_str = table[commit_key].astype(str).tolist()
-    commit_column_str_bool = []
-    for val in commit_column_str:
-        if val.lower() in {'true', 't', 'yes', 'y', '1'}:
-            commit_column_str_bool.append(True)
-        elif val.lower() in {'false', 'f', 'no', 'n', '0'}:
-            commit_column_str_bool.append(False)
-        else:
-            commit_column_str_bool.append(None)
-    if all(isinstance(val, bool) for val in commit_column_str_bool):
-        table[commit_key] = commit_column_str_bool
     commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [np.int, np.float]
-    assert2(data_type_ok, f'{key} data type must be numeric')
+    data_type_ok = column.dtype in [np.int, np.float, np.bool]
+    assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):
         rng = range(len(table))
@@ -140,25 +116,26 @@ for key in keys:
         assert2(not(any(cannot_commit)), f'Input table rejected: {key} contains {err_desc} for posid(s) {cannot_commit}')
     isfinite = np.isfinite(column)
     assert_ok(isfinite, 'non-finite value(s)')
-    nom = pc.nominals[key]
-    nom_min = nom['value'] - nom['tol']
-    nom_max = nom['value'] + nom['tol']
-    column[isfinite == False] = np.inf  # dummy value to suppress astropy warnings when performing >= or <= ops below, on values that we don't plan to commit anyway. ok to do here because already checked commit values for finitude above
-    assert_ok(column >= nom_min, f'value(s) below limit {nom_min}')
-    assert_ok(column <= nom_max, f'value(s) above limit {nom_max}')
+    if key not in no_nominal_val:
+        nom = pc.nominals[key]
+        nom_min = nom['value'] - nom['tol']
+        nom_max = nom['value'] + nom['tol']
+        column[isfinite == False] = np.inf  # dummy value to suppress astropy warnings when performing >= or <= ops below, on values that we don't plan to commit anyway. ok to do here because already checked commit values for finitude above
+        assert_ok(column >= nom_min, f'value(s) below limit {nom_min}')
+        assert_ok(column <= nom_max, f'value(s) above limit {nom_max}')
     requested_posids |= set(table['POS_ID'][commit_requested])
 logger.info('Checked data types and bounds')
 
 # set up pecs (access to online system)
 try:
     from pecs import PECS
-    pecs = PECS(interactive=False)
+    pecs = PECS(interactive=False, fvc=False, no_expid=True)
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     posids = set(table['POS_ID'])
     pecs.ptl_setup(pecs.pcids, posids=posids)
     pecs_on = True
-except:
-    logger.warning(f'PECS initialization failed')
+except Exception as e:
+    logger.warning(f'PECS initialization failed: {e}')
     pecs_on = False
 
 # gather some interactive information from the user
@@ -187,32 +164,45 @@ logger.info(f'Storing data to memory (not yet to database) for {len(table)} posi
 any_stored = False
 for row in table:
     posid = row['POS_ID']
-    if not args.simulate:
-        role = pecs.ptl_role_lookup(posid)
+    role = -1 if args.simulate else pecs.ptl_role_lookup(posid)
     stored = {}
     for key in keys:
         if row[commit_keys[key]]:
             value = row[key]
-            if not args.simulate:
-                val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
-            else:
-                val_accepted = True
-            if val_accepted:
-                stored[key] = value
-            else:
-                logger.error(f'set_posfid_val(posid={posid}, key={key}, value={value}')
+            kwargs = {'device_id': posid,
+                      'key': key,
+                      'value': value,
+                      'participating_petals': role
+                      }
+            updates = [kwargs]
+            if key == 'DEVICE_CLASSIFIED_NONFUNCTIONAL':
+                kwargs['comment'] = row['ENABLE_DISABLE_RATIONALE']
+                fiber_intact = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'FIBER_INTACT', participating_petals=role)
+                ctrl_enabled = True if args.simulate else pecs.ptlm.get_posfid_val(posid, 'CTRL_ENABLED', participating_petals=role)
+                new_ctrl_enabled = not(value) & fiber_intact
+                if ctrl_enabled != new_ctrl_enabled:
+                    kwargs2 = kwargs.copy()
+                    kwargs2['key'] = 'CTRL_ENABLED'
+                    kwargs2['value'] = new_ctrl_enabled
+                    kwargs2['comment'] = f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
+                    updates = [kwargs, kwargs2]
+            for kwargs in updates:
+                val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
+                if val_accepted:
+                    stored[kwargs['key']] = kwargs['value']
+                else:
+                    logger.error(f'set_posfid_val({kwargs})')
     if stored:
-        # [JHS] Would be nice to include analysis metadata fields in the log_note, drawn
+        # [JHS] Would be nice to include analysis metadata fields in the note, drawn
         # from the input table. Presumably when that table is in ecsv format.
-        log_note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
+        note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
                                  f'input_file {args.infile}', f'archive_ref {archive_ref}',
                                  f'params {stored}')
         for key in fit_err_keys:
             if key in row.columns:
-                log_note = pc.join_notes(log_note, f'{key.lower()} {row[key]}')
-            
+                note = pc.join_notes(note, f'{key.lower()} {row[key]}')
         if not args.simulate:
-            pecs.ptlm.set_posfid_val(posid, 'LOG_NOTE', log_note)
+            pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note, participating_petals=role)
         logger.info(f'{posid}: {stored}')
         any_stored = True
         
@@ -220,7 +210,7 @@ for row in table:
 if any_stored:
     logger.info('Committing the data set to online database.')
     if not args.simulate:
-        pecs.ptlm.commit(mode='both', log_note='')  # mode 'both' since LOG_NOTE goes in "moves" db. and blank log_note since done positioner-by-positioner above
+        pecs.ptlm.commit(mode='both')
     logger.info('Commit complete.')
 else:
     logger.warning('No data found to commit. Nothing will be changed in the online db.')

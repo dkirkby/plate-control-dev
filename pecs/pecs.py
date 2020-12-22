@@ -39,7 +39,7 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS', device_locs=None):
+                 test_name='PECS', device_locs=None, no_expid=False, posids=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -51,10 +51,13 @@ class PECS:
         self.exptime = 1.
         self.start_time = pc.now()
         self.test_name = test_name
+        self.interactive = interactive
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
+        if self.exposure_dir is None:
+            self.exposure_dir = '/exposures/desi/'
         self.printfunc = printfunc
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
@@ -63,9 +66,13 @@ class PECS:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
                                constants_version=self.constants_version,
                                use_desimeter=self.use_desimeter,
-                               match_to_positioner_centers=self.match_to_positioner_centers)
+                               match_to_positioner_centers=self.match_to_positioner_centers,
+                               use_arcprep=self.use_arcprep)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
+        elif not(fvc): # if FVC is False don't startup FVC stuff
+            self.fvc = fvc
+            self.print('Starting PECS with no FVC proxy.')
         else:
             self.fvc = fvc
             self.print(f"Reusing existing FVC proxy: "
@@ -92,12 +99,17 @@ class PECS:
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
-        if interactive or (self.pcids is None):
-            self.interactive_ptl_setup(device_locs)  # choose which petal to operate
-        elif interactive is False:
+        if self.interactive or (self.pcids is None):
+            self.interactive_ptl_setup(device_locs=device_locs, posids=posids)
+        elif self.interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
+        # Do this after interactive_ptl_setup
+        if self.interactive:
+            self.home_adc() #asks to home, not automatic
+            self.turn_on_fids()
         #Setup exposure ID last incase aborted doing the above
-        self._get_expid()
+        if not(no_expid):
+            self._get_expid()
 
     def exp_setup(self):
         '''
@@ -149,6 +161,9 @@ class PECS:
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PC{pcid:02} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
+        all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
+        self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
+        self.petal_locs = self.all_posinfo[['DEVICE_ID', 'PETAL_LOC']]
         if posids is None:
             posids0, posinfo = self.get_enabled_posids(posids='all', include_posinfo=True)
             if device_locs:
@@ -175,12 +190,12 @@ class PECS:
         self.posinfo = posinfo
         self.ptl_roles = self.ptlm.participating_petals
 
-    def interactive_ptl_setup(self, device_locs=None):
+    def interactive_ptl_setup(self, device_locs=None, posids=None):
         self.print('Running interactive setup for PECS')
         pcids = self._interactively_get_pcid()  # set selected ptlid
-        if device_locs:
-            posids = None
-        else:
+        if posids:
+            device_locs = None  # i.e. posids override device_locs
+        elif device_locs == None:
             posids = self._interactively_get_posids()  # set selected posids
         self.ptl_setup(pcids, posids=posids, device_locs=device_locs)
 
@@ -216,6 +231,7 @@ class PECS:
             posids = None
         else:
             selection = user_text.split()
+            selection = list(set(selection)) # Stop repeated entries.
             kw = 'busids' if 'can' in selection[0] else 'posids'
             kwarg.update({kw: selection})
             enabled_only = False
@@ -253,6 +269,7 @@ class PECS:
                  matched ... set of positioner ids matched to measured centroids
                  unmatched ... set of unmatched positioner ids
         '''
+        assert self.fvc, 'fvc_measure called when FVC not availible in PECS instance!'
         assert num_meas > 0, f'argued num_meas={num_meas}, but must do at least one measurement'
         if match_radius is None :
             match_radius = self.match_radius
@@ -260,26 +277,32 @@ class PECS:
             # participating_petals=None gets responses from all
             # not just selected petals
             exppos = (self.ptlm.get_positions(
-                          return_coord='QS',
+                          return_coord='QS', drop_devid=False,
                           participating_petals=self.illuminated_ptl_roles)
                       .sort_values(by='DEVICE_ID').reset_index(drop=True))
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False)
+        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False,
+                                        participating_petals=self.illuminated_ptl_roles)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
         for i in range(num_meas):
             self.print(f'Calling FVC.measure with exptime = {self.exptime} s, '
                    f'expecting {len(exppos)} backlit positioners. Image {i+1} of {num_meas}.')
-            this_meapos = (pd.DataFrame(self.fvc.measure(
-                              expected_positions=exppos, seqid=seqid,
-                              exptime=self.exptime, match_radius=match_radius,
-                              matched_only=matched_only,
-                              all_fiducials=self.all_fiducials,centers=centers))
-                          .rename(columns={'id': 'DEVICE_ID'})
-                          .set_index('DEVICE_ID').sort_index())
+            positions =self.fvc.measure(expected_positions=exppos, seqid=seqid,
+                                        exptime=self.exptime, match_radius=match_radius,
+                                        matched_only=matched_only,
+                                        all_fiducials=self.all_fiducials,centers=centers)
+            self.print('Finished FVC.measure')
+            
+            # Positions is either a pandas dataframe or else a dictionary (from np.rec_array).
+            # Is may empty when no posiitoners are present. Sometimes I've also seen a list...                
+            assert len(positions) > 0, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            
+            this_meapos = pd.DataFrame(positions).rename(columns=
+                            {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
             if np.any(['P' in device_id for device_id in this_meapos.index]):
                 self.print('Measured positions of positioners by FVC '
                            'are contaminated by fiducials.')
@@ -313,32 +336,42 @@ class PECS:
         fvc_data = pd.concat([meapos,
                     exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
                     axis=1)
-        #Call handle fvc feedback
+        submeas = {}
+        if num_meas > 1:
+            submeas = self.summarize_submeasurements(meapos)
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                       test_tp=test_tp, auto_update=True,
                                       err_thresh=self.max_err, up_tol=self.tp_tol,
-                                      up_frac=self.tp_frac)
-        
+                                      up_frac=self.tp_frac, postscript=submeas)
         return exppos, meapos, matched, unmatched
 
-    def move_measure(self, request, match_radius=None, check_unmatched=False,
+    def move_measure(self, request=None, match_radius=None, check_unmatched=False,
                      test_tp=False, anticollision=None, num_meas=1):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request.
         
-        INPUTS:  request ... pandas dataframe that includes columns:
-                             ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
-                 match_radius ... passed to fvc_measure()
+        INPUTS:  request        ... pandas dataframe that includes columns:
+                                    ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
+                                ... if request == None, the "prepare_move" call is suppressed.
+                                    This is for special cases where move requests have already
+                                    been independently registered and scheduled by direct calls
+                                    to petal(s).
+                                    
+                 match_radius   ... passed to fvc_measure()
+                 
                  check_umatched ... passed to PetalApp.handle_fvc_feedback()
-                 test_tp ... passed to PetalApp.handle_fvc_feedback()
-                 anticollison ... mode like 'default', 'freeze', 'adjust', or None
-                 num_meas ... how many FVC images to take (the results will be median-ed)
-        
+                 
+                 test_tp        ... passed to PetalApp.handle_fvc_feedback()
+                 
+                 anticollison   ... mode like 'default', 'freeze', 'adjust', 'adjust_requested_only' or None
+                 
+                 num_meas       ... how many FVC images to take (the results will be median-ed)
+                         
         OUTPUTS: result ... pandas dataframe that includes columns:
                             ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR',
-                             'mea_Q', 'mea_S', 'COMMAND', 'tgt_posintT',
-                             'tgt_posintP', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
+                             'mea_Q', 'mea_S', 'COMMAND', 'MOVE_VAL1',
+                             'MOVE_VAL2', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
                              'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
                             
                             And also, ['Q0', 'Q1', 'Q2', etc ...]
@@ -351,7 +384,20 @@ class PECS:
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
-        self.ptlm.prepare_move(request, anticollision=anticollision)
+        should_prepare_move = True
+        if request is None:
+            should_prepare_move = False
+            self.print('Skipping "prepare_moves" call, under assumption of independently requested / scheduled moves.')
+            requested_posids = self.ptlm.get_requested_posids(kind='all')
+            all_requested = set()
+            for posids in requested_posids.values():
+                all_requested |= posids
+            dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
+            request = pd.DataFrame(dummy_req)
+        if 'PETAL_LOC' not in request.columns:
+            request = request.merge(self.petal_locs, on='DEVICE_ID')
+        if should_prepare_move:
+            self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
@@ -368,6 +414,10 @@ class PECS:
         '''
         assert axis in {'both', 'phi', 'phi_only', 'theta', 'theta_only'}
         assert debounce in {True, False}
+        if anticollision not in {'freeze', None}:
+            anticollision = 'freeze'
+            self.print(f'Anticollision method {anticollision} is not supported during rehome.' +
+                       f' Reverting to {anticollision}')
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(ids=posids, axis=axis, debounce=debounce,
@@ -404,43 +454,48 @@ class PECS:
         self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         posids = kwargs['ids']
         enabled = self.get_enabled_posids(posids)
-        posids_by_petal = {}
-        for posid in enabled:
-            pcid = self.pcid_lookup(posid)
-            if pcid not in posids_by_petal:
-                posids_by_petal[pcid] = set()
-            posids_by_petal[pcid].add(posid)
-        for pcid, these_posids in posids_by_petal.items():
-            # 2020-07-12 [JHS] this happens sequentially petal by petal, only because
-            # I haven't studied the PetalMan / PECS interfaces sufficiently well to
-            # understand how to call the rehome_pos commands simultanously across
-            # multiple petals. That said, this is probably such a rarely called function
-            # that it's not critical to achieve that parallelism right now.
-            role = self._pcid2role(pcid)
-            move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
-            move_kwargs.update({'ids': these_posids, 'participating_petals': role})
-            funcs[move](**move_kwargs)
+        move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
+        move_kwargs['ids'] = enabled
+        if 'control' not in list(move_kwargs.keys()):
+            move_kwargs['control'] = {'timeout': 90.0}
+        else:
+            move_kwargs['control']['timeout'] = 90.0
+        funcs[move](**move_kwargs)
         
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
         meas_kwargs = {key:kwargs[key] for key in meas_args}
         meas_kwargs.update({'exppos': None, 'matched_only': True})
-        result = self.fvc_measure(**meas_kwargs)
+        # 20200-10-21 [KF] only use the meapos as result, not the whole tuple return
+        _, result, _, _ = self.fvc_measure(**meas_kwargs)
         self.ptlm.clear_exposure_info()
         return result
 
     def home_adc(self):
-        try:
-            adc = SimpleProxy('ADC')
-            if self._parse_yn(input('Home ADC? (y/n): ')):
-                self.print('Homing ADC...')
-                retcode = adc._send_command('home', controllers=[1, 2])
-                self.print(f'ADC.home returned code: {retcode}')
-        except Exception as e:
-            print(f'Exception homing ADC, {e}')
+        if self.adc_available:
+            try:
+                adc = SimpleProxy('ADC')
+                if self._parse_yn(input('Home ADC? (y/n): ')):
+                    self.print('Homing ADC...')
+                    retcode = adc._send_command('home', controllers=[1, 2])
+                    self.print(f'ADC.home returned code: {retcode}')
+            except Exception as e:
+                print(f'Exception homing ADC, {e}')
+        else:
+            return
+
+    def turn_on_fids(self):
+        if self._parse_yn(input('Turn on fiducials (y/n): ')):
+            responses = self.ptlm.set_fiducials(setting='on',
+                            participating_petals=list(self.ptlm.Petals.keys()))
+            # Set fiducials for all availible petals
+        else:
+            responses = self.ptlm.get_fiducials()
+        self.print(f'Petals report fiducials in the following states: {responses}')
+
 
     def fvc_collect(self):
         destination = os.path.join(
-            '/exposures/desi', pc.dir_date_str(t=self.start_time),
+            self.exposure_dir, pc.dir_date_str(t=self.start_time),
             f'{self.exp.id:08}')
         # os.makedirs(destination, exist_ok=True)  # no permission anyway
         try:
@@ -449,13 +504,13 @@ class PECS:
             self.print(f'FVCCollector.configure returned code: {retcode}')
             retcode = fvccoll._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
-                logbook=False)
+                logbook=False, remove_after_transfer=self.fvc_cleanup)
             self.print(f'FVCCollector.collect returned code: {retcode}')
             if retcode == 'SUCCESS':
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')
             expserv = SimpleProxy('EXPOSURESERVER')
-            retcode = expserv._send_command('distribute', source=destination)
+            retcode = expserv._send_command('distribute', source=destination, expid=self.exp.id)
             self.print(f'ExposureServer.distribute returned code: {retcode}')
             if retcode == 'SUCCESS':
                 self.print(f'symlink created for: {destination}')
@@ -519,7 +574,7 @@ class PECS:
             return posids, posinfo
         return posids
     
-    def summarize_submeasurements(self, meapos, posids='sub'):
+    def summarize_submeasurements(self, meapos):
         '''Collects submeasurements (like from fvc_measure with num_meas > 1)
         by positioner ID into suitable strings for logging purposes.
         
@@ -533,10 +588,7 @@ class PECS:
         In cases where only the 0-th terms are found (i.e. we had num_meas==1)
         the strings in the return dict will be empty, ''.
         '''
-        included_posids = set(meapos.index)
-        enabled_posids = self.get_enabled_posids(posids=posids, include_posinfo=False)
-        missing_posids = set(enabled_posids) - set(included_posids)
-        assert len(missing_posids) == 0, f'{missing_posids} are missing from meapos data'
+        posids = set(meapos.index)
         num_meas = 0
         crazy_number_of_iterations = 100
         for i in range(crazy_number_of_iterations):
@@ -546,9 +598,9 @@ class PECS:
                 break
         assert num_meas != 0, 'meapos is missing columns "Q0" and/or "S0"'
         if num_meas == 1:
-            return {posid: '' for posid in enabled_posids}
+            return {posid: '' for posid in posids}
         out = {}
-        for posid in enabled_posids:
+        for posid in posids:
             data = meapos.loc[posid]
             this_dict = {'Q':[], 'S':[], 'obsX':[], 'obsY':[]}
             for key in this_dict:
@@ -562,9 +614,39 @@ class PECS:
             out[posid] = s
         return out
     
+    def quick_query(self, key=None, op='', value='', posids='all', mode='iterable'):
+        '''Returns a collection containing values for all petals of a quick_query()
+        call. See documentation for petal.quick_query() for details.
+        '''
+        # This type of call to PetalMan (in the next line) returns *either* dict with keys = like
+        # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR just the return
+        # data from that one petal. It's not perfectly clear when this does or doesn't happen, but
+        # from discussion with Kevin and some trials at the CONSOLE this ought to be ok here.
+        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode, skip_unknowns=True)
+        if isinstance(data_by_petal, (str, list, tuple)):
+            return data_by_petal
+        check_val = data_by_petal[list(data_by_petal.keys())[0]]
+        if isinstance(check_val, dict):
+            combined = {}
+            for data in data_by_petal.values():
+                combined.update(data)
+        elif isinstance(check_val, set):
+            combined = set()
+            for data in data_by_petal.values():
+                combined |= data
+        elif isinstance(check_val, list):
+            combined = []
+            for data in data_by_petal.values():
+                combined += data
+        elif isinstance(check_val, str):
+            combined = '\n'.join(data_by_petal.values())
+        else:
+            assert False, f'unrecognized return type {type(check_val)} from quick_query()'
+        return combined
+    
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
         '''Returns results of fvc measurement after checking for target matches
-        and doing ome pandas juggling, very specifc to the other data interchange
+        and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
         
         request ... pandas dataframe with index column DEVICE_ID and request data
@@ -572,20 +654,21 @@ class PECS:
         matched ... set of posids
         '''
         # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
+        posids_to_match = set(request['DEVICE_ID']) | set(self.posids)
+        matched_df = meapos.loc[sorted(matched & posids_to_match)]
         merged = matched_df.merge(request, on='DEVICE_ID')
         if not(merged.index.name == 'DEVICE_ID'):
             merged = merged.set_index('DEVICE_ID')
         
         # columns get renamed
-        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
+        merged.rename(columns={'X1': 'MOVE_VAL1', 'X2': 'MOVE_VAL2',
                                'Q': 'mea_Q', 'S': 'mea_S', 'FLAG': 'FLAGS'},
                       inplace=True)
         mask = merged['FLAGS'].notnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
         # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+        exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
                                           participating_petals=self.ptl_roles)
                   .set_index('DEVICE_ID')[['X1', 'X2']])
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
@@ -598,30 +681,17 @@ class PECS:
         a new frame that now includes new columns (or replaces existing columns)
         for coordinate system 2. E.g. you could start with only 'Q' and 'S' in
         frame, and then 'obsX' and 'obsY' will be added.
+
+        DOES NOT change frame
         '''
-        # I know, I know... the implementation is hacky madness... But it's very
-        # hard to predict how these pandas frames behave going in and out of opaque
-        # interfaces through PetalMan to PetalApp and back. Meanwhile I need to move
-        # on with other work. I so much wish we could have just had normal python
-        # dicts and lists getting passed around.
-        u_col = []
-        v_col = []
-        def breakup(cs):
-            if cs == 'QS':
-                return 'Q', 'S'
-            if cs == 'obsXY':
-                return 'obsX', 'obsY'
-        u1, v1 = breakup(cs1)
-        u2, v2 = breakup(cs2)
-        for posid in frame.index:
-            vals1 = [frame.loc[posid][u1], frame.loc[posid][v1]]
-            vals2 = self.ptlm.ptltrans(f'{cs1}_to_{cs2}', vals1, cast=True)
-            if isinstance(vals2, dict):
-                vals2 = list(vals2.values())[0]
-            vals2 = vals2.flatten()
-            u_col += [vals2[0]]
-            v_col += [vals2[1]]
-        new = frame.copy()
-        new[u2] = u_col
-        new[v2] = v_col
-        return new
+        if not(frame.index.name == 'DEVICE_ID'):
+            df = frame.set_index('DEVICE_ID')
+            reset_index = True
+        else:
+            df = frame.copy()
+            reset_index = False
+        ret = self.ptlm.batch_transform(df, cs1, cs2)
+        df = pd.concat([x for x in ret.values()])
+        if reset_index:
+            df.reset_index(inplace=True)
+        return df
