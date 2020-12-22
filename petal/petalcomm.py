@@ -5,7 +5,8 @@ import Pyro4
 import sys
 from DOSlib.advertise import Seeker
 
-# interface / error handling cases for sending and executing move tables by petalcontroller
+# Interface / error handling cases for the return data from petalcontroller,
+# when sending and executing move tables.
 send_fail_return_format = {'cleared': dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
                            'no_response': dict,  # failed pos, which didn't respond on CAN bus. collection may overlap with cleared or unknown
                            'unknown': dict,  # failed pos, which might or might not currently have tables loaded
@@ -25,6 +26,7 @@ send_and_exec_cases = {
     }
 valid_power_supplies = {'PS1', 'PS2'}
 valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
+
 
 class PetalComm(object):
     """
