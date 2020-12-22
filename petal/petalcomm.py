@@ -5,8 +5,20 @@ import Pyro4
 import sys
 from DOSlib.advertise import Seeker
 
-# Interface / error handling cases for the return data from petalcontroller,
-# when sending and executing move tables.
+# Interface / error handling cases are encoded below, for the return data from
+# petalcontroller when sending and executing move tables. There is an order in
+# which the failure checks are applied:
+#   1. Required power supplies are on?
+#   2. Required canbuses are enabled?
+#   3. We are below the moves per hour limit?
+#   4. We are above the power supply reset rate limit?
+#   5. We are below the temperature acceptance limit?
+#   6. Tables wre sent and confirmed...
+#       a) ...for all required tables?
+#       b) ...for all tables?
+# So for example a return value 'FAILED: power off' (e.g. #1 above) does not
+# necessarily mean that one of the later error cases in the list would not also
+# apply, had we gotten to that check.
 send_fail_return_format = {'cleared': dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
                            'no_response': dict,  # failed pos, which didn't respond on CAN bus. collection may overlap with cleared or unknown
                            'unknown': dict,  # failed pos, which might or might not currently have tables loaded
