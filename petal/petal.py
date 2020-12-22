@@ -683,7 +683,7 @@ class Petal(object):
         failed_posids, n_retries = self.send_and_execute_moves()
         return failed_posids, n_retries
 
-    def send_and_execute_moves(self, n_retries=1, previous_failed=None):
+    def send_and_execute_moves(self, n_retries=1):
         """Send move tables that have been scheduled out to the positioners.
         When all tables are loaded on positioners, immediately commence the
         movements.
@@ -697,12 +697,12 @@ class Petal(object):
         INPUTS:
             n_retries ... for internal usage when handling error cases, where move
                           tables need to be rescheduled and resent
-                          
+                                                    
         OUTPUTS:
             tuple[0] ... set containing any posids for which sending the table failed
             tuple[1] ... number of retries remaining
         """
-        self.printfunc(f'send_move_tables called (n_retries={n_retries})')
+        self.printfunc(f'send_and_execute_moves called (n_retries={n_retries})')
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('send_move_tables: no tables to send')
@@ -728,7 +728,7 @@ class Petal(object):
                 self.printfunc('Simulator skips sending move tables to positioners.')
         else:
             self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
-            response = self.comm.send_tables(hw_tables)
+            response = self.comm.send_and_execute_tables(hw_tables)
         failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
         if n_retries == 0 or not failed_posids:
             frozen = self.schedule.get_frozen_posids()
@@ -740,18 +740,8 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-
         if self.save_debug:
-            # debugging code, will save the move table dictionaries
-            # as they are when sent to petalcontroller
-            debug_table = AstropyTable(hw_tables)
-            for key in ['motor_steps_P', 'motor_steps_T', 'move_time', 'postpause', 'speed_mode_P', 'speed_mode_T']:
-                debug_table[key] = [str(x) for x in debug_table[key]]
-            debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
-            exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-            filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}.csv'
-            debug_path = os.path.join(pc.dirs['temp_files'], filename)
-            debug_table.write(debug_path, overwrite=True)        
+            self._write_hw_tables_to_disk(hw_tables, failed_posids)
         self.printfunc('execute_moves called')
         if self.simulator_on:
             if self.verbose:
@@ -2114,6 +2104,22 @@ class Petal(object):
         if self.schedule_stats.is_enabled():
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
+    
+    def _write_hw_tables_to_disk(self, hw_tables, failed_posids=None):
+        '''Saves a list of hardware-ready move table dictionaries to disk. These are
+        the format used when sent to the petalcontroller. May be useful for debugging.
+        Optional inclusion of collection of posids to identify as failed_to_send in
+        the output table.
+        '''
+        debug_table = AstropyTable(hw_tables)
+        for key in ['motor_steps_P', 'motor_steps_T', 'move_time', 'postpause', 'speed_mode_P', 'speed_mode_T']:
+            debug_table[key] = [str(x) for x in debug_table[key]]
+        failed_posids = set() if not failed_posids else failed_posids
+        debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
+        exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
+        filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}.csv'
+        debug_path = os.path.join(pc.dirs['temp_files'], filename)
+        debug_table.write(debug_path, overwrite=True)  
 
     def _postmove_cleanup(self):
         """This always gets called after performing a set of moves, so that
