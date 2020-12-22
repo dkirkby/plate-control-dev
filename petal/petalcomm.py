@@ -4,7 +4,6 @@ import time
 import Pyro4
 import sys
 from DOSlib.advertise import Seeker
-import posconstants as pc
 
 # interface / error handling cases for sending and executing move tables by petalcontroller
 send_fail_return_format = {'cleared': dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
@@ -200,7 +199,7 @@ class PetalComm(object):
         """
         try:
             output = self._call_device('send_and_execute_tables', move_tables_ex=move_tables)
-            pc.validate_send_and_exec(output)
+            self.validate_send_and_exec(output)
             return output
         except Exception as e:
             msg = 'FAILED: Could not send_and_execute move tables, in an undefined way.'
