@@ -156,6 +156,15 @@ class SendExecCases(object):
                 seq += [case]
         return seq
     
+    def sim_send_and_execute_tables(self, move_tables, case='SUCCESS'):
+        '''For simulation. Replicates inputs/outputs of petalcomm function.
+        Additional input argument 'case' should be one of the keys in this
+        module's defs param.
+        '''
+        output = case, self.simdata(case, move_tables)
+        sendex.validate(output)
+        return output
+    
 # so you only have to initialize this once, in order to use the guts
 sendex = SendExecCases()
 
@@ -169,8 +178,8 @@ if __name__ == '__main__':
     cases = sendex.sim_cases_sequence()
     simdata = []
     for case in cases:
-        simdata += [sendex.simdata(case, dummy_tables)]
-        sendex.validate((case, simdata[-1]))
+        output = sendex.sim_send_and_execute_tables(dummy_tables, case=case)
+        simdata += [output[1]]
     print(f'{len(cases)} cases self-validated')
     for i in range(len(cases)):
         print(f'\n{cases[i]}\n{"-"*len(cases[i])}\n{simdata[i]}')

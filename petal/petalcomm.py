@@ -157,7 +157,7 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_and_execute_tables(self, move_tables, simulate=False):
+    def send_and_execute_tables(self, move_tables):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
@@ -167,9 +167,6 @@ class PetalComm(object):
 
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
-            simulate ... False --> send tables to hardware
-                     ... True --> return SUCCESS case
-                     ... string in send_and_exec_cases keys --> simulate that error 
             
         OUTPUT:
             tuple[0] ... string
@@ -180,11 +177,6 @@ class PetalComm(object):
         validated here, so higher level code does not need to double-check whether
         they conform to the interface given in posconstants.
         """
-        if simulate:
-            errstr = sendex.SUCCESS if simulate == True else simulate
-            output = errstr, sendex.simdata(errstr, move_tables)
-            sendex.validate(output)
-            return output
         try:
             output = self._call_device('send_and_execute_tables', move_tables_ex=move_tables)
             sendex.validate(output)
