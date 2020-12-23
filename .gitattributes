@@ -57,6 +57,7 @@ petal/posschedulestage.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/replay.py -text
+petal/sendcases.py -text
 petal/setup.py -text
 petal/xy2tp.py -text
 posfidfvc/PFS_ID_Map.csv -text
