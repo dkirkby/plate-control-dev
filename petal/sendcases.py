@@ -22,10 +22,14 @@ class SendExecCases(object):
     apply, had petalcontroller gotten to that check.
     """
     def __init__(self):
+        self.CLEARED = 'cleared'
+        self.NORESPONSE = 'no_response'
+        self.UNKNOWN = 'unknown'
+        
         self.send_fail_format = {
-            'cleared': dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
-            'no_response': dict,  # failed pos, which didn't respond on CAN bus. collection may overlap with cleared or unknown
-            'unknown': dict,  # failed pos, which might or might not currently have tables loaded
+            self.CLEARED: dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
+            self.NORESPONSE: dict,  # failed pos, which didn't respond on CAN bus. collection may overlap with cleared or unknown
+            self.UNKNOWN: dict,  # failed pos, which might or might not currently have tables loaded
             }  # subdicts have keys = busid strings like 'can11' etc and values = canid ints
         
         self.rate_fail_format = {
@@ -41,7 +45,7 @@ class SendExecCases(object):
         self.FAIL_MOVERATE = 'FAILED: move rate limit'
         self.FAIL_RESETRATE = 'FAILED: power supply reset rate limit'
         self.FAIL_TEMPLIMIT = 'FAILED: temperature limit'
-        
+                
         self.defs = {
             self.SUCCESS:        None,  # all requested move tables sent and executed ok
             self.PARTIAL_SEND:   self.send_fail_format,  # any returned pos are in the failed-but-not-required category
@@ -124,7 +128,7 @@ class SendExecCases(object):
         self.sim_subcases_last[case] = i
         subcase = self.sim_subcases_cycle[i]
         out = {k: {} for k in self.defs[case]}
-        if subcase == 'cleared':
+        if subcase == self.CLEARED:
             out[subcase] = {busid: [k for k, v in ids.items() if v == busid] for busid in busids}
             return out
         if case == self.PARTIAL_SEND:
@@ -140,9 +144,9 @@ class SendExecCases(object):
                     out[subcase][busid] = []
                 out[subcase][busid].append(i)
             else:
-                if busid not in out['cleared']:
-                    out['cleared'][busid] = []
-                out['cleared'][busid].append(i)
+                if busid not in out[self.CLEARED]:
+                    out[self.CLEARED][busid] = []
+                out[self.CLEARED][busid].append(i)
         return out
     
     def sim_cases_sequence(self):
