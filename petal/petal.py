@@ -734,15 +734,25 @@ class Petal(object):
                 if no_response:
                     self.printfunc(f'Petalcontroller reports NO RESPONSE from {len(no_response)} positioners.')
                     # do the disabling, and that function should printout log msgs / do log notes, etc
+                if errstr == sendex.PARTIAL_SEND:
+                    # continue operations
+                    pass
+                elif n_retries >= 1:
+                    # reschedule and try again
+                else:
+                    # fail_handler()
+                    
             else:
-                # ? neighbors too?
-                neighbors = set()
-                for posid in unknowns:
-                    neighbors |= self.collider.pos_neighbors[posid]
-                self.printfunc(f'Petalcontroller reports UNKNOWN whether {len(unknowns)} positioners executed ' + \
-                               f'their move tables or not. These and their neighbors will be disabled.' + \
-                               f'\nunknown: {sorted(unknowns)}\nneighbors: {neighbors}')
-                # do the disabling, and that function should printout log msgs / do log notes, etc
+                # fail_handler(), which might include ...
+                # ---------------------------------------
+                # # ? neighbors too?
+                # neighbors = set()
+                # for posid in unknowns:
+                #     neighbors |= self.collider.pos_neighbors[posid]
+                # self.printfunc(f'Petalcontroller reports UNKNOWN whether {len(unknowns)} positioners executed ' + \
+                #                f'their move tables or not. These and their neighbors will be disabled.' + \
+                #                f'\nunknown: {sorted(unknowns)}\nneighbors: {neighbors}')
+                # # do the disabling, and that function should printout log msgs / do log notes, etc
 
         failed_posids = self._handle_sendexec_response(errstr, errdata, n)
         if n_retries == 0 or not failed_posids:
