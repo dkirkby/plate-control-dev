@@ -12,6 +12,7 @@ except:
 import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
+from sendcases import sendex
 import time
 import os
 import random
@@ -702,44 +703,37 @@ class Petal(object):
             tuple[0] ... set containing any posids for which sending the table failed
             tuple[1] ... number of retries remaining
         """
-        self.printfunc(f'send_and_execute_moves called (n_retries={n_retries})')
-        hw_tables = self._hardware_ready_move_tables()
-        if not hw_tables:
-            self.printfunc('send_move_tables: no tables to send')
-            return set(), n_retries
-        for tbl in hw_tables:
-            self._posids_where_tables_were_just_sent.add(tbl['posid'])
-        if self.simulator_on:
-            sim_fail = random.random() <= self.sim_fail_freq['send_tables']
-            if sim_fail:
-                commanded_posids = [table['posid'] for table in hw_tables]
-                num_fail = random.randint(1, len(commanded_posids)) if commanded_posids else 0
-                sim_fail_posids = set(random.choices(commanded_posids, k=num_fail))
-                sim_fail_buscans = {}
-                for posid in sim_fail_posids:
-                    busid = self.busids[posid]
-                    if busid not in sim_fail_buscans:
-                        sim_fail_buscans[busid] = []
-                    sim_fail_buscans[busid].append(self.canids[posid])
-                response = 'FAILED', sim_fail_buscans
+        for retry in range(n_retries):
+            self.printfunc(f'send_and_execute_moves called, try {retry + 1} (max tries = {n_retries})')
+            hw_tables = self._hardware_ready_move_tables()
+            if not hw_tables:
+                self.printfunc('send_move_tables: no tables to send')
+                return set(), n_retries
+            for tbl in hw_tables:
+                self._posids_where_tables_were_just_sent.add(tbl['posid'])
+            if self.simulator_on:
+                if self.verbose:
+                    self.printfunc(f'Simulator skips sending {len(hw_tables)} move tables to positioners.')
+                sim_fail = random.random() <= self.sim_fail_freq['send_tables']
+                if sim_fail:
+                    case = sendex.next_sim_case()
+                else:
+                    case = sendex.SUCCESS
+                errstr, errdata = sendex.sim_send_and_execute_tables(hw_tables, case=case)
             else:
-                response = 'SUCCESS'
-            if self.verbose:
-                self.printfunc('Simulator skips sending move tables to positioners.')
-        else:
-            self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
-            response = self.comm.send_and_execute_tables(hw_tables)
-        failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
-        if n_retries == 0 or not failed_posids:
-            frozen = self.schedule.get_frozen_posids()
-            for posid in frozen:
-                self.pos_flags[posid] |= self.flags.get('FROZEN', self.missing_flag) # Mark as frozen by anticollision
-            if any(frozen):
-                self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
-            times = {tbl['total_time'] for tbl in hw_tables}
-            self.printfunc(f'max move table time = {max(times):.4f} sec')
-            self.printfunc(f'min move table time = {min(times):.4f} sec')
-            self.printfunc('send_move_tables: Done')
+                self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
+                errstr, errdata = self.comm.send_and_execute_tables(hw_tables)
+            failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
+            if n_retries == 0 or not failed_posids:
+                frozen = self.schedule.get_frozen_posids()
+                for posid in frozen:
+                    self.pos_flags[posid] |= self.flags.get('FROZEN', self.missing_flag) # Mark as frozen by anticollision
+                if any(frozen):
+                    self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
+                times = {tbl['total_time'] for tbl in hw_tables}
+                self.printfunc(f'max move table time = {max(times):.4f} sec')
+                self.printfunc(f'min move table time = {min(times):.4f} sec')
+                self.printfunc('send_move_tables: Done')
         if self.save_debug:
             self._write_hw_tables_to_disk(hw_tables, failed_posids)
         self.printfunc('execute_moves called')
