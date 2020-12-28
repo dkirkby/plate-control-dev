@@ -1,7 +1,7 @@
 import posconstants as pc
 import random, math
 
-class SendExecCases(object):
+class SendExecCases():
     """Enumeration of return cases for sending and executing move tables. All
     defined cases are encoded / documented here.
     
@@ -70,7 +70,7 @@ class SendExecCases(object):
         Throws an assertion if invalid, otherwise silent.
         '''
         def assert2(test):
-            f'petalcontroller return data not understood:\n{pc_response}'
+            assert test, f'petalcontroller return data not understood:\n{pc_response}'
         assert2(len(pc_response) == 2)
         assert2(isinstance(pc_response, (tuple, list)))
         errstr = pc_response[0]
