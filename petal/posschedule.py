@@ -295,7 +295,6 @@ class PosSchedule(object):
                 colliding_sweeps, collision_pairs = c, p # for readability
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
-        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
@@ -305,9 +304,11 @@ class PosSchedule(object):
         if self.petal.animator_on:
             anim_tables = {posid: table.copy() for posid, table in self.move_tables.items()}
         else:
-            anim_tables = {}
+            anim_tables = {}            
         for table in self.move_tables.values():
             table.strip()
+            is_required = not(self._hw_failure_to_execute_is_low_risk(table))
+            table.set_required(is_required)
         self._schedule_moves_store_requests_info()
         self._schedule_moves_finish_logging(anim_tables)
 
@@ -951,6 +952,21 @@ class PosSchedule(object):
                 diff_abs[i] -= 360
         if diff_abs[0] > tol or diff_abs[1] > tol:
             return False
+        return True
+    
+    def _hw_failure_to_execute_is_low_risk(self, table):
+        '''Boolean, based on several heuristics. It is a yes/no assessment. It says
+        in the case of a hardware failure, presumably where the petalcontroller failed
+        to send the move table out to the positioner over the canbus, whether there is
+        a significant risk of adverse effects (for example crashing into neighbors).
+        '''
+        if table.posmodel.classified_as_retracted:
+            return True
+        angles = table.angles()
+        for axis in ['T', 'P']:
+            max_excursion = max(abs(x) for x in angles[f'net_d{axis}'])
+            if max_excursion > pc.low_risk_motion_deg[f'd{axis}']:
+                return False
         return True
     
     def _denied_str(self, target_str, msg_str):
