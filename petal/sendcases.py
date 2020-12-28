@@ -199,5 +199,5 @@ if __name__ == '__main__':
         output = sendex.sim_send_and_execute_tables(dummy_tables, case=cases[-1])
         simdata += [output[1]]
     print(f'{len(cases)} cases self-validated')
-    for i in range(len(cases)):
-        print(f'\n{cases[i]}\n{"-"*len(cases[i])}\n{simdata[i]}')
+    for i, case in enumerate(cases):
+        print(f'\n{case}\n{"-"*len(case)}\n{simdata[i]}')
