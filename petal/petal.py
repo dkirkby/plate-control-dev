@@ -708,7 +708,7 @@ class Petal(object):
         for tbl in hw_tables:
             self._posids_where_tables_were_just_sent.add(tbl['posid'])
         self.printfunc(f'{msg_prefix} {len(hw_tables)} move table(s) to send')
-        self.printfunc(f'{msg_prefix} {n_retries} retr{"y" if n_retries == 1 else "ies"} remaining (if comm failure occurs during this attempt)')
+        self.printfunc(f'{msg_prefix} {n_retries} retr{"y" if n_retries == 1 else "ies"} remaining (if comm failure should occur during this attempt)')
             
         # send to hardware (or simulator)
         if self.simulator_on:
@@ -726,7 +726,6 @@ class Petal(object):
         
         # handle results
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
-        fail_no_retry = False
         if errstr in {sendex.PARTIAL_SEND, sendex.FAIL_SEND}:
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
@@ -734,8 +733,9 @@ class Petal(object):
                 if posids:
                     response_msg += f': {posids}'
                 self.printfunc(response_msg)
-            all_fails = set().union(*combined.values())
-            successes = set(self._posids_where_tables_were_just_sent) - all_fails
+            failed_posids = set().union(*combined.values())
+            find_successes = lambda fails: set(self._posids_where_tables_were_just_sent) - fails
+            successes = find_successes(failed_posids)
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
                 posids = combined[key]
                 err_mode = key if key == sendex.NORESPONSE else f'"{sendex.UNKNOWN}" response'
@@ -746,8 +746,7 @@ class Petal(object):
                 if any(successes):
                     self.printfunc(f'{msg_prefix} petalcontroller should now be executing *some* move{s}, since "required" table{s} reported as sent')
                 else:
-                    fail_no_retry = True
-                    fail_suffix = f'Unexpected {sendex.PARTIAL_SEND} response from petalcontroller, despite it also reporting that no tables were sent.'
+                    fail_suffix = f'Unexpected response "{sendex.PARTIAL_SEND}" from petalcontroller, despite it also reporting that no tables were sent.'
             else:
                 required = {t['posid'] for t in hw_tables if t['required']}
                 unknown_but_required = required & combined[sendex.UNKNOWN]
@@ -756,15 +755,15 @@ class Petal(object):
                     neighbors |= self.collider.pos_neighbors[posid]
                 self._handle_nonresponsive_positioners(neighbors, error_mode=f'neighbor of "required" pos with "{sendex.UNKNOWN}" response', set_flag=False)
                 if n_retries >= 1:
-                    self._reschedule(combined[sendex.CLEARED])
+                    retry_posids = combined[sendex.CLEARED]
+                    self._reschedule(retry_posids)
                     if any(self.schedule.move_tables):
                         failed_retry_posids = self.send_and_execute_moves(n_retries - 1)
-                        all_fails |= failed_retry_posids
+                        failed_posids = (failed_posids - retry_posids) | failed_retry_posids
+                        successes = find_successes(failed_posids)
                     else:
-                        fail_no_retry = True
                         fail_suffix = 'No positioners remain with any moves for retry.'
                 else:
-                    fail_no_retry = True
                     fail_suffix = 'No more retries remaining.'
                     if unknown_but_required:
                         s = '' if len(unknown_but_required) == 1 else 's'
@@ -773,27 +772,13 @@ class Petal(object):
                                        ' or loss of tracking upon the next SYNC signal. The only guaranteed fix is to cycle POSFID power. This' + \
                                        ' should be done by a Focal Plane expert.'
         elif errstr != sendex.SUCCESS:
-            fail_no_retry = True
-            
+            successes = set()
             if errstr == self.FAIL_TEMPLIMIT:
                 posids_temps = {self.canids_to_posids[canid]: value for canid, value in errdata}
                 fail_suffix += f'{posids_temps}'
             else:
-                fail_suffix += f'{errdata}'
-                
-        # 2020-11-30 [JHS] This code block (or something roughly like it) could be used (need to add method to turn on
-        # that boolean in the if statement) to let failures still proceed in limited cases.
-        # if n_retries == 0 and self.limit_angle >= self.collider.Eo_phi and self.accept_comm_failures_if_restricted_patrol:
-        #     msg = f'WARNING: Despite failures of CAN communication, with n_retries remaining == {n_retries}, ' + \
-        #           'this move will simply be allowed to proceed, because collision risk has been mitigated by ' + \
-        #           f'restricted target patrol zones (phi limit angle = {self.limit_angle}). Failures of spotmatching ' + \
-        #           'may result, if this incurs significant loss of tracking accuracy.'
-        #     act like with PARTIAL_SEND...
-        
-        if fail_no_retry:
-            # 2020-12-28 [JHS] We could change what we're returning here, to give higher level scripts more
-            # appropriate responses. For now, this more-or-less does what PetalApp historically expects.
-            failed_posids = all_fails
+                fail_suffix += f'{errdata}'        
+        if not any(successes):
             s = '' if len(failed_posids) == 1 else 's'
             fail_msg = f'{msg_prefix} Could not send move{s} to {len(failed_posids)} positioner{s}. {fail_suffix}'
             self.printfunc(fail_msg)
@@ -816,6 +801,12 @@ class Petal(object):
                 self._wait_while_moving()
         self._remove_posid_from_sent_tables('all')
         self.printfunc(f'{msg_prefix} Done')
+        
+        # 2020-12-28 [JHS] We could potentially change / add contextual information to what we're returning in this case,
+        # so that higher level scripts can take appropriate automated responses. For example, directly return the sendex
+        # case and data---if there was say a small temperature limit problem, or move rate limit exceeded, the higher level
+        # script could automatically pause. That could be the next step in user friendliness. Anyway, for now, simply
+        # returning a set of failed posids is what PetalApp currently expects.
         return failed_posids
     
     def send_move_tables(self):
