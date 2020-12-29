@@ -695,9 +695,8 @@ class Petal(object):
             n_retries ... number of retries when handling error cases, where move
                           tables may need to be rescheduled and resent
                                                     
-        OUTPUTS:
-            tuple[0] ... set containing any posids for which sending the table failed
-            tuple[1] ... number of retries remaining
+        OUTPUT:
+            set containing any posids for which sending the table failed
         """
         msg_prefix = 'send_and_execute_moves:'
         self.printfunc(f'{msg_prefix} {n_retries} tries remaining')
@@ -706,7 +705,7 @@ class Petal(object):
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc(f'{msg_prefix} no tables to send')
-            return set(), n_retries
+            return set()
         for tbl in hw_tables:
             self._posids_where_tables_were_just_sent.add(tbl['posid'])
             
