@@ -726,6 +726,8 @@ class Petal(object):
         
         # handle results
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
+        if errstr == sendex.SUCCESS:
+            successes = set(self._posids_where_tables_were_just_sent)
         if errstr in {sendex.PARTIAL_SEND, sendex.FAIL_SEND}:
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
@@ -734,7 +736,7 @@ class Petal(object):
                     response_msg += f': {posids}'
                 self.printfunc(response_msg)
             failed_posids = set().union(*combined.values())
-            find_successes = lambda fails: set(self._posids_where_tables_were_just_sent) - fails
+            find_successes = lambda fails: set(self._posids_where_tables_were_just_sent) - set(fails)
             successes = find_successes(failed_posids)
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
                 posids = combined[key]
@@ -761,8 +763,10 @@ class Petal(object):
                         failed_retry_posids = self.send_and_execute_moves(n_retries - 1)
                         failed_posids = (failed_posids - retry_posids) | failed_retry_posids
                         successes = find_successes(failed_posids)
+                        if not any(successes):
+                            return failed_posids  # because the recursive send_and_execute_moves() call just above already did all the stateful clean up work below
                     else:
-                        fail_suffix = 'No positioners remain with any moves for retry.'
+                        fail_suffix = 'No positioners remain with any move table to retry sending.'
                 else:
                     fail_suffix = 'No more retries remaining.'
                     if unknown_but_required:
