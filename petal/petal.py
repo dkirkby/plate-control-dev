@@ -677,8 +677,8 @@ class Petal(object):
         moves, all in one shot.
         """
         self.schedule_moves(anticollision, should_anneal)
-        failed_posids, n_retries = self.send_and_execute_moves()
-        return failed_posids, n_retries
+        failed_posids = self.send_and_execute_moves()
+        return failed_posids
 
     def send_and_execute_moves(self, n_retries=1):
         """Send move tables that have been scheduled out to the positioners.
@@ -699,7 +699,6 @@ class Petal(object):
             set containing any posids for which sending the table failed
         """
         msg_prefix = 'send_and_execute_moves:'
-        self.printfunc(f'{msg_prefix} {n_retries} tries remaining')
         
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
@@ -708,6 +707,8 @@ class Petal(object):
             return set()
         for tbl in hw_tables:
             self._posids_where_tables_were_just_sent.add(tbl['posid'])
+        self.printfunc(f'{msg_prefix} {len(hw_tables)} move table(s) to send')
+        self.printfunc(f'{msg_prefix} {n_retries} retr{"y" if n_retries == 1 else "ies"} remaining (if comm failure occurs during this attempt)')
             
         # send to hardware (or simulator)
         if self.simulator_on:
@@ -725,11 +726,14 @@ class Petal(object):
         
         # handle results
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
-        fail_should_halt = False
+        fail_no_retry = False
         if errstr in {sendex.PARTIAL_SEND, sendex.FAIL_SEND}:
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
-                self.printfunc(f'{msg_prefix} petalcontroller labeled {len(posids)} positioners as "{key}":\n{posids}')
+                response_msg = f'{msg_prefix} petalcontroller labeled {len(posids)} positioner{"" if len(posids) == 1 else "s"} as "{key}"'
+                if posids:
+                    response_msg += f': {posids}'
+                self.printfunc(response_msg)
             all_fails = set().union(*combined.values())
             successes = set(self._posids_where_tables_were_just_sent) - all_fails
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
@@ -737,8 +741,13 @@ class Petal(object):
                 err_mode = key if key == sendex.NORESPONSE else f'"{sendex.UNKNOWN}" response'
                 self._handle_nonresponsive_positioners(posids, error_mode=err_mode)                
             if errstr == sendex.PARTIAL_SEND:
-                self.printfunc(f'{msg_prefix} {len(successes)} tables were successfully sent to positioners')
-                self.printfunc(f'{msg_prefix} petalcontroller should now be executing *some* moves, since all "required" tables were reported as sent')
+                s = '' if len(successes) == 1 else 's'
+                self.printfunc(f'{msg_prefix} {len(successes)} table{s} sent to positioner{s}')
+                if any(successes):
+                    self.printfunc(f'{msg_prefix} petalcontroller should now be executing *some* move{s}, since "required" table{s} reported as sent')
+                else:
+                    fail_no_retry = True
+                    fail_suffix = f'Unexpected {sendex.PARTIAL_SEND} response from petalcontroller, despite it also reporting that no tables were sent.'
             else:
                 required = {t['posid'] for t in hw_tables if t['required']}
                 unknown_but_required = required & combined[sendex.UNKNOWN]
@@ -748,23 +757,29 @@ class Petal(object):
                 self._handle_nonresponsive_positioners(neighbors, error_mode=f'neighbor of "required" pos with "{sendex.UNKNOWN}" response', set_flag=False)
                 if n_retries >= 1:
                     self._reschedule(combined[sendex.CLEARED])
-                    self.send_and_execute_moves(n_retries - 1)
+                    if any(self.schedule.move_tables):
+                        failed_retry_posids = self.send_and_execute_moves(n_retries - 1)
+                        all_fails |= failed_retry_posids
+                    else:
+                        fail_no_retry = True
+                        fail_suffix = 'No positioners remain with any moves for retry.'
                 else:
-                    fail_should_halt = True
-                    fail_msg = f'{msg_prefix} Could not send moves to {len(all_fails)} positioners. No more retries remaining.'
+                    fail_no_retry = True
+                    fail_suffix = 'No more retries remaining.'
                     if unknown_but_required:
-                        fail_msg += f' {len(unknown_but_required)} positioners had "{sendex.UNKNOWN}" response when sending move tables,' + \
-                                    ' but were marked as "required". These move tables may be lingering in positioner memory, and cause' + \
-                                    ' collisions or loss of tracking upon the next SYNC signal. The only guaranteed fix is to cycle POSFID' + \
-                                    ' power supplies. This should be done by a Focal Plane expert.'
+                        s = '' if len(unknown_but_required) == 1 else 's'
+                        fail_suffix += f' {len(unknown_but_required)} positioner{s} had "{sendex.UNKNOWN}" response when sending move table{s},' + \
+                                       f' but marked as "required". Move table{s} may be lingering in positioner memory, and cause collision{s}' + \
+                                       ' or loss of tracking upon the next SYNC signal. The only guaranteed fix is to cycle POSFID power. This' + \
+                                       ' should be done by a Focal Plane expert.'
         elif errstr != sendex.SUCCESS:
-            fail_should_halt = True
-            fail_msg = f'{msg_prefix} Cannot send moves. '
+            fail_no_retry = True
+            
             if errstr == self.FAIL_TEMPLIMIT:
                 posids_temps = {self.canids_to_posids[canid]: value for canid, value in errdata}
-                fail_msg += f' {posids_temps}'
+                fail_suffix += f'{posids_temps}'
             else:
-                fail_msg += f' {errdata}'
+                fail_suffix += f'{errdata}'
                 
         # 2020-11-30 [JHS] This code block (or something roughly like it) could be used (need to add method to turn on
         # that boolean in the if statement) to let failures still proceed in limited cases.
@@ -775,10 +790,13 @@ class Petal(object):
         #           'may result, if this incurs significant loss of tracking accuracy.'
         #     act like with PARTIAL_SEND...
         
-        if fail_should_halt:
+        if fail_no_retry:
             # 2020-12-28 [JHS] We could change what we're returning here, to give higher level scripts more
             # appropriate responses. For now, this more-or-less does what PetalApp historically expects.
             failed_posids = all_fails
+            s = '' if len(failed_posids) == 1 else 's'
+            fail_msg = f'{msg_prefix} Could not send move{s} to {len(failed_posids)} positioner{s}. {fail_suffix}'
+            self.printfunc(fail_msg)
             self._cancel_move(reset_flags=False)
             self._postmove_cleanup()
         else:
@@ -2147,7 +2165,7 @@ class Petal(object):
             if err:
                 self.printfunc(err)
                 m.display(self.printfunc)
-        if self.schedule_stats.is_enabled():
+        if self.schedule_stats.is_enabled() and any(hw_tables):
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
     
@@ -2229,7 +2247,7 @@ class Petal(object):
             posids = {p for p in posids if p in all_requests}
             requests_to_retry = {posid: all_requests[posid] for posid in posids}
         self._cancel_move(reset_flags='all')
-        self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids)} positioners')
+        self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids)} positioner(s)')
         if expert_mode:
             for move_table in expert_tables_to_retry:
                 error = self.schedule.expert_add_table(move_table)
