@@ -448,6 +448,18 @@ def linspace(start,stop,num):
     List has num elements."""
     return [i*(stop-start)/(num-1)+start for i in range(num)]
 
+def plural(string, test_item):
+    '''Returns string appropriately pluralized according to length of test_item.
+    Alternately if test_item is an integer, uses that number. If string ends in
+    "y", replaces with "ies" to pluralize. Otherwise simply appends and "s".
+    '''
+    length = test_item if is_integer(test_item) else len(test_item)
+    if length == 1:
+        return string
+    if string[-1] == 'y':
+        return string[:-1] + 'ies'
+    return string + 's'
+
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):
     """Turn [u,v] into [[u],[v]], if it isn't already.
