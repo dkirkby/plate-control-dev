@@ -73,6 +73,18 @@ class PosSchedule(object):
     def expert_requests_accepted(self):
         return set(self.stages['expert'].move_tables.keys())
     
+    @property
+    def requested_posids(self):
+        return self._all_requested_posids['regular'] | self._all_requested_posids['expert']
+    
+    @property
+    def accepted_posids(self):
+        return self.regular_requests_accepted | self.expert_requests_accepted
+    
+    @property
+    def rejected_posids(self):
+        return self.requested_posids - self.accepted_posids
+    
     def has_regular_request_already(self, posid):
         if posid in self._requests and not self._requests[posid]['is_dummy']:
             return True
@@ -354,11 +366,11 @@ class PosSchedule(object):
         """
         return self.stages['expert'].is_not_empty()
     
-    def get_requests(self, include_dummies=False):
-        """Returns a dict containing copies of all the current requests. Keys
-        are posids. Any dummy requests (auto-generated during anticollision
-        scheduling) by default are excluded. But can be included with the
-        include_dummies boolean.
+    def get_regular_requests(self, include_dummies=False):
+        """Returns a dict containing copies of all the current "regular" (non-expert)
+        requests. Keys are posids. Any dummy requests (auto-generated during anticollision
+        scheduling) by default are excluded. But can be included with the include_dummies
+        boolean.
         """
         requests = {}
         for posid, request in self._requests.items():
@@ -512,7 +524,7 @@ class PosSchedule(object):
         keys = posid and values = any adjusted starting POS_T, POS_P (so that later
         stages know where this debounce move puts the robots.)
         '''
-        user_requests = self.get_requests(include_dummies=False)
+        user_requests = self.get_regular_requests(include_dummies=False)
         requested_posids = user_requests.keys()
         overlaps_dict = self.get_overlaps(requested_posids)
         if len(overlaps_dict) == 0:
@@ -960,6 +972,14 @@ class PosSchedule(object):
         to send the move table out to the positioner over the canbus, whether there is
         a significant risk of adverse effects (for example crashing into neighbors).
         '''
+        # 2020-11-30 [JHS] This code block (or something roughly like it) could be used (need to add method to turn on
+        # that boolean in the if statement) to let failures still proceed in limited cases.
+        # if n_retries == 0 and self.limit_angle >= self.collider.Eo_phi and self.accept_comm_failures_if_restricted_patrol:
+        #     msg = f'WARNING: Despite failures of CAN communication, with n_retries remaining == {n_retries}, ' + \
+        #           'this move will simply be allowed to proceed, because collision risk has been mitigated by ' + \
+        #           f'restricted target patrol zones (phi limit angle = {self.limit_angle}). Failures of spotmatching ' + \
+        #           'may result, if this incurs significant loss of tracking accuracy.'
+        #     act like with PARTIAL_SEND...
         if table.posmodel.classified_as_retracted:
             return True
         angles = table.angles()
