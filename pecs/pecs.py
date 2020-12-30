@@ -388,7 +388,7 @@ class PECS:
         if request is None:
             should_prepare_move = False
             self.print('Skipping "prepare_moves" call, under assumption of independently requested / scheduled moves.')
-            requested_posids = self.ptlm.get_requested_posids(kind='all')
+            requested_posids = self.ptlm.get_posids_with_accepted_requests(kind='all')
             all_requested = set()
             for posids in requested_posids.values():
                 all_requested |= posids
