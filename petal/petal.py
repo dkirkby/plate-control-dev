@@ -716,7 +716,7 @@ class Petal(object):
             
         # send to hardware (or simulator)
         if self.simulator_on:
-            self.printfunc(f'{msg_prefix} simulator skips sending {len(hw_tables)} move table{s} to hardware')
+            self.printfunc(f'{msg_prefix} simulator skips sending {len(hw_tables)} move {pc.plural("table", hw_tables)} to hardware')
             sim_fail = random.random() <= self.sim_fail_freq['send_tables']
             if sim_fail:
                 case = sendex.next_sim_case()
@@ -742,83 +742,55 @@ class Petal(object):
             failures = set().union(*combined.values())
         else:
             failures = posids_to_try
+            errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata} if errstr == self.FAIL_TEMPLIMIT else errdata
+            self.printfunc(f'{msg_prefix} "{errstr}" data: {errdata2}')
+            self._cancel_move(reset_flags='all')
         successes = posids_to_try - failures
+        for result, posids in {'SUCCESS': successes, 'FAILURE': failures}.items():
+            if any(posids):
+                self.printfunc(f'{msg_prefix} petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
         self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
+        
+        # disable bad communicators
+        if self.auto_disabling_on:
+            for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
+                self._batch_disable(combined[key], comment='auto-disabled due to communication error "{key}"', commit=True)
+            required = {t['posid'] for t in hw_tables if t['required']}
+            unknown_but_required = required & combined[sendex.UNKNOWN]
+            for posid in unknown_but_required:
+                self._disable_neighbors(posid, comment='auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
         # retry if applicable
         retry_posids = combined[sendex.CLEARED]
-        if errstr == sendex.FAIL_SEND and n_retries >= 1 and any(retry_posids):
-            self._reschedule(retry_posids)
-            return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids)
-        
-        self._clear_schedule()
-        
-        # 
-        
-            for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
-                posids = combined[key]
-                err_mode = key if key == sendex.NORESPONSE else f'"{sendex.UNKNOWN}" response'
-                self._handle_nonresponsive_positioners(posids, error_mode=err_mode)                
-            if errstr == sendex.PARTIAL_SEND:
-                s = pc.plural('table', successes)
-                self.printfunc(f'{msg_prefix} {len(successes)} {s} sent to positioner{s}')
-                if any(successes):
-                    self.printfunc(f'{msg_prefix} petalcontroller should now be executing *some* move{s}, since "required" table{s} reported as sent')
-                else:
-                    fail_suffix = f'Unexpected response "{sendex.PARTIAL_SEND}" from petalcontroller, despite it also reporting that no tables were sent.'
+        if errstr == sendex.FAIL_SEND and any(retry_posids):
+            if n_retries >= 1:
+                self._reschedule(retry_posids)
+                return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids)
             else:
-                required = {t['posid'] for t in hw_tables if t['required']}
-                unknown_but_required = required & combined[sendex.UNKNOWN]
-                neighbors = set()
-                for posid in unknown_but_required:
-                    neighbors |= self.collider.pos_neighbors[posid]
-                self._handle_nonresponsive_positioners(neighbors, error_mode=f'neighbor of "required" pos with "{sendex.UNKNOWN}" response', set_flag=False)
-                if n_retries >= 1:
-                    
-                else:
-                    fail_suffix = 'No more retries remaining.'
-                    if unknown_but_required:
-                        s = pc.plural('', unknown_but_required)
-                        fail_suffix += f' {len(unknown_but_required)} positioner{s} had "{sendex.UNKNOWN}" response when sending move table{s},' + \
-                                       f' but marked as "required". Move table{s} may be lingering in positioner memory, and cause collision{s}' + \
-                                       ' or loss of tracking upon the next SYNC signal. The only guaranteed fix is to cycle POSFID power. This' + \
-                                       ' should be done by a Focal Plane expert.'
-        else:
-            successes = set()
-            if errstr == self.FAIL_TEMPLIMIT:
-                posids_temps = {self.canids_to_posids[canid]: value for canid, value in errdata}
-                fail_suffix += f'{posids_temps}'
-            else:
-                fail_suffix += f'{errdata}'        
-        if not any(successes):
-            s = pc.plural('positioner', failed_posids)
-            fail_msg = f'{msg_prefix} Could not send move{s} to {len(failed_posids)} {s}. {fail_suffix}'
-            self.printfunc(fail_msg)
-            self._cancel_move(reset_flags=False)
-            self._postmove_cleanup()
-        else:
-            failed_posids = set()
-            frozen = self.schedule.get_frozen_posids()
+                self.printfunc('No more retries remaining.')        
+        
+        # other logging / reporting
+        if errstr == sendex.PARTIAL_SEND and not any(successes):
+            self.printfunc(f'Unexpected response "{sendex.PARTIAL_SEND}" from petalcontroller, despite it also reporting that no tables were sent.')    
+        if any(successes):
+            frozen = self.schedule.get_frozen_posids() & successes
             for posid in frozen:
                 self.set_posfid_flag(posid, 'FROZEN')
             if any(frozen):
                 self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
-            times = {tbl['total_time'] for tbl in hw_tables}
+            sent_tables = [t for t in hw_tables if t['posid'] in successes]
+            times = {tbl['total_time'] for tbl in sent_tables}
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
-            if self.save_debug:
-                self._write_hw_tables_to_disk(hw_tables, failed_posids)
-            self._postmove_cleanup()
-            if not self.simulator_on:
-                self._wait_while_moving()
+        if self.save_debug:
+            self._write_hw_tables_to_disk(hw_tables, failures)
+            
+        # final cleanup
+        if not self.simulator_on:
+            self._wait_while_moving()
+        self._clear_schedule()
         self.printfunc(f'{msg_prefix} Done')
-        
-        # 2020-12-28 [JHS] We could potentially change / add contextual information to what we're returning in this case,
-        # so that higher level scripts can take appropriate automated responses. For example, directly return the sendex
-        # case and data---if there was say a small temperature limit problem, or move rate limit exceeded, the higher level
-        # script could automatically pause. That could be the next step in user friendliness. Anyway, for now, simply
-        # returning a set of failed posids is what PetalApp currently expects.
-        return failed_posids
+        return failures
     
     def send_move_tables(self):
         assert False, 'BUG!! This call to send_move_tables is deprecated! Use send_and_execute_moves() instead.'
@@ -2217,6 +2189,7 @@ class Petal(object):
         
         INPUTS:  send_succeeded ... set of posids for which tables were successfully sent
                  send_failed ... set of posids for which tables failed to send
+                 disable ... set of posids that should be disabled
                  
         Positioners with rejected requests are *different* from send_failed, and
         will be automatically found within this function.
@@ -2233,8 +2206,6 @@ class Petal(object):
         for posid in send_succeeded:
             table = self.schedule.move_tables[posid].for_cleanup()
             self.posmodels[posid].postmove_cleanup(table)
-        if self.auto_disabling_on:
-            disabled = self._batch_disable(send_failed, comment='auto-disabled due to communication error')
         for posid in send_failed:
             self.set_posfid_flag(posid, 'COMERROR')
         for posid in self.schedule.rejected_posids:
@@ -2242,7 +2213,7 @@ class Petal(object):
         self.commit(mode='both')
         self._clear_log_move_cmds(posids='all')
         
-    def _disable_neighbors(self, posids, comment=''):
+    def _disable_neighbors(self, posids, comment='', commit=True):
         '''Disable any neighbors of the argued posids. Returns set of posids
         that were disabled.
         '''
@@ -2250,7 +2221,7 @@ class Petal(object):
         neighbors = set()
         for posid in posids:
             neighbors |= self.collider.pos_neighbors[posid]
-        disabled = self._batch_disable(neighbors, comment='')
+        disabled = self._batch_disable(neighbors, comment=comment, commit=commit)
         for posid in disabled:
             self.set_posfid_flag(posid, 'BADNEIGHBOR')
         if any(disabled):
@@ -2259,7 +2230,7 @@ class Petal(object):
             self.printfunc(f'WARNING: Disabled {len(disabled)} {s1} of {len(posids)} {s2}')
         return disabled
                 
-    def _batch_disable(self, posids, comment=''):
+    def _batch_disable(self, posids, comment='', commit=True):
         '''Disable positioners. Returns set of posids that were disabled.
         '''
         posids = self._validate_posids_arg(posids, skip_unknowns=True)
@@ -2272,6 +2243,8 @@ class Petal(object):
         if any(disabled):
             s = pc.plural('posids', disabled)
             self.printfunc(f'WARNING: Disabled {len(disabled)} {s} with comment "{comment}": {sorted(disabled)}')
+        if commit:
+            self.commit(mode='move')
         return disabled
         
     def _clear_schedule(self):
