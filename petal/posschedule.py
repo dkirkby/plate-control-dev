@@ -986,8 +986,8 @@ class PosSchedule(object):
             angles = table.angles()
             min_phi[posid] = min(tp[1] for tp in angles['poslocTP'])
             max_excursion[posid] = {max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
-        safe = {max_excursion[posid]['T'] < pc.low_risk_motion_deg['dT'] and
-                max_excursion[posid]['P'] < pc.low_risk_motion_deg['dP'] for posid in all_posids}
+        safe = {max_excursion[posid]['T'] < pc.low_risk_rotation and
+                max_excursion[posid]['P'] < pc.low_risk_rotation for posid in all_posids}
         unknown = all_posids - safe
         min_safe_phi = self.collider.Eo_phi
         retracted = {posid for posid in unknown if min_phi[posid] > min_safe_phi}

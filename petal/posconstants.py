@@ -146,9 +146,8 @@ near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop c
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 theta_hardstop_ambig_tol = 5.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
-low_risk_motion_mm = 0.1 # motions smaller than this threshold have low risk if hardware fails to execute them as scheduled
-low_risk_motion_rad = {'dT': low_risk_motion_mm / 6.0, 'dP': low_risk_motion_mm / 3.0} # deg, angular versions
-low_risk_motion_deg = {key: val*deg_per_rad for key, val in low_risk_motion_rad.items()}
+keepout_typ_angular_padding = 3.5 # deg, per DESI-0899-v14
+low_risk_rotation = keepout_typ_angular_padding - 0.1 # deg, delta theta or phi smaller than this threshold have low risk if hardware should fail to execute them as scheduled
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
