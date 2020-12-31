@@ -319,8 +319,11 @@ class PosSchedule(object):
             anim_tables = {}            
         for table in self.move_tables.values():
             table.strip()
-            is_required = not(self._hw_failure_to_execute_is_low_risk(table))
-            table.set_required(is_required)
+        safe, risky = self._check_risk_if_hw_failure()
+        for posid in safe:
+            self.move_tables[posid].set_required(False)
+        for posid in risky:
+            self.move_tables[posid].set_required(True)
         self._schedule_moves_store_requests_info()
         self._schedule_moves_finish_logging(anim_tables)
 
@@ -966,28 +969,34 @@ class PosSchedule(object):
             return False
         return True
     
-    def _hw_failure_to_execute_is_low_risk(self, table):
-        '''Boolean, based on several heuristics. It is a yes/no assessment. It says
-        in the case of a hardware failure, presumably where the petalcontroller failed
-        to send the move table out to the positioner over the canbus, whether there is
-        a significant risk of adverse effects (for example crashing into neighbors).
+    def _check_risk_if_hw_failure(self):
+        '''Scans through self.move_tables, making a boolean assessment for each positioner.
+        In the case of a hardware failure (presumably where the petalcontroller failed
+        to send the move table out to the positioner over the canbus) this boolean says
+        whether there is a significant risk of adverse effects (for example crashing
+        into neighbors).
+        
+        OUTPUT:  tuple[0] ... set of posids that are safe if fail to move
+                 tuple[1] ... set of posids that are risky if fail to move
         '''
-        # 2020-11-30 [JHS] This code block (or something roughly like it) could be used (need to add method to turn on
-        # that boolean in the if statement) to let failures still proceed in limited cases.
-        # if n_retries == 0 and self.limit_angle >= self.collider.Eo_phi and self.accept_comm_failures_if_restricted_patrol:
-        #     msg = f'WARNING: Despite failures of CAN communication, with n_retries remaining == {n_retries}, ' + \
-        #           'this move will simply be allowed to proceed, because collision risk has been mitigated by ' + \
-        #           f'restricted target patrol zones (phi limit angle = {self.limit_angle}). Failures of spotmatching ' + \
-        #           'may result, if this incurs significant loss of tracking accuracy.'
-        #     act like with PARTIAL_SEND...
-        if table.posmodel.classified_as_retracted:
-            return True
-        angles = table.angles()
-        for axis in ['T', 'P']:
-            max_excursion = max(abs(x) for x in angles[f'net_d{axis}'])
-            if max_excursion > pc.low_risk_motion_deg[f'd{axis}']:
-                return False
-        return True
+        all_posids = set(self.move_tables)
+        min_phi = {}
+        max_excursion = {posid:{} for posid in all_posids}
+        for posid, table in self.move_tables:
+            angles = table.angles()
+            min_phi[posid] = min(tp[1] for tp in angles['poslocTP'])
+            max_excursion[posid] = {max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
+        safe = {max_excursion[posid]['T'] < pc.low_risk_motion_deg['dT'] and
+                max_excursion[posid]['P'] < pc.low_risk_motion_deg['dP'] for posid in all_posids}
+        unknown = all_posids - safe
+        min_safe_phi = self.collider.Eo_phi
+        retracted = {posid for posid in unknown if min_phi[posid] > min_safe_phi}
+        for posid in retracted:
+            neighbors_min_phi = min(min_phi[n] for n in self.collider.pos_neighbors[posid])
+            if neighbors_min_phi > min_safe_phi:
+                safe.add(posid)
+        risky = all_posids - safe
+        return safe, risky
     
     def _denied_str(self, target_str, msg_str):
         return f'Target request denied: {target_str}. {msg_str}'
