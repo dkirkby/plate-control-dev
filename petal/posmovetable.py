@@ -551,12 +551,13 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['log_note'] = self.log_note
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-        if output_type in {'full'}:
+        if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
             posintP = [self.init_posintTP[pc.P] + table['net_dP'][i] for i in row_range]
             table['posintTP'] = [[posintT[i], posintP[i]] for i in row_range]
             table['poslocTP'] = [trans.posintTP_to_poslocTP(tp) for tp in table['posintTP']]
+        if output_type in {'full'}:
             table['poslocXY'] = [trans.posintTP_to_poslocXY(tp) for tp in table['posintTP']]
             table['QS'] = [trans.poslocXY_to_QS(xy) for xy in table['poslocXY']]
         return table
