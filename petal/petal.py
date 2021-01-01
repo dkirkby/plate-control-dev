@@ -744,7 +744,7 @@ class Petal(object):
             failures = set().union(*combined.values())
         else:
             failures = posids_to_try
-            errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata} if errstr == sendex.FAIL_TEMPLIMIT else errdata
+            errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata.items()} if errstr == sendex.FAIL_TEMPLIMIT else errdata
             self.printfunc(f'{msg_prefix} "{errstr}" data: {errdata2}')
             self._cancel_move(reset_flags='all')
             should_cleanup_pos_data = False  # cancel move already takes care of all cleanup
