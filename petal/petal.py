@@ -730,6 +730,7 @@ class Petal(object):
         # process petalcontroller's success/fail data
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
         comm_fail_cases = {sendex.PARTIAL_SEND, sendex.FAIL_SEND}
+        should_cleanup_pos_data = True
         if errstr == sendex.SUCCESS:
             failures = set()
         elif errstr in comm_fail_cases:
@@ -746,11 +747,13 @@ class Petal(object):
             errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata} if errstr == sendex.FAIL_TEMPLIMIT else errdata
             self.printfunc(f'{msg_prefix} "{errstr}" data: {errdata2}')
             self._cancel_move(reset_flags='all')
+            should_cleanup_pos_data = False  # cancel move already takes care of all cleanup
         successes = posids_to_try - failures
         for result, posids in {'SUCCESS': successes, 'FAILURE': failures}.items():
             if any(posids):
                 self.printfunc(f'{msg_prefix} petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
-        self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
+        if should_cleanup_pos_data:
+            self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
         
         # disable robots with bad comm 
         if self.auto_disabling_on and errstr in comm_fail_cases:
