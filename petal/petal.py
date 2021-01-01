@@ -729,9 +729,10 @@ class Petal(object):
         
         # process petalcontroller's success/fail data
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
+        comm_fail_cases = {sendex.PARTIAL_SEND, sendex.FAIL_SEND}
         if errstr == sendex.SUCCESS:
             failures = set()
-        elif errstr in {sendex.PARTIAL_SEND, sendex.FAIL_SEND}:
+        elif errstr in comm_fail_cases:
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
                 s = pc.plural('positioner', posids)
@@ -751,8 +752,8 @@ class Petal(object):
                 self.printfunc(f'{msg_prefix} petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
         self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
         
-        # disable bad communicators
-        if self.auto_disabling_on:
+        # disable robots with bad comm 
+        if self.auto_disabling_on and errstr in comm_fail_cases:
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
                 self._batch_disable(combined[key], comment='auto-disabled due to communication error "{key}"', commit=True)
             required = {t['posid'] for t in hw_tables if t['required']}
@@ -761,13 +762,14 @@ class Petal(object):
                 self._disable_neighbors(posid, comment='auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
         # retry if applicable
-        retry_posids = combined[sendex.CLEARED]
-        if errstr == sendex.FAIL_SEND and any(retry_posids):
-            if n_retries >= 1:
-                self._reschedule(retry_posids)
-                return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids)
-            else:
-                self.printfunc('No more retries remaining.')        
+        if errstr == sendex.FAIL_SEND:
+            retry_posids = combined[sendex.CLEARED]
+            if any(retry_posids):
+                if n_retries >= 1:
+                    self._reschedule(retry_posids)
+                    return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids)
+                else:
+                    self.printfunc('No more retries remaining.')        
         
         # other logging / reporting
         if errstr == sendex.PARTIAL_SEND and not any(successes):
@@ -2195,7 +2197,7 @@ class Petal(object):
         will be automatically found within this function.
         """
         conflict = send_succeeded & send_failed
-        assert not any(conflict), f'success/fail sets have overlapping posids: {arg_conflict}'
+        assert not any(conflict), f'success/fail sets have overlapping posids: {conflict}'
         mismatch = (send_succeeded | send_failed) ^ self.schedule.accepted_posids
         assert not any(mismatch), f'args/schedule mismatch, missing posids: {mismatch}'
         if self.schedule_stats.is_enabled():
@@ -2217,6 +2219,8 @@ class Petal(object):
         '''Disable any neighbors of the argued posids. Returns set of posids
         that were disabled.
         '''
+        if not posids:
+            return set()
         posids = self._validate_posids_arg(posids, skip_unknowns=True)
         neighbors = set()
         for posid in posids:
@@ -2233,6 +2237,8 @@ class Petal(object):
     def _batch_disable(self, posids, comment='', commit=True):
         '''Disable positioners. Returns set of posids that were disabled.
         '''
+        if not posids:
+            return set()
         posids = self._validate_posids_arg(posids, skip_unknowns=True)
         disabled = set()
         for posid in posids:
@@ -2307,7 +2313,7 @@ class Petal(object):
         should_anneal = self.__current_schedule_moves_should_anneal
         self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
         rescheduled_str = 'rescheduled'
-        for table in self.schedule.move_tables:
+        for table in self.schedule.move_tables.values():
             if rescheduled_str not in table.log_note:
                 table.append_log_note(rescheduled_str)
         
