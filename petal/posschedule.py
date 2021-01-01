@@ -67,7 +67,7 @@ class PosSchedule(object):
     
     @property
     def regular_requests_accepted(self):
-        return {self.has_regular_request_already(posid) for posid in self._requests}
+        return {posid for posid in self._requests if self.has_regular_request_already(posid)}
     
     @property
     def expert_requests_accepted(self):
@@ -982,12 +982,13 @@ class PosSchedule(object):
         all_posids = set(self.move_tables)
         min_phi = {}
         max_excursion = {posid:{} for posid in all_posids}
-        for posid, table in self.move_tables:
+        for posid, table in self.move_tables.items():
             angles = table.angles()
             min_phi[posid] = min(tp[1] for tp in angles['poslocTP'])
-            max_excursion[posid] = {max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
-        safe = {max_excursion[posid]['T'] < pc.low_risk_rotation and
-                max_excursion[posid]['P'] < pc.low_risk_rotation for posid in all_posids}
+            max_excursion[posid] = {axis: max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
+        safe = {p for p in all_posids if
+                max_excursion[posid]['T'] < pc.low_risk_rotation and
+                max_excursion[posid]['P'] < pc.low_risk_rotation}
         unknown = all_posids - safe
         min_safe_phi = self.collider.Eo_phi
         retracted = {posid for posid in unknown if min_phi[posid] > min_safe_phi}
