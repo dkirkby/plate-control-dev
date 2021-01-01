@@ -743,7 +743,7 @@ class Petal(object):
             failures = set().union(*combined.values())
         else:
             failures = posids_to_try
-            errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata} if errstr == self.FAIL_TEMPLIMIT else errdata
+            errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata} if errstr == sendex.FAIL_TEMPLIMIT else errdata
             self.printfunc(f'{msg_prefix} "{errstr}" data: {errdata2}')
             self._cancel_move(reset_flags='all')
         successes = posids_to_try - failures
@@ -755,11 +755,11 @@ class Petal(object):
         # disable robots with bad comm 
         if self.auto_disabling_on and errstr in comm_fail_cases:
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
-                self._batch_disable(combined[key], comment='auto-disabled due to communication error "{key}"', commit=True)
+                self._batch_disable(combined[key], comment=f'auto-disabled due to communication error "{key}"', commit=True)
             required = {t['posid'] for t in hw_tables if t['required']}
             unknown_but_required = required & combined[sendex.UNKNOWN]
             for posid in unknown_but_required:
-                self._disable_neighbors(posid, comment='auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
+                self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
         # retry if applicable
         if errstr == sendex.FAIL_SEND:
@@ -2198,7 +2198,7 @@ class Petal(object):
         """
         conflict = send_succeeded & send_failed
         assert not any(conflict), f'success/fail sets have overlapping posids: {conflict}'
-        mismatch = (send_succeeded | send_failed) ^ self.schedule.accepted_posids
+        mismatch = (send_succeeded | send_failed) ^ self.schedule.scheduled_posids
         assert not any(mismatch), f'args/schedule mismatch, missing posids: {mismatch}'
         if self.schedule_stats.is_enabled():
             for posid in self.posids:
@@ -2247,7 +2247,7 @@ class Petal(object):
                 disabled.add(posid)
                 self.set_posfid_flag(posid, 'NOTCTLENABLED')
         if any(disabled):
-            s = pc.plural('posids', disabled)
+            s = pc.plural('posid', disabled)
             self.printfunc(f'WARNING: Disabled {len(disabled)} {s} with comment "{comment}": {sorted(disabled)}')
         if commit:
             self.commit(mode='move')
