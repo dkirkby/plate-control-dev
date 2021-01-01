@@ -27,7 +27,7 @@ subset7b = {21, 22, 26, 27, 28, 33, 34}
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = subset7b # note pre-cooked options above
+device_loc_to_command = 'all' # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
 retract_and_disable = set() #{87,88} # enter device locations to simulate those positioners as retracted and disabled

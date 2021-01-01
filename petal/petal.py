@@ -2436,7 +2436,7 @@ class Petal(object):
         if update:
             self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment=comment)
             for flag in flags:
-                self.set_posfid_flag(posid, flag)
+                self.set_posfid_flag(devid, flag)
 
     def _apply_all_state_enable_settings(self):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
