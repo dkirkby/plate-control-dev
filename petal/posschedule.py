@@ -85,6 +85,10 @@ class PosSchedule(object):
     def rejected_posids(self):
         return self.requested_posids - self.accepted_posids
     
+    @property
+    def scheduled_posids(self):
+        return set(self.move_tables)
+    
     def has_regular_request_already(self, posid):
         if posid in self._requests and not self._requests[posid]['is_dummy']:
             return True
