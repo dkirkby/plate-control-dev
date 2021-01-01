@@ -986,7 +986,9 @@ class PosSchedule(object):
             angles = table.angles()
             min_phi[posid] = min(tp[1] for tp in angles['poslocTP'])
             max_excursion[posid] = {axis: max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
-        safe = {p for p in all_posids if
+        for posid in self.petal.posids - set(min_phi):
+            min_phi[posid] = self.petal.posmodels[posid].expected_current_poslocTP[1]  # non-moving bots --> use current phi location
+        safe = {posid for posid in all_posids if
                 max_excursion[posid]['T'] < pc.low_risk_rotation and
                 max_excursion[posid]['P'] < pc.low_risk_rotation}
         unknown = all_posids - safe
