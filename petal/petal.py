@@ -80,6 +80,7 @@ class Petal(object):
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
         phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        auto_disabling_on ... boolean, for experts only, controls whether to disable positioners if they fail to communicate over CAN
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -91,7 +92,7 @@ class Petal(object):
                  printfunc=print, verbose=False, save_debug=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True):
+                 phi_limit_on=True, auto_disabling_on=True):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -137,7 +138,7 @@ class Petal(object):
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
-        self.auto_disabling_on = True
+        self.auto_disabling_on = auto_disabling_on
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0} 

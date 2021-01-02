@@ -159,7 +159,9 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       sched_stats_on  = True, # minor speed-up if turn off
                       anticollision   = 'adjust',
                       verbose         = False,
-                      phi_limit_on    = False)
+                      phi_limit_on    = False,
+                      auto_disabling_on = True,
+                      )
     for key, val in sim_fail_freq.items():
         ptl.sim_fail_freq[key] = val
     ptl.limit_radius = None
