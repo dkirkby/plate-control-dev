@@ -35,26 +35,7 @@ class PosSchedule(object):
                                 power_supply_map = self.petal.power_supply_map,
                                 verbose          = self.verbose,
                                 printfunc        = self.printfunc
-                            ) for name in self.stage_order}
-        
-        # Anneal times spread out power density in time, as well as naturally reducing
-        # potential collision frequency. See comments in PosScheduleStage regarding
-        # implementation. Move time considerations as of 2020-10-09 [JHS]:
-        #   cruise 180 deg ... 180 / 176.07 deg/s --> 1.02 sec
-        #   cruise 360 deg ... 360 / 176.07 deg/s --> 2.04 sec
-        #   creep 3 deg ... 3 / 2.67 deg/s --> 1.12 sec
-        # Rationales for the values below are:
-        #   direct ... typ slowest case is ~ 3 deg creep corr move + 2x final auto-creeps --> 3.4 sec
-        #   retract ... phi cruise --> 1.0 sec
-        #   rotate ... theta cruise --> 2.0 sec
-        #   extend ... phi cruise + 2x final auto-creeps --> 3.2 sec
-        #   expert ... common case is homing, with cruise search distances 510 deg theta + 259 deg phi --> 4.4 sec
-        # Then in all cases I multiply by a factor 1.5, to give the annealing some room to spread.
-        # I think these numbers are functional, and not too inefficient. Next level of refinement
-        # would be to run a sizeable sample of targets / correction moves (maybe 1000 each) and
-        # analyze resulting stage times.
-        self.anneal_time = {'direct':5.1, 'retract':1.5, 'rotate':3.0, 'extend':4.8, 'expert':6.6}  # unit seconds
-        
+                            ) for name in self.stage_order}        
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
@@ -315,13 +296,10 @@ class PosSchedule(object):
         """Returns a conservative period of time (in seconds) that one should
         wait for move table execution, before assuming some failure must have
         occurred. An internal time estimate is done. Then this estimate is
-        multiplied by the argued safety_factor, and returned. No guarantee is
-        made about the efficiency of the time estimate that is returned. For
-        example, in many cases the estimate may be much longer than the actual
-        move time.
+        multiplied by the argued safety_factor, and returned.
         """
-        anneal_time_sum = sum(t for t in self.anneal_time.values())
-        return anneal_time_sum * safety_factor
+        times = {table.total_time(suppress_automoves=False) for table in self.move_tables.values()}
+        return max(times) * safety_factor
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
@@ -449,7 +427,6 @@ class PosSchedule(object):
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')
         self._direct_stage_conditioning(stage=self.stages['expert'],
-                                        anneal_time=self.anneal_time['expert'],
                                         should_freeze=should_freeze,
                                         should_anneal=should_anneal)
 
@@ -474,20 +451,18 @@ class PosSchedule(object):
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
         self._direct_stage_conditioning(stage=stage,
-                                        anneal_time=self.anneal_time['direct'],
                                         should_freeze=should_freeze,
                                         should_anneal=should_anneal)
 
-    def _direct_stage_conditioning(self, stage, anneal_time, should_freeze, should_anneal):
+    def _direct_stage_conditioning(self, stage, should_freeze, should_anneal):
         """Applies annealing and possibly freezing to a 'direct' or 'expert' stage.
 
             stage         ... instance of PosScheduleStage, needs to already have its move tables initialized
-            anneal_time   ... time in seconds, for annealing
             should_freeze ... boolean, says whether to check for collisions and freeze
             should_anneal ... boolean, enables/disables annealing
         """
         if should_anneal:
-            stage.anneal_tables(anneal_time, include_auto_moves=True)
+            stage.anneal_tables(suppress_automoves=False)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -625,9 +600,9 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            is_last_stage = name = self.RRE_stage_order[-1]
+            is_not_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(self.anneal_time[name], include_auto_moves=is_last_stage)
+                stage.anneal_tables(suppress_automoves=is_not_last_stage)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
@@ -640,7 +615,7 @@ class PosSchedule(object):
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
                         adjusted, frozen = stage.adjust_path(posid, freezing=freezing, do_not_move=no_auto_adjust)
                         for p in frozen:
-                            if not(is_last_stage): # i.e. some next stage exists
+                            if is_not_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
                                 adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]

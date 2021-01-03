@@ -41,7 +41,6 @@ class PosMoveTable(object):
         self._warning_flag = 'WARNING'
         self._error_flag = 'ERROR'
         self._not_yet_calculated = '(not yet calculated)'
-        self._latest_total_time_est = self._reset_total_time_estimate()
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -58,7 +57,7 @@ class PosMoveTable(object):
              'allow_cruise':          c.allow_cruise,
              'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
              'orig_command':          c._orig_command,
-             'latest_total_time_est': c._latest_total_time_est
+             'total_time':            self.total_time(suppress_automoves=False),
              }
         return d
     
@@ -165,31 +164,24 @@ class PosMoveTable(object):
         return new
 
     # getters
-    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True, _output_type='schedule'):
+    def for_schedule(self, suppress_automoves=True):
         """Version of the table suitable for move scheduling. Distances are given at
         the output shafts, in degrees. Times are given in seconds.
 
-        An option is provided to select whether final creep and antibacklash
-        moves should be suppressed from the schedule-formatted output table.
-        Typically this option is left as True, since margin space for these moves
-        is included in the geometric envelope of the positioner.
+        An option is provided to select whether auto-generated final creep and antibacklash
+        moves should be suppressed from the schedule-formatted output table. For typical
+        anticollision calcs, this option is left as True, since margin space for these
+        moves is included in the geometric envelope of the positioner.
         """
-        if suppress_any_finalcreep_and_antibacklash:
-            old_finalcreep = self.should_final_creep
-            old_antibacklash = self.should_antibacklash
-            self.should_final_creep = False
-            self.should_antibacklash = False
-        output = self._for_output_type(_output_type)
-        if suppress_any_finalcreep_and_antibacklash:
-            self.should_final_creep = old_finalcreep
-            self.should_antibacklash = old_antibacklash
-        return output
+        if suppress_automoves:
+            return self._format_while_suppressing_automoves('schedule')            
+        return self._for_output_type('schedule')
 
     def for_collider(self):
         """Version of the table that is same as for_schedule, except with reduced
         amount of data returned (only what the poscollider requires and no more.)
         """
-        return self.for_schedule(_output_type='collider')
+        return self._format_while_suppressing_automoves('collider')
 
     def for_hardware(self):
         """Version of the table suitable for the hardware side.
@@ -208,6 +200,25 @@ class PosMoveTable(object):
         """Version of the table with all data.
         """
         return self._for_output_type('full')
+
+    def timing(self, suppress_automoves=False):
+        '''Version of the table with just the time data.
+        '''
+        if suppress_automoves:
+            return self._format_while_suppressing_automoves('timing')            
+        return self._for_output_type('timing') 
+    
+    def _format_while_suppressing_automoves(self, output_type):
+        '''Calculate version of table according to output_type, but don't include
+        final creep or antibacklash moves.'''
+        old_finalcreep = self.should_final_creep
+        old_antibacklash = self.should_antibacklash
+        self.should_final_creep = False
+        self.should_antibacklash = False
+        output = self._for_output_type(output_type)
+        self.should_final_creep = old_finalcreep
+        self.should_antibacklash = old_antibacklash
+        return output
 
     @property
     def n_rows(self):
@@ -254,6 +265,11 @@ class PosMoveTable(object):
         if msg:
             msg = f'{self.posid} move table contains errors/warnings:' + msg
         return msg
+    
+    def total_time(self, suppress_automoves=False):
+        '''Returns total time to execute the table.'''
+        times_table = self.timing(suppress_automoves=suppress_automoves)
+        return times_table['net_time'][-1]
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -265,7 +281,6 @@ class PosMoveTable(object):
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data[dist_label[axisid]] = distance
-        self._reset_total_time_estimate()
 
     def store_orig_command(self, string, val1=None, val2=None):
         '''To keep a note of original move command associated with this move
@@ -296,7 +311,6 @@ class PosMoveTable(object):
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['prepause'] = prepause
-        self._reset_total_time_estimate()
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
@@ -306,7 +320,6 @@ class PosMoveTable(object):
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['postpause'] = postpause
-        self._reset_total_time_estimate()
 
     def strip(self):
         '''Removes two things from table:
@@ -333,7 +346,6 @@ class PosMoveTable(object):
             has_postpause = self.rows[i].has_postpause
             if not has_motion and not has_prepause and not has_postpause:
                 del self.rows[i]
-        self._reset_total_time_estimate()
 
     # row manipulations
     def insert_new_row(self, index):
@@ -341,11 +353,9 @@ class PosMoveTable(object):
         self.rows.insert(index, newrow)
         if index > len(self.rows):
             self.insert_new_row(index) # to fill in any blanks up to index
-        self._reset_total_time_estimate()
 
     def delete_row(self, index):
         del self.rows[index]
-        self._reset_total_time_estimate()
 
     def extend(self, other_move_table):
         """Extend one move table with another.
@@ -353,7 +363,6 @@ class PosMoveTable(object):
         you want other_move_table to override these flags, this must be explicitly
         done separately.
         """
-        self._reset_total_time_estimate()
         if self == other_move_table:
             return
         for otherrow in other_move_table.rows:
@@ -466,6 +475,7 @@ class PosMoveTable(object):
         if output_type in {'collider', 'schedule', 'full'}:
             table['Tdot'] = [true_moves[pc.T][i]['speed'] for i in row_range]
             table['Pdot'] = [true_moves[pc.P][i]['speed'] for i in row_range]
+        if output_type in {'collider', 'schedule', 'full', 'timing'}:
             table['prepause'] = [rows[i].data['prepause'] for i in row_range]
             table['postpause'] = [rows[i].data['postpause'] for i in row_range]            
         if output_type in {'hardware', 'full'}:
@@ -477,7 +487,7 @@ class PosMoveTable(object):
         if output_type in {'full', 'cleanup'}:
             table['orig_command'] = self._orig_command
             table['auto_commands'] = [rows[i].data['auto_cmd'] for i in row_range]
-        if output_type in {'collider', 'schedule', 'full', 'hardware'}:
+        if output_type in {'collider', 'schedule', 'full', 'hardware', 'timing'}:
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],
                                       true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type == 'hardware':
@@ -503,17 +513,17 @@ class PosMoveTable(object):
             table['nrows'] = len(table['move_time'])
             table['total_time'] = sum(table['move_time'] + table['postpause']) # in seconds
             table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds
-            self._latest_total_time_est = table['total_time']
             return table
-        table['nrows'] = len(table['dT'])
+        table['nrows'] = len(table['move_time']) if 'move_time' in table else len(table['dT'])
         if output_type == 'collider':
             return table
         table['posid'] = self.posmodel.posid
-        if output_type in {'schedule', 'full'}:
+        if output_type in {'schedule', 'full', 'timing'}:
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
                 table['net_time'][i] += table['net_time'][i-1]
-            self._latest_total_time_est = table['net_time'][-1]
+        if output_type == 'timing':
+            return table
         if output_type in {'schedule', 'cleanup', 'full'}:
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
@@ -540,9 +550,6 @@ class PosMoveTable(object):
             table['poslocXY'] = [trans.posintTP_to_poslocXY(tp) for tp in table['posintTP']]
             table['QS'] = [trans.poslocXY_to_QS(xy) for xy in table['poslocXY']]
         return table
-    
-    def _reset_total_time_estimate(self):
-        self._latest_total_time_est = self._not_yet_calculated
 
 class PosMoveRow(object):
     """The general user does not directly use the internal values of a

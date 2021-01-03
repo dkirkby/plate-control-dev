@@ -142,6 +142,11 @@ max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long cree
 theta_hardstop_ambig_tol = 5.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
 
+# Annealing spreads out motor power consumption in time, as well as naturally reducing
+# potential collision frequency. See posschedulestage.py for more info.
+anneal_quantile = 0.95  # for outlier rejection when selecting the initial anneal time window
+anneal_density = 0.7  # after taking the quantile cut, spread out the window per this factor
+
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
 nominals['LENGTH_R1']        = {'value':   3.0, 'tol':    1.0}

@@ -1,6 +1,8 @@
 import posconstants as pc
 import posmovetable
 import math
+import numpy as np
+import matplotlib.pyplot as plt
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -83,28 +85,29 @@ class PosScheduleStage(object):
             if posid in d:
                 del d[posid]
 
-    def anneal_tables(self, anneal_time=None, include_auto_moves=False):
+    def anneal_tables(self, suppress_automoves=False):
         """Adjusts move table timing, to attempt to reduce peak power consumption
         of the overall array.
 
             anneal_time ... Time in seconds over which to spread out moves in this stage
-                            to reduce overall power density consumed by the array. You
-                            can also argue None if no spreading should be done.
+                            to reduce overall power density consumed by the array.
                              
-            include_auto_moves ... Include final creep and antibacklash moves in the move
-                                   times. For use only with the last stage in the sequence.
+            suppress_automoves ... Boolean, if True, don't include auto-generated final
+                                   creep and antibacklash moves in the move times. Typically
+                                   you want this True only for stages which are not the last
+                                   one in the sequence.
 
         If anneal_time is less than the time it takes to execute the longest move
         table, then that longer execution time will be used instead of anneal_time.
         """
-        if anneal_time == None:
-            return
-        kwargs = {'suppress_any_finalcreep_and_antibacklash': not(include_auto_moves)}
-        postprocessed = {posid:table.for_schedule(**kwargs) for posid,table in self.move_tables.items()}
-        times = {posid:post['net_time'][-1] for posid,post in postprocessed.items()}
-        orig_max_time = max(times.values())
-        new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
-        supply_map = {supply: [p for p in posids if p in postprocessed]  # list type is intentional, so easy to check below for last element
+        times = {posid: table.total_time(suppress_automoves=suppress_automoves) for posid, table in self.move_tables.items()}
+        sorted_times = sorted(times.values())
+        cut = np.quantile(sorted_times, pc.anneal_quantile)  # prevent large outlier from skewing effect of "anneal_density" factor below
+        filtered_times = [t for t in sorted_times if t <= cut]
+        orig_max_time = max(sorted_times)
+        anneal_window = max(filtered_times) / pc.anneal_density
+        new_max_time = max(anneal_window, orig_max_time)  # for case of very large outlier
+        supply_map = {supply: [p for p in posids if p in self.move_tables]  # list type is intentional, so easy to check below for last element
                       for supply, posids in self._power_supply_map.items()}
         for posids in supply_map.values():
             group = []
@@ -403,6 +406,26 @@ class PosScheduleStage(object):
             if not s.check_continuity(self.sweep_continuity_check_stepsize, self.collider.posmodels[p]):
                 discontinuous.add(p)
         return discontinuous
+    
+    def plot_density(self):
+        '''Bins and plots total power density of motors as-scheduled. Useful for
+        checking effects of annealing. Assumes that sweeps have been calculated
+        already and stored (c.f. store_collision_finding_results).'''
+        num_moving = []
+        for posid in self.move_tables:
+            # actually, sweep ain't great here, since it doesn't include creep moves!!
+            # have to do a separate quantizing here
+            sweep = self.sweeps[posid]
+            was_moving = sweep.was_moving_cached
+            longer = len(was_moving) - len(num_moving)
+            num_moving.extend([0] * longer)
+            for i in range(len(num_moving)):
+                if was_moving[i]:
+                    num_moving[i] += 1
+        time = [i * self.collider.timestep for i in range(len(num_moving))]
+        plt.plot(time, num_moving)
+        plt.xlabel('time [sec]')
+        plt.ylabel('num moving')
 
     def _propose_path_adjustment(self, posid, method='freeze', do_not_move=None):
         """Generates a proposed alternate move table for the positioner posid

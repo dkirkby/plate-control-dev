@@ -69,7 +69,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 0 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
@@ -314,6 +314,3 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.states[posid].store(key, value, register_if_altered=False)
         ptl.states[posid].write()
     loop += 1
-    
-ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=0)
-ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=30)
