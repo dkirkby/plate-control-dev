@@ -487,7 +487,7 @@ class PosSchedule(object):
             should_anneal ... boolean, enables/disables annealing
         """
         if should_anneal:
-            stage.anneal_tables(anneal_time)
+            stage.anneal_tables(anneal_time, include_auto_moves=True)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -625,22 +625,22 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
+            is_last_stage = name = self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(self.anneal_time[name])
+                stage.anneal_tables(self.anneal_time[name], include_auto_moves=is_last_stage)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
-            not_the_last_stage = name != self.RRE_stage_order[-1]
             while stage.colliding and attempts_sequence:
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
                         adjusted, frozen = stage.adjust_path(posid, freezing=freezing, do_not_move=no_auto_adjust)
                         for p in frozen:
-                            if not_the_last_stage: # i.e. some next stage exists
+                            if not(is_last_stage): # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
                                 adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]

@@ -83,20 +83,24 @@ class PosScheduleStage(object):
             if posid in d:
                 del d[posid]
 
-    def anneal_tables(self, anneal_time=None):
+    def anneal_tables(self, anneal_time=None, include_auto_moves=False):
         """Adjusts move table timing, to attempt to reduce peak power consumption
         of the overall array.
 
-            anneal_time  ... Time in seconds over which to spread out moves in this stage
-                             to reduce overall power density consumed by the array. You
-                             can also argue None if no spreading should be done.
+            anneal_time ... Time in seconds over which to spread out moves in this stage
+                            to reduce overall power density consumed by the array. You
+                            can also argue None if no spreading should be done.
+                             
+            include_auto_moves ... Include final creep and antibacklash moves in the move
+                                   times. For use only with the last stage in the sequence.
 
         If anneal_time is less than the time it takes to execute the longest move
         table, then that longer execution time will be used instead of anneal_time.
         """
         if anneal_time == None:
             return
-        postprocessed = {posid:table.for_schedule() for posid,table in self.move_tables.items()}
+        kwargs = {'suppress_any_finalcreep_and_antibacklash': not(include_auto_moves)}
+        postprocessed = {posid:table.for_schedule(**kwargs) for posid,table in self.move_tables.items()}
         times = {posid:post['net_time'][-1] for posid,post in postprocessed.items()}
         orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
