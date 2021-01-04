@@ -135,7 +135,7 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
-#handle_fvc_feedback defaults
+# handle_fvc_feedback defaults
 err_thresh = False # tracing error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
 up_frac = 1.0 # amount of update to apply to posTP

@@ -318,7 +318,7 @@ class Petal(object):
         else:
             kwargs['configfile'] = collider_file
         self.collider = poscollider.PosCollider(**kwargs)
-        self.anticol_settings = self.collider.config
+        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
@@ -997,7 +997,7 @@ class Petal(object):
                 raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
             canbusses = conf['can_bus_list']
             ready = self.comm.check_can_ready(canbusses)
-            if not(ready) or 'FAILED' in str(ready):
+            if not(ready) or ('FAILED' in str(ready)):
                 self.printfunc(f'WARNING: check_can_ready returned {ready}')
                 #raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
                 return f'FAILED: will not move to {hw_state}. check_can_ready returned {ready}.'
@@ -1767,6 +1767,7 @@ class Petal(object):
             value ... the operand to compare against, usually a number for most keys
             posids ... 'all', 'enabled', 'disabled' or iterator of positioner id strings
             mode ... 'compact', 'expanded', 'iterable' ... controls return type
+            skip_unknowns ... boolean, if True, quietly skip any unknown posids, rather than throwing an error
             
         Call with no arguments, to get a list of valid keys and ops.
         

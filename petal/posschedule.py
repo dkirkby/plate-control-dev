@@ -908,12 +908,12 @@ class PosSchedule(object):
             self.petal.animator_move_number += 1
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
-                for posid,sweep in colliding_sweeps.items():
+                for posid, sweep in colliding_sweeps.items():
                     sweeps_to_add.update({posid:sweep})
                     neighbor_sweeps = {n:all_sweeps[n] for n in self.collider.pos_neighbors[posid]}
                     sweeps_to_add.update(neighbor_sweeps)
             else:
-                sweeps_to_add = all_sweeps
+                sweeps_to_add = {posid: all_sweeps[posid] for posid in all_sweeps if posid in self.collider.posids_to_animate}
             if sweeps_to_add:
                 self.collider.add_mobile_to_animator(self.petal.animator_total_time, sweeps_to_add)
                 for posid in sweeps_to_add:
