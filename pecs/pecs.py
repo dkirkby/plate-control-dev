@@ -283,7 +283,8 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False)
+        centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False,
+                                        participating_petals=self.illuminated_ptl_roles)
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
@@ -455,6 +456,10 @@ class PECS:
         enabled = self.get_enabled_posids(posids)
         move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
         move_kwargs['ids'] = enabled
+        if 'control' not in list(move_kwargs.keys()):
+            move_kwargs['control'] = {'timeout': 90.0}
+        else:
+            move_kwargs['control']['timeout'] = 90.0
         funcs[move](**move_kwargs)
         
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
@@ -617,7 +622,7 @@ class PECS:
         # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR just the return
         # data from that one petal. It's not perfectly clear when this does or doesn't happen, but
         # from discussion with Kevin and some trials at the CONSOLE this ought to be ok here.
-        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode)
+        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode, skip_unknowns=True)
         if isinstance(data_by_petal, (str, list, tuple)):
             return data_by_petal
         check_val = data_by_petal[list(data_by_petal.keys())[0]]

@@ -633,9 +633,9 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            is_not_last_stage = name != self.RRE_stage_order[-1]
+            not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(suppress_automoves=is_not_last_stage)
+                stage.anneal_tables(suppress_automoves=not_the_last_stage)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
@@ -648,7 +648,7 @@ class PosSchedule(object):
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
                         adjusted, frozen = stage.adjust_path(posid, freezing=freezing, do_not_move=no_auto_adjust)
                         for p in frozen:
-                            if is_not_last_stage: # i.e. some next stage exists
+                            if not_the_last_stage: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
                                 adjusted_table_data = stage.move_tables[p].for_schedule()
                                 adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]

@@ -134,8 +134,8 @@ try:
     posids = set(table['POS_ID'])
     pecs.ptl_setup(pecs.pcids, posids=posids)
     pecs_on = True
-except:
-    logger.warning('PECS initialization failed')
+except Exception as e:
+    logger.warning(f'PECS initialization failed: {e}')
     pecs_on = False
 
 # gather some interactive information from the user
@@ -185,7 +185,7 @@ for row in table:
                     kwargs2['key'] = 'CTRL_ENABLED'
                     kwargs2['value'] = new_ctrl_enabled
                     kwargs2['comment'] = f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
-                    updates += [kwargs2]
+                    updates = [kwargs, kwargs2]
             for kwargs in updates:
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
@@ -202,7 +202,7 @@ for row in table:
             if key in row.columns:
                 note = pc.join_notes(note, f'{key.lower()} {row[key]}')
         if not args.simulate:
-            pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note)
+            pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note, participating_petals=role)
         logger.info(f'{posid}: {stored}')
         any_stored = True
         

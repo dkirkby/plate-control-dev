@@ -181,8 +181,11 @@ if online:
         ns_thread = subprocess.Popen(['pyro4-ns'])
     else:
         ns_thread = None
+    ptlid2loc = {0: 8, 1: 3, 2: 7, 3: 3, 4: 0, 5: 1, 6: 2, 7: 8, 8: 4, 9: 9, 10: 5, 11: 6}
     def run_petal(petal_id, role):
-        return ['python', f'{ptlapp_path}', '--device_mode', 'True', '--sim', 'True', '--petal_id', f'{petal_id}', '--role', f'{role}']
+        # petal_loc and petalbox_id (same number) are required to not read the petal states/configobj
+        loc = ptlid2loc[petal_id]
+        return ['python', f'{ptlapp_path}', '--device_mode', 'True', '--sim', 'True', '--petal_id', f'{petal_id}', '--role', f'{role}', '--petal_loc', f'{loc}', '--petalbox_id', f'{loc}']
     for petal_id in petal_ids:
         name = f'PetalApp{petal_id}'
         role = f'PETALSIM{petal_id}'
