@@ -36,6 +36,7 @@ class PosMoveTable(object):
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+        self._is_required = True
         self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
         self._orig_command = ''
         self._warning_flag = 'WARNING'
@@ -58,6 +59,7 @@ class PosMoveTable(object):
              'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
              'orig_command':          c._orig_command,
              'total_time':            self.total_time(suppress_automoves=False),
+             'is_required':           c._is_required,
              }
         return d
     
