@@ -99,52 +99,29 @@ class PosScheduleStage(object):
         If anneal_time is less than the time it takes to execute the longest move
         table, then that longer execution time will be used instead of anneal_time.
         """
-        times = {posid: table.total_time(suppress_automoves=suppress_automoves) for posid, table in self.move_tables.items()}
+        times = {posid: table.total_time(suppress_automoves=suppress_automoves)
+                 for posid, table in self.move_tables.items()
+                 if not(table.is_motionless)}
+        if not times:
+            return
         sorted_times = sorted(times.values())
+        sorted_posids = sorted(times, key=lambda k: times[k])
         cut = np.quantile(sorted_times, pc.anneal_quantile)  # prevent large outlier from skewing effect of "anneal_density" factor below
         filtered_times = [t for t in sorted_times if t <= cut]
         orig_max_time = max(sorted_times)
         anneal_window = max(filtered_times) / pc.anneal_density
         new_max_time = max(anneal_window, orig_max_time)  # for case of very large outlier
-        supply_map = {supply: [p for p in posids if p in self.move_tables]  # list type is intentional, so easy to check below for last element
-                      for supply, posids in self._power_supply_map.items()}
-        for posids in supply_map.values():
-            group = []
-            group_time = 0
-            
-            # 2020-10-02 [JHS] This sorting step was required to resolve a complex, and non-deterministic bug
-            # in move scheduling. That bug was first encountered during exposure_id 3047, exposure_iter 46,
-            # on petal 1, 2020-10-01. I never managed to track down how adding a sort here resolves the issue.
-            # But in principle, since there is no random number generation going on anywhere in the code, our
-            # best assumption was that *some* unordered for-loop operation was causing wrong behavior on some
-            # runs. The line below is the only place I found where adding a sorting step had any tangible impact
-            # on the move tables that get generated. And after I added it, the error never arose again, in 85
-            # consecutive runs of replay.py upon the 3047.46 move data. Then I turned off the sorted() call as
-            # a test, and counted errors on 10% of runs (9 of 85 attempts). Also, I noted that without this sort,
-            # the total move table times were non-deterministic, varying with each run. (That alone is a good
-            # enough reason to include it.)
-            posids = sorted(posids)
-            
-            for posid in posids:
-                group.append(posid)
-                group_time += times[posid]
-                if group_time > new_max_time or posid == posids[-1]:
-                    n = len(group)
-                    nominal_spacing = new_max_time / (n + 1)
-                    center = 0
-                    for i in range(n):
-                        p = group[i]
-                        center += nominal_spacing
-                        start = center - times[p]/2
-                        if start < 0:
-                            start = 0
-                        finish = start + times[p]
-                        if finish > new_max_time:
-                            start = new_max_time - times[p]
-                        self.move_tables[p].insert_new_row(0)
-                        self.move_tables[p].set_prepause(0, start)
-                    group = []
-                    group_time = 0
+        resolution = 0.1 # sec
+        for map_posids in self._power_supply_map.values():
+            posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
+            prepause = 0.0
+            which = 0
+            while posids:
+                posid = posids.pop(which)
+                prepause = 0.0 if prepause + times[posid] > new_max_time else prepause + resolution
+                self.move_tables[posid].insert_new_row(0)
+                self.move_tables[posid].set_prepause(0, prepause)
+                which = -1 if which == 0 else 0
 
     def equalize_table_times(self):
         """Makes all move tables in the stage have an equal total time length,
