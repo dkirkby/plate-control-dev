@@ -13,9 +13,10 @@ positioner_param_sequences = {'cmds_unit_test':['ptl01_00001'],
 
 move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
                               'ptl01_set00_single':['ptl01_set00_00001'],
-                              'ptl01_set00_double':[f'ptl01_set00_{i:05}' for i in (0,1)],
-                              'ptl01_set00_cento':[f'ptl01_set00_{i:05}' for i in range(100)],
-                              'ptl01_set00_mille':[f'ptl01_set00_{i:05}' for i in range(1000)],
+                              'ptl01_set00_double':[f'ptl01_set00_{i:05}' for i in range(2)],
+                              'ptl01_set00_dix':   [f'ptl01_set00_{i:05}' for i in range(10)],
+                              'ptl01_set00_cento': [f'ptl01_set00_{i:05}' for i in range(100)],
+                              'ptl01_set00_mille': [f'ptl01_set00_{i:05}' for i in range(1000)],
                              }
 
 stress_sequences_petal3_subset7a = {'03001_ntarg001_set000': [3229],
