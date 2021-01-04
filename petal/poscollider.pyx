@@ -646,6 +646,16 @@ class PosSweep(object):
         if self.tp[step][0] == self.tp[step-1][0] and self.tp[step][1] == self.tp[step-1][1]:
             return False
         return True
+    
+    def axis_was_moving(self, step, axis):
+        '''Like was_moving, but for axis = 0 (means theta) or 1 (means phi).
+        Separately defined from was_moving, to avoid some overhead when that
+        function is repeatedly called during anticollision calcs.'''
+        if step <= 0 or step >= len(self.tp):
+            return False
+        if self.tp[step][axis] == self.tp[step-1][axis]:
+            return False
+        return True
 
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""

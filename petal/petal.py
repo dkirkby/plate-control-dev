@@ -1820,6 +1820,7 @@ class Petal(object):
             value ... the operand to compare against, usually a number for most keys
             posids ... 'all', 'enabled', 'disabled' or iterator of positioner id strings
             mode ... 'compact', 'expanded', 'iterable' ... controls return type
+            skip_unknowns ... boolean, if True, quietly skip any unknown posids, rather than throwing an error
             
         Call with no arguments, to get a list of valid keys and ops.
         

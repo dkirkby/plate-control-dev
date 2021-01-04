@@ -116,8 +116,8 @@ else:
 #  2020-06-25 [JHS] For usage of new petalboxes with 20 can channels, an alternate
 #  map will need to be provided here. Selection of which map to use will need to
 #  be given by some configuration argument during petal initialization.
-power_supply_canbus_map = {'PS1':{'can10', 'can11', 'can13', 'can22', 'can23'},
-                           'PS2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
+power_supply_canbus_map = {'V1': {'can10', 'can11', 'can13', 'can22', 'can23'},
+                           'V2': {'can12', 'can14', 'can15', 'can16', 'can17'}}
 
 # Constants
 deg = '\u00b0'
