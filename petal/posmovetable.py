@@ -42,7 +42,6 @@ class PosMoveTable(object):
         self._warning_flag = 'WARNING'
         self._error_flag = 'ERROR'
         self._not_yet_calculated = '(not yet calculated)'
-        self._latest_total_time_est = self._reset_total_time_estimate()
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -59,7 +58,7 @@ class PosMoveTable(object):
              'allow_cruise':          c.allow_cruise,
              'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
              'orig_command':          c._orig_command,
-             'latest_total_time_est': c._latest_total_time_est,
+             'total_time':            self.total_time(suppress_automoves=False),
              'is_required':           c._is_required,
              }
         return d
@@ -167,7 +166,7 @@ class PosMoveTable(object):
         return new
 
     # getters
-    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True, _output_type='schedule'):
+    def for_schedule(self, suppress_automoves=True):
         """Version of the table suitable for move scheduling. Distances are given at
         the output shafts, in degrees. Times are given in seconds.
 
@@ -322,7 +321,6 @@ class PosMoveTable(object):
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['prepause'] = prepause
-        self._reset_total_time_estimate()
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
