@@ -177,11 +177,13 @@ class PosMoveTable(object):
             return self._format_while_suppressing_automoves('schedule')            
         return self._for_output_type('schedule')
 
-    def for_collider(self):
+    def for_collider(self, suppress_automoves=True):
         """Version of the table that is same as for_schedule, except with reduced
         amount of data returned (only what the poscollider requires and no more.)
         """
-        return self._format_while_suppressing_automoves('collider')
+        if suppress_automoves:
+            return self._format_while_suppressing_automoves('collider')
+        return self._for_output_type('collider')
 
     def for_hardware(self):
         """Version of the table suitable for the hardware side.

@@ -760,6 +760,7 @@ class Petal(object):
             
         INPUTS:  None
         """
+        # self.schedule.plot_density()
         failed_posids = self.send_move_tables()
         self.execute_moves()
         return failed_posids

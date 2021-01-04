@@ -414,6 +414,39 @@ class PosSchedule(object):
             s += '\n' + str(self.stages['final'].sweeps[posid])
             s += '\n'
         return s
+        
+    def plot_density(self):
+        '''Bins and plots total power density of motors as-scheduled. Useful for
+        checking effects of annealing. Assumes that sweeps have been calculated
+        already and stored (c.f. store_collision_finding_results).'''
+        import matplotlib.pyplot as plt
+        import poscollider
+        quantize_timestep = 0.02 # sec
+        plt.figure()
+        for supply, posids in self.petal.power_supply_map.items():
+            has_table = posids & set(self.move_tables)
+            if not any(has_table):
+                continue
+            num_moving = []
+            for posid in has_table:
+                table = self.move_tables[posid]
+                sweep = poscollider.PosSweep(posid)
+                sweep.fill_exact(init_poslocTP=table.init_poslocTP,
+                                 table=table.for_collider(suppress_automoves=False),
+                                 start_time=0)
+                sweep.quantize(timestep=quantize_timestep)
+                was_moving = {axis: [sweep.axis_was_moving(i, axis) for i in range(len(sweep.time))] for axis in [pc.T, pc.P]}
+                for axis, axis_was_moving in was_moving.items():
+                    longer = len(axis_was_moving) - len(num_moving)
+                    num_moving.extend([0] * longer)
+                    for i in range(len(axis_was_moving)):
+                        if axis_was_moving[i]:
+                            num_moving[i] += 1
+            time = [i * quantize_timestep for i in range(len(num_moving))]
+            plt.plot(time, num_moving, label=f'Power supply: {supply}')
+        plt.xlabel('time [sec]')
+        plt.ylabel('num motors moving')
+        plt.legend()
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
