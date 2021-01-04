@@ -701,6 +701,7 @@ class Petal(object):
             set containing any posids for which sending the table failed
         """
         msg_prefix = 'send_and_execute_moves:'
+        # self.schedule.plot_density()
         
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
