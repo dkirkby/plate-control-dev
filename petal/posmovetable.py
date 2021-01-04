@@ -197,6 +197,12 @@ class PosMoveTable(object):
         position tracking after the physical move has been performed.
         """
         return self._for_output_type('cleanup')
+    
+    def angles(self):
+        """Reduced version of the table giving just the theta and phi angles and
+        deltas.
+        """
+        return self._for_output_type('angles')
 
     def full_table(self):
         """Version of the table with all data.
@@ -323,6 +329,16 @@ class PosMoveTable(object):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data['postpause'] = postpause
 
+    def set_required(self, boolean):
+        '''Set flag which will be ultimately passed along to hardware. It tells
+        the petalcontroller whether hardware *must* execute this table (to avoid
+        collisions etc). If petalcontroller fails to send this table to its
+        positioner, while required == True, then petalcontroller must return an
+        error or reset power supplies, or some other such fallback plan, rather
+        than just firing off the "execute tables" signal.
+        '''
+        self._is_required = pc.boolean(boolean)
+        
     def strip(self):
         '''Removes two things from table:
         
@@ -384,6 +400,9 @@ class PosMoveTable(object):
         
         # Any forcing of creep-only takes precedence.
         self.allow_cruise &= other_move_table.allow_cruise
+        
+        # Any required table takes precedence.
+        self._is_required |= other_move_table._is_required
         
     # internal methods
     def _calculate_true_moves(self):
@@ -471,7 +490,7 @@ class PosMoveTable(object):
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
         table = {}
-        if output_type in {'collider', 'schedule', 'full', 'cleanup'}:
+        if output_type in {'collider', 'schedule', 'full', 'cleanup', 'angles'}:
             table['dT'] = [true_moves[pc.T][i]['distance'] for i in row_range]
             table['dP'] = [true_moves[pc.P][i]['distance'] for i in row_range]
         if output_type in {'collider', 'schedule', 'full'}:
@@ -515,6 +534,8 @@ class PosMoveTable(object):
             table['nrows'] = len(table['move_time'])
             table['total_time'] = sum(table['move_time'] + table['postpause']) # in seconds
             table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds
+            table['required'] = self._is_required
+            self._latest_total_time_est = table['total_time']
             return table
         table['nrows'] = len(table['move_time']) if 'move_time' in table else len(table['dT'])
         if output_type == 'collider':
@@ -526,7 +547,7 @@ class PosMoveTable(object):
                 table['net_time'][i] += table['net_time'][i-1]
         if output_type == 'timing':
             return table
-        if output_type in {'schedule', 'cleanup', 'full'}:
+        if output_type in {'schedule', 'cleanup', 'full', 'angles'}:
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
             for i in range(1, table['nrows']):
@@ -541,14 +562,13 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['log_note'] = self.log_note
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-        if output_type == 'full':
+        if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
-            posintT = [self.init_posintTP[pc.T] + table['net_dT'][i]
-                       for i in row_range]
-            posintP = [self.init_posintTP[pc.P] + table['net_dP'][i]
-                       for i in row_range]
+            posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
+            posintP = [self.init_posintTP[pc.P] + table['net_dP'][i] for i in row_range]
             table['posintTP'] = [[posintT[i], posintP[i]] for i in row_range]
             table['poslocTP'] = [trans.posintTP_to_poslocTP(tp) for tp in table['posintTP']]
+        if output_type in {'full'}:
             table['poslocXY'] = [trans.posintTP_to_poslocXY(tp) for tp in table['posintTP']]
             table['QS'] = [trans.poslocXY_to_QS(xy) for xy in table['poslocXY']]
         return table
