@@ -314,6 +314,3 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.states[posid].store(key, value, register_if_altered=False)
         ptl.states[posid].write()
     loop += 1
-    
-ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=0)
-ptl.quick_direct_dtdp(posids='all', dtdp=[0,10], prepause=30)
