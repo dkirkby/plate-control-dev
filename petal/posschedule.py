@@ -107,7 +107,6 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.perf_counter()
             self.stats.add_request()
         self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
@@ -193,7 +192,6 @@ class PosSchedule(object):
                        }
         self._requests[posid] = new_request
         if stats_enabled:
-            self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
         return None
 
@@ -265,7 +263,7 @@ class PosSchedule(object):
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
         self._combine_stages_into_final()
-        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
+        self.printfunc(f'Move tables calculated done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
         finalcheck_timer_start = time.perf_counter()
         final = self.stages['final']
         if anticollision:
@@ -341,7 +339,8 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
-            self.stats.add_expert_table_time(time.perf_counter() - timer_start)
+            total_time = time.perf_counter() - timer_start
+            self.stats.add_expert_table_time(total_time)
         return None
             
     def expert_mode_is_on(self):
@@ -472,10 +471,10 @@ class PosSchedule(object):
         plt.legend()
         if not path:
             path = pc.dirs['temp_files']
-            path = os.path.join(path, f'density_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.png')
+            path = os.path.join(path, f'density_ptlid{self.petal.petal_id:02}_{pc.filename_timestamp_str()}.png')
         plt.tight_layout()
         plt.savefig(path)
-        plt.clf()
+        plt.close()
         self.printfunc(f'Saved density plot to {path}')
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
@@ -549,7 +548,7 @@ class PosSchedule(object):
         keys = posid and values = any adjusted starting POS_T, POS_P (so that later
         stages know where this debounce move puts the robots.)
         '''
-        user_requests = self.get_requests(include_dummies=False)
+        user_requests = self.get_regular_requests(include_dummies=False)
         requested_posids = user_requests.keys()
         overlaps_dict = self.get_overlaps(requested_posids)
         if len(overlaps_dict) == 0:
@@ -922,13 +921,16 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            self.stats.add_scheduling_time(time.perf_counter() - self.__timer_start)
             freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
             if freeze_collisions:
                 self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
-        self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
+        self.printfunc(f'Num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
+        total_time = time.perf_counter() - self.__timer_start
+        if self.stats.is_enabled():
+            self.stats.add_scheduling_time(total_time)
+        self.printfunc(f'Total time to calculate and check schedules = {total_time:.3f} sec')
         if self.petal.animator_on and anim_tables:
             final = self.stages['final']
             dummy_stats = posschedstats.PosSchedStats(enabled=False)
