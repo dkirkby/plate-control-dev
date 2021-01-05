@@ -22,8 +22,11 @@ from astropy.table import Table as AstropyTable
 # Set KPNO_SIM to True
 KPNO_SIM = False
 
-if KPNO_SIM:
+try:
     from DOSlib.positioner_index import PositionerIndex
+    INDEX_AVAILABLE = True
+except ImportError:
+    INDEX_AVAILABLE = False
 
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
@@ -135,6 +138,9 @@ class Petal(object):
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
+        if INDEX_AVAILABLE and not hasattr(self, index): #Don't overwrite PetalApp's index
+            self.index = PositionerIndex()
+
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
@@ -221,7 +227,6 @@ class Petal(object):
         self._initialize_pos_flags(initialize=True, enabled_only=False)
         self._apply_all_state_enable_settings()
 
-        self.hw_states = {}
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -2360,6 +2365,10 @@ class Petal(object):
             if hasattr(self, 'disabled_fids') and ids == 'all':
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
+            if hasattr(self, 'index'):
+                etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
+                for etc in etcs:
+                    self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
                 # Unsets flags in reset_mask
