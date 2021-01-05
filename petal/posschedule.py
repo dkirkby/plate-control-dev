@@ -421,6 +421,8 @@ class PosSchedule(object):
         already and stored (c.f. store_collision_finding_results).'''
         import matplotlib.pyplot as plt
         import poscollider
+        import os
+        plt.ioff()
         quantize_timestep = 0.02 # sec
         plt.figure()
         for supply, posids in self.petal.power_supply_map.items():
@@ -446,7 +448,14 @@ class PosSchedule(object):
             plt.plot(time, num_moving, label=f'Power supply: {supply}')
         plt.xlabel('time [sec]')
         plt.ylabel('num motors moving')
+        plt.title(pc.timestamp_str())
         plt.legend()
+        path = pc.dirs['temp_files']
+        path = os.path.join(path, f'density_{pc.filename_timestamp_str()}.png')
+        plt.tight_layout()
+        plt.savefig(path)
+        plt.clf()
+        self.printfunc(f'Saved density plot to {path}')
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
