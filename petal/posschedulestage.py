@@ -1,7 +1,6 @@
 import posconstants as pc
 import posmovetable
 import math
-import numpy as np
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -106,10 +105,8 @@ class PosScheduleStage(object):
             return
         sorted_times = sorted(times.values())[::-1]
         sorted_posids = sorted(times, key=lambda k: times[k])[::-1]
-        cut = np.quantile(sorted_times, pc.anneal_quantile)  # prevent large outlier from skewing effect of "anneal_density" factor below
-        filtered_times = [t for t in sorted_times if t <= cut]
         orig_max_time = max(sorted_times)
-        anneal_window = max(filtered_times) / pc.anneal_density
+        anneal_window = sum(sorted_times) / len(sorted_times) / pc.anneal_density
         anneal_window = max(anneal_window, orig_max_time)  # for case of very large outlier
         def first_within(x, vec):
             for i, test in enumerate(vec):
