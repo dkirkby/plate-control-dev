@@ -415,7 +415,7 @@ class PosSchedule(object):
             s += '\n'
         return s
         
-    def plot_density(self):
+    def plot_density(self, path=None):
         '''Bins and plots total power density of motors as-scheduled. Useful for
         checking effects of annealing. Assumes that sweeps have been calculated
         already and stored (c.f. store_collision_finding_results).'''
@@ -448,10 +448,11 @@ class PosSchedule(object):
             plt.plot(time, num_moving, label=f'Power supply: {supply}')
         plt.xlabel('time [sec]')
         plt.ylabel('num motors moving')
-        plt.title(pc.timestamp_str())
+        plt.title(f'move schedule density - petal id {self.petal.petal_id}\n{pc.timestamp_str()}')
         plt.legend()
-        path = pc.dirs['temp_files']
-        path = os.path.join(path, f'density_{pc.filename_timestamp_str()}.png')
+        if not path:
+            path = pc.dirs['temp_files']
+            path = os.path.join(path, f'density_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.png')
         plt.tight_layout()
         plt.savefig(path)
         plt.clf()
