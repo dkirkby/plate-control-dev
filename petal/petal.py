@@ -80,6 +80,7 @@ class Petal(object):
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
         phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         auto_disabling_on ... boolean, for experts only, controls whether to disable positioners if they fail to communicate over CAN
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
@@ -701,7 +702,7 @@ class Petal(object):
             set containing any posids for which sending the table failed
         """
         msg_prefix = 'send_and_execute_moves:'
-        # self.schedule.plot_density()
+        self.schedule.plot_density()
         
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
@@ -790,7 +791,7 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
         if self.save_debug:
-            self._write_hw_tables_to_disk(hw_tables, failures)
+            self._write_schedule_debug_data_to_disk(hw_tables, failures)
             
         # final cleanup
         if not self.simulator_on:
@@ -1029,7 +1030,7 @@ class Petal(object):
                 raise_error('_set_hardware_state: Could not read busses from petalcontroller.')
             canbusses = conf['can_bus_list']
             ready = self.comm.check_can_ready(canbusses)
-            if not(ready) or 'FAILED' in str(ready):
+            if not(ready) or ('FAILED' in str(ready)):
                 self.printfunc(f'WARNING: check_can_ready returned {ready}')
                 #raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
                 return f'FAILED: will not move to {hw_state}. check_can_ready returned {ready}.'
@@ -2173,7 +2174,7 @@ class Petal(object):
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
     
-    def _write_hw_tables_to_disk(self, hw_tables, failed_posids=None):
+    def _write_schedule_debug_data_to_disk(self, hw_tables, failed_posids=None):
         '''Saves a list of hardware-ready move table dictionaries to disk. These are
         the format used when sent to the petalcontroller. May be useful for debugging.
         Optional inclusion of collection of posids to identify as failed_to_send in
@@ -2186,9 +2187,11 @@ class Petal(object):
         failed_posids = set() if not failed_posids else failed_posids
         debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
         exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-        filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}.csv'
-        debug_path = os.path.join(pc.dirs['temp_files'], filename)
-        debug_table.write(debug_path, overwrite=True)  
+        filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}'
+        debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
+        debug_table.write(debug_path, overwrite=True)
+        density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
+        self.schedule.plot_density(density_path)
 
     def _postmove_cleanup(self, send_succeeded, send_failed):
         """This always gets called after performing a set of moves, so that

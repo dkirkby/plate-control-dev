@@ -149,6 +149,10 @@ theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure gettin
 keepout_typ_angular_padding = 3.5 # deg, per DESI-0899-v14
 low_risk_rotation = keepout_typ_angular_padding - 0.1 # deg, delta theta or phi smaller than this threshold have low risk if hardware should fail to execute them as scheduled
 
+# Annealing spreads out motor power consumption in time, as well as naturally reducing
+# potential collision frequency. See posschedulestage.py for more info.
+anneal_density = 0.5  # after taking the quantile cut, spread out the window per this factor
+
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
 nominals['LENGTH_R1']        = {'value':   3.0, 'tol':    1.0}
