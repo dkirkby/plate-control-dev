@@ -309,6 +309,9 @@ class Petal(object):
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
+        if hasattr(self, index):
+            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
+            self.etcs = set(etcs) & self.posids
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
@@ -2366,8 +2369,7 @@ class Petal(object):
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
             if hasattr(self, 'index'):
-                etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
-                for etc in etcs:
+                for etc in self.etcs:
                     self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
