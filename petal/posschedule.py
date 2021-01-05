@@ -299,7 +299,9 @@ class PosSchedule(object):
         multiplied by the argued safety_factor, and returned.
         """
         times = {table.total_time(suppress_automoves=False) for table in self.move_tables.values()}
-        return max(times) * safety_factor
+        if times:
+            return max(times) * safety_factor
+        return 0.0
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
