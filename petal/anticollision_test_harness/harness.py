@@ -38,7 +38,7 @@ include_neighbors = True
 
 # Whether to test some "expert" mode commands
 test_direct_dTdP = False
-test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
@@ -46,7 +46,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_single' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_dix' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -69,10 +69,11 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 0 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
+expand_keepouts = False
 
 # randomizer for correction moves
 randomizer_seed = 0
@@ -160,9 +161,11 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       anticollision   = 'adjust',
                       verbose         = False,
                       phi_limit_on    = False,
-                      save_debug      = True,
+                      save_debug      = False,
                       auto_disabling_on = True,
                       )
+    if expand_keepouts:
+        ptl.set_keepouts(posids='all', radT=0.05, radP=0.05, angT=5, angP=10)
     for key, val in sim_fail_freq.items():
         ptl.sim_fail_freq[key] = val
     ptl.limit_radius = None
