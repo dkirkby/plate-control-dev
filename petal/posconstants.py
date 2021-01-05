@@ -150,7 +150,7 @@ theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure gettin
 # Annealing spreads out motor power consumption in time, as well as naturally reducing
 # potential collision frequency. See posschedulestage.py for more info.
 anneal_quantile = 0.95  # for outlier rejection when selecting the initial anneal time window
-anneal_density = 0.7  # after taking the quantile cut, spread out the window per this factor
+anneal_density = 0.6  # after taking the quantile cut, spread out the window per this factor
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()

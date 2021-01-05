@@ -111,7 +111,6 @@ class PosScheduleStage(object):
         orig_max_time = max(sorted_times)
         anneal_window = max(filtered_times) / pc.anneal_density
         anneal_window = max(anneal_window, orig_max_time)  # for case of very large outlier
-        resolution = 0.1 # sec
         for map_posids in self._power_supply_map.values():
             posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
             for i, posid in enumerate(posids):
