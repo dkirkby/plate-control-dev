@@ -200,17 +200,12 @@ if uargs.match_radius == None and pecs_on:
 move_meas_settings = {key: uargs.__dict__[key] for key in ['match_radius', 'check_unmatched', 'test_tp', 'anticollision']}
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
-# motor settings (must be made known to petal.py and FIPOS)
-motor_current_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
-motor_settings = motor_current_settings | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
-other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
-
-# hanlde any overrides of positioner settings
-use_online_value = 'use_online_value'
+# organize positioner settings
+motor_current_keys = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
+motor_settings_keys = motor_current_keys | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 pos_settings = seq.pos_settings.copy()
-seq_has_motor_currents = any(key in motor_current_settings for key in seq.pos_settings)
 if uargs.motor_current:
-    new = {key: uargs.motor_current for key in motor_current_settings}
+    new = {key: uargs.motor_current for key in motor_current_keys}
     pos_settings.update(new)
     logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
 logger.info(f'Positioner settings for this test: {pos_settings}')
@@ -281,7 +276,7 @@ def apply_pos_settings(settings):
                 if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
                     assert2(False, f'unable to set {key}={value} for {posid}')
                 elif val_accepted == True:  # again, distinct from the None case
-                    if key in motor_settings:
+                    if key in motor_settings_keys:
                         motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
@@ -428,10 +423,13 @@ def get_parkable_neighbors(posids):
 
 # setup prior to running sequence
 if pecs_on:
-    # cache the pos settings
+    # cache the existing pos settings
     cache_posids = get_posids()
     cache_path = cache_current_pos_settings(cache_posids)
     logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
+    
+    # apply new pos settings
+    apply_pos_settings(pos_settings)
     
     # set phi limit angle for the test
     old_phi_limits = pecs.ptlm.get_phi_limit_angle()
