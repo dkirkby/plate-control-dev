@@ -104,20 +104,34 @@ class PosScheduleStage(object):
                  if not(table.is_motionless)}
         if not times:
             return
-        sorted_times = sorted(times.values())
-        sorted_posids = sorted(times, key=lambda k: times[k])
+        sorted_times = sorted(times.values())[::-1]
+        sorted_posids = sorted(times, key=lambda k: times[k])[::-1]
         cut = np.quantile(sorted_times, pc.anneal_quantile)  # prevent large outlier from skewing effect of "anneal_density" factor below
         filtered_times = [t for t in sorted_times if t <= cut]
         orig_max_time = max(sorted_times)
         anneal_window = max(filtered_times) / pc.anneal_density
         anneal_window = max(anneal_window, orig_max_time)  # for case of very large outlier
+        def first_within(x, vec):
+            for i, test in enumerate(vec):
+                if test <= x:
+                    return i
+            return None
         for map_posids in self._power_supply_map.values():
             posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
-            for i, posid in enumerate(posids):
-                prepause = 0.0 if i % 2 else anneal_window - times[posid]
-                assert prepause >= 0.0
-                self.move_tables[posid].insert_new_row(0)
-                self.move_tables[posid].set_prepause(0, prepause)
+            times2 = [sorted_times[i] for i in range(len(sorted_posids)) if sorted_posids[i] in map_posids]
+            prepause = 0.0
+            while posids:
+                open_time = anneal_window - prepause
+                i = first_within(open_time, times2)
+                if i == None:
+                    prepause = 0.0
+                else:
+                    posid = posids[i]
+                    self.move_tables[posid].insert_new_row(0)
+                    self.move_tables[posid].set_prepause(0, prepause)
+                    prepause += times2[i]
+                    del posids[i]
+                    del times2[i]
 
     def equalize_table_times(self):
         """Makes all move tables in the stage have an equal total time length,
