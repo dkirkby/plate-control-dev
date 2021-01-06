@@ -343,3 +343,14 @@ class PetalComm(object):
             return self._call_device('check_can_ready', can_bus_list)
         except Exception as e:
             return 'FAILED: could not check can ready: %s' % str(e)
+
+    def powercycle_systec_boards(self):
+        """
+        Petalcontroller powercycles systec boards with sufficient timing to
+        recover from problems. Recommended to not be in OBSERVING when calling
+        this function.
+        """
+        try:
+            return self._call_device('powercycle_systec_boards')
+        except Exception as e:
+            return 'FAILED: could not powercycle_systec_boards: %s' % str(e)
