@@ -22,8 +22,11 @@ from astropy.table import Table as AstropyTable
 # Set KPNO_SIM to True
 KPNO_SIM = False
 
-if KPNO_SIM:
+try:
     from DOSlib.positioner_index import PositionerIndex
+    INDEX_AVAILABLE = True
+except ImportError:
+    INDEX_AVAILABLE = False
 
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
@@ -40,7 +43,7 @@ try:
     from DOSlib.util import raise_error
 except ImportError:
     def raise_error(*args, **kwargs):
-        print('RAISE_ERROR: args: %r, kwargs: *r' % (args, kwargs))
+        print('RAISE_ERROR: args: %r, kwargs: %r' % (args, kwargs))
         raise RuntimeError(*args)  ##, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
@@ -135,6 +138,9 @@ class Petal(object):
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
+        if INDEX_AVAILABLE and not hasattr(self, 'index'): # Don't overwrite PetalApp's index
+            self.index = PositionerIndex()
+
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
@@ -221,7 +227,6 @@ class Petal(object):
         self._initialize_pos_flags(initialize=True, enabled_only=False)
         self._apply_all_state_enable_settings()
 
-        self.hw_states = {}
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -304,6 +309,9 @@ class Petal(object):
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
+        if hasattr(self, 'index'):
+            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
+            self.etcs = set(etcs) & self.posids
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
@@ -2362,6 +2370,9 @@ class Petal(object):
             if hasattr(self, 'disabled_fids') and ids == 'all':
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
+            if hasattr(self, 'index'):
+                for etc in self.etcs:
+                    self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
                 # Unsets flags in reset_mask
