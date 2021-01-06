@@ -85,7 +85,7 @@ seqs.append(seq)
 # GENERIC XY TESTS
 # ----------------
 import xy_targets_generator
-n_targs = [24, 100]
+n_targs = [4, 24, 100]
 calib_seqs = {}
 for n in n_targs:
     for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
