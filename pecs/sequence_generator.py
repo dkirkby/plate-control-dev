@@ -85,22 +85,23 @@ seqs.append(seq)
 # GENERIC XY TESTS
 # ----------------
 import xy_targets_generator
-n_targs = 24
+n_targs = [24, 100]
 calib_seqs = {}
-for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
-    seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""}',
-                            long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}',
-                            )
-    targs = xy_targets_generator.filled_annulus(n_points=n_targs,
-                                                r_min=0.0,
-                                                r_max=3.1 if limited else 6.0,
-                                                random=False)
-    for targ in targs:
-        move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
-        seq.append(move)
-    seqs.append(seq)
-    if limited == True:
-        calib_seqs['xy'] = seq  # for re-use in calibration script below
+for n in n_targs:
+    for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
+        seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""} {n}',
+                                long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}',
+                                )
+        targs = xy_targets_generator.filled_annulus(n_points=n,
+                                                    r_min=0.0,
+                                                    r_max=3.1 if limited else 6.0,
+                                                    random=False)
+        for targ in targs:
+            move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
+            seq.append(move)
+        seqs.append(seq)
+        if limited == True:
+            calib_seqs['xy'] = seq  # for re-use in calibration script below
 
 
 # BASIC HOMING SEQUENCES
