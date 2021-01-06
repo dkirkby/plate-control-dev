@@ -91,7 +91,7 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=False,
+                 printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
                  phi_limit_on=True, sync_mode='hard'):
@@ -138,7 +138,7 @@ class Petal(object):
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
-        if INDEX_AVAILABLE and not hasattr(self, index): #Don't overwrite PetalApp's index
+        if INDEX_AVAILABLE and not hasattr(self, 'index'): #Don't overwrite PetalApp's index
             self.index = PositionerIndex()
 
         self.verbose = verbose # whether to print verbose information at the terminal
@@ -309,8 +309,8 @@ class Petal(object):
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
-        if hasattr(self, index):
-            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
+        if hasattr(self, 'index'):
+            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_ID')
             self.etcs = set(etcs) & self.posids
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
@@ -2368,7 +2368,7 @@ class Petal(object):
             if hasattr(self, 'disabled_fids') and ids == 'all':
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
-            if hasattr(self, 'index'):
+            if hasattr(self, 'etcs'):
                 for etc in self.etcs:
                     self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
