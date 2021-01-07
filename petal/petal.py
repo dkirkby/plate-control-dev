@@ -91,7 +91,7 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=False,
+                 printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
                  phi_limit_on=True, sync_mode='hard'):
@@ -2369,7 +2369,7 @@ class Petal(object):
             if hasattr(self, 'disabled_fids') and ids == 'all':
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
-            if hasattr(self, 'index'):
+            if hasattr(self, 'etcs'):
                 for etc in self.etcs:
                     self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
