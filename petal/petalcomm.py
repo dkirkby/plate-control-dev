@@ -116,16 +116,17 @@ class PetalComm(object):
                 args, kwargs are passed to the remove function
         Returns: return value received from remote function
         """
+        timeout = kwargs.get('pyrotimeout', 20.0)
         try:
             # kh: to prevent blocking calls if the connection is down
-            self.device['proxy']._pyroTimeout = 20.0
+            self.device['proxy']._pyroTimeout = timeout
             return getattr(self.device['proxy'],cmd)(*args, **kwargs)
         except:
             if 'pyro_uri' in self.device:
                 try:
                     self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
                     # kh: to prevent blocking calls if the connection is down
-                    self.device['proxy']._pyroTimeout = 20.0
+                    self.device['proxy']._pyroTimeout = timeout
                     return getattr(self.device['proxy'],cmd)(*args, **kwargs)
                 except Exception as e:
                     raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
@@ -351,6 +352,6 @@ class PetalComm(object):
         this function.
         """
         try:
-            return self._call_device('powercycle_systec_boards')
+            return self._call_device('powercycle_systec_boards', pyrotimeout=40.0)
         except Exception as e:
             return 'FAILED: could not powercycle_systec_boards: %s' % str(e)
