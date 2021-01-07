@@ -174,7 +174,7 @@ phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / _min_leng
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Hardware (operations) States
-PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                  'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                                  'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
                                                  'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
@@ -185,7 +185,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                                  #PetalBox Power ON - controlled by physical raritan switch
                                                  'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                                  'PS2_EN':('off', 1.0)}),
-                    'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'STANDBY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                              'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
                                              'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                              'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
@@ -196,7 +196,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                              #PetalBox Power ON - controlled by physical raritan switch
                                              'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                              'PS2_EN':('off', 1.0)}),
-                    'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'READY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                            'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                            'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                            'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
@@ -207,7 +207,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                            #PetalBox Power ON - controlled by physical raritan switch
                                            'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
                                            'PS2_EN': ('off', 1.0)}),
-                    'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'OBSERVING' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                                'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                                'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
