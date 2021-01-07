@@ -52,7 +52,7 @@ def _regular_filled_annulus(n_points, r_min, r_max, verbose, _is_first_pass=True
     selected_xy = [grid[i] for i in range(len(grid)) if grid_r[i] <= cutoff]
     scale = r_max / max(selected_r)
     scaled_xy = [[xy[0]*scale, xy[1]*scale] for xy in selected_xy]
-    if _is_first_pass:
+    if _is_first_pass and n_points > 4:
         retry = _regular_filled_annulus(n_points=n_points-1, r_min=r_min, r_max=r_max,
                               verbose=verbose, _is_first_pass=False)
         current_err = len(scaled_xy) - n_points
