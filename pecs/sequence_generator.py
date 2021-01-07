@@ -82,6 +82,7 @@ for i in range(n_moves):
     seq.append(move)
 seqs.append(seq)
 
+
 # GENERIC XY TESTS
 # ----------------
 import xy_targets_generator
@@ -100,8 +101,6 @@ for n in n_targs:
             move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
             seq.append(move)
         seqs.append(seq)
-        if limited == True:
-            calib_seqs['xy'] = seq  # for re-use in calibration script below
 
 
 # BASIC HOMING SEQUENCES
@@ -128,10 +127,8 @@ seqs.append(seq)
 cmd = 'posintTP'
 settings = {'ALLOW_EXCEED_LIMITS': True}
 name_note = ', travel limits OFF'
-for axis in ['theta', 'phi']:
-    seq = sequence.Sequence(short_name=f'arc {axis}',
-                            long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}',
-                            pos_settings=settings)
+
+def arc_targets(axis, n_points, start, step):
     if axis == 'theta':
         thetas = [-170+i*20 for i in range(18)]
         phi = 130
@@ -140,12 +137,19 @@ for axis in ['theta', 'phi']:
         theta = 0
         phis = [120+i*3 for i in range(18)]
         targets = [[theta, phi] for phi in phis]
-    for i in range(len(targets)):
-        target = targets[i]
+    return targets
+targets = {'theta': arc_targets('theta', n_points=18, start=-170, step=20),
+           'phi': arc_targets('phi', n_points=18, start=120, step=3),
+           }
+for axis, targs in targets.items():
+    seq = sequence.Sequence(short_name=f'arc {axis}',
+                            long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}',
+                            pos_settings=settings)
+    for i in range(len(targs)):
+        target = targs[i]
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', allow_corr=False)
         seq.append(move)
     seqs.append(seq)
-    calib_seqs[axis] = seq  # for re-use in calibration script below
     
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
@@ -173,10 +177,18 @@ seq = sequence.Sequence(short_name='RC calib',
                         )
 move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note='homing', allow_corr=False)
 seq.append(move)
+targets = {'xy': xy_targets_generator.filled_annulus(n_points=24, r_min=0.0, r_max=3.1, random=False),
+           'theta': arc_targets('theta', n_points=18, start=-170, step=20),
+           'phi': arc_targets('phi', n_points=18, start=120, step=3),
+           }
 for key in ['theta', 'phi', 'xy']:
-    for move in calib_seqs[key]:
-        move.log_note = f'{key} {"arc" if key in ["theta", "phi"] else "grid"}'
-        move.allow_corr = False
+    targs = targets[key]
+    cmd = 'posintTP' if key in {'theta', 'phi'} else 'poslocXY'
+    for i in range(len(targs)):
+        target = targs[i]
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1],
+                             log_note=f'{key} {"arc" if key in ["theta", "phi"] else "grid"}',
+                             allow_corr=False)
         seq.append(move)
 seqs.append(seq)
 
