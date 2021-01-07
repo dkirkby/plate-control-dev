@@ -806,7 +806,7 @@ class Petal(object):
         if disable_limit_angle:
             self.limit_angle = None
         requests = {}
-        posids = {posids} if isinstance(posids, str) else set(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         err_prefix = 'quick_move: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert cmd in pc.valid_move_commands, f'{err_prefix} invalid move command {cmd}'
@@ -854,8 +854,7 @@ class Petal(object):
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''
-        if posids == 'all':
-            posids = self.all_enabled_posids()
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         n_repeats = int(n_repeats)
         delay = float(delay)
         assert n_repeats > 0, f'dance: invalid arg {n_repeats} for n_repeats'
