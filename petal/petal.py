@@ -43,7 +43,7 @@ try:
     from DOSlib.util import raise_error
 except ImportError:
     def raise_error(*args, **kwargs):
-        print('RAISE_ERROR: args: %r, kwargs: *r' % (args, kwargs))
+        print('RAISE_ERROR: args: %r, kwargs: %r' % (args, kwargs))
         raise RuntimeError(*args)  ##, **kwargs)
 try:
     # Perhaps force this to be a requirement in the future?
@@ -712,7 +712,7 @@ class Petal(object):
                 debug_table[key] = [str(x) for x in debug_table[key]]
             debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
             exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-            filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}.csv'
+            filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}.csv'
             debug_path = os.path.join(pc.dirs['temp_files'], filename)
             debug_table.write(debug_path, overwrite=True)
             
@@ -804,7 +804,7 @@ class Petal(object):
         if disable_limit_angle:
             self.limit_angle = None
         requests = {}
-        posids = {posids} if isinstance(posids, str) else set(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         err_prefix = 'quick_move: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert cmd in pc.valid_move_commands, f'{err_prefix} invalid move command {cmd}'
@@ -852,8 +852,7 @@ class Petal(object):
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''
-        if posids == 'all':
-            posids = self.all_enabled_posids()
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         n_repeats = int(n_repeats)
         delay = float(delay)
         assert n_repeats > 0, f'dance: invalid arg {n_repeats} for n_repeats'
@@ -1166,7 +1165,8 @@ class Petal(object):
         fiducial, this call does NOT turn the fiducial physically on or off.
         It only saves a value.
         
-        Returns a boolean whether the value was accepted.
+        Returns a boolean whether the value was accepted, or in special cases,
+        None (see below).
         
         The boolean arg check_existing only changes things if the old value
         differs from new. A special return value of None is returned if the
@@ -1175,12 +1175,14 @@ class Petal(object):
         Comment allows associating a note string with the change. If a comment
         is provided, then check_existing will be automatically forced to True.
         """
+        if comment:
+            check_existing = True
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
         if key in pc.require_comment_to_store and not comment:
                 raise ValueError(f'setting {key} requires an accompanying comment string')
         state = self.states[device_id]
-        if check_existing and comment:
+        if check_existing:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
@@ -1190,10 +1192,13 @@ class Petal(object):
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
 
-    def batch_set_posfid_val(self, settings):
+    def batch_set_posfid_val(self, settings, check_existing=False, comment=''):
         """ Sets several values for several positioners or fiducials.
-            INPUT: settings ... dict (keyed by devid) of dicts {state key:value}
-                                same as output of batch_get_posfid_val
+            INPUT:  settings ... dict (keyed by devid) of dicts {state key:value}
+                                 same as output of batch_get_posfid_val
+                    check_existing ... return None and make no changes if new value matches existing
+                    comment ... add string to log_note associated with value, forces check_existing=True
+                    
             OUTPUT: accepts ... dict (keyed by devid) of dicts {state key:bool}
                                 where the bool indicates if the value was accepted
 
@@ -1205,7 +1210,7 @@ class Petal(object):
             if devid in devids:
                 accepts[devid] = {}
                 for setting, value in sets.items():
-                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value)
+                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value, check_existing, comment)
         return accepts
     
     def get_posids_with_commit_pending(self):
@@ -2122,7 +2127,7 @@ class Petal(object):
             if err:
                 self.printfunc(err)
                 m.display(self.printfunc)
-        if self.schedule_stats.is_enabled():
+        if self.schedule_stats.is_enabled() and any(hw_tables):
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
 
