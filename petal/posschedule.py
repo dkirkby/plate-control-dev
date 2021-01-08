@@ -507,7 +507,7 @@ class PosSchedule(object):
             should_anneal ... boolean, enables/disables annealing
         """
         if should_anneal:
-            stage.anneal_tables(suppress_automoves=False)
+            stage.anneal_tables(suppress_automoves=False, mode=self.petal.anneal_mode)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -647,7 +647,7 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(suppress_automoves=not_the_last_stage)
+                stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))

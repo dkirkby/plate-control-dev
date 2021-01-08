@@ -27,7 +27,7 @@ subset7b = {21, 22, 26, 27, 28, 33, 34}
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = subset7b # note pre-cooked options above
+device_loc_to_command = 'all' # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
 retract_and_disable = set() #{87,88} # enter device locations to simulate those positioners as retracted and disabled
@@ -46,7 +46,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_double' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_single' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -161,6 +161,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       verbose         = False,
                       phi_limit_on    = False,
                       save_debug      = True,
+                      anneal_mode     = 'filled',
                       )
     for key, val in sim_fail_freq.items():
         ptl.sim_fail_freq[key] = val
