@@ -2202,7 +2202,7 @@ class Petal(object):
         failed_posids = set() if not failed_posids else failed_posids
         debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
         exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-        filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}{pc.filename_timestamp_str()}'
+        filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}'
         debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
         debug_table.write(debug_path, overwrite=True)
         density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
