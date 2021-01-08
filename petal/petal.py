@@ -2127,7 +2127,7 @@ class Petal(object):
             if err:
                 self.printfunc(err)
                 m.display(self.printfunc)
-        if self.schedule_stats.is_enabled():
+        if self.schedule_stats.is_enabled() and any(hw_tables):
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
 
