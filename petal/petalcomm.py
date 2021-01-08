@@ -116,7 +116,7 @@ class PetalComm(object):
                 args, kwargs are passed to the remove function
         Returns: return value received from remote function
         """
-        timeout = kwargs.get('pyrotimeout', 20.0)
+        timeout = kwargs.pop('pyrotimeout', 20.0)
         try:
             # kh: to prevent blocking calls if the connection is down
             self.device['proxy']._pyroTimeout = timeout
