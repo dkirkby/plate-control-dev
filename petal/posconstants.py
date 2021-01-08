@@ -148,7 +148,9 @@ theta_hardstop_ambig_tol = 5.0 # deg, for determining when within ambiguous zone
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
 
 # Annealing spreads out motor power consumption in time, as well as naturally reducing
-# potential collision frequency. See posschedulestage.py for more info.
+# potential collision frequency. See posschedulestage.py for more info. Do *not* increase
+# the anneal_density values below on a whim. These values were chosen to broadly ensure
+# not too many motors spinning simultaneously.
 anneal_density = {'filled': 0.5,
                   'ramped': 0.35,
                   }
