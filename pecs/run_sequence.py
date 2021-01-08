@@ -267,7 +267,7 @@ def apply_pos_settings(settings):
             else:
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
-    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
+    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings, check_existing=True)
     for accepted in accepted_by_petal.values():
         for posid, these_accepted in accepted.items():
             for key, val_accepted in these_accepted.items():
