@@ -101,6 +101,7 @@ class PosScheduleStage(object):
         If anneal_time is less than the time it takes to execute the longest move
         table, then that longer execution time will be used instead of anneal_time.
         """
+        assert mode in pc.anneal_density, f'unrecognized anneal mode {mode}'
         times = {posid: table.total_time(suppress_automoves=suppress_automoves)
                  for posid, table in self.move_tables.items()
                  if not(table.is_motionless)}
@@ -109,7 +110,7 @@ class PosScheduleStage(object):
         sorted_times = sorted(times.values())[::-1]
         sorted_posids = sorted(times, key=lambda k: times[k])[::-1]
         orig_max_time = max(sorted_times)
-        anneal_window = sum(sorted_times) / len(sorted_times) / pc.anneal_density
+        anneal_window = sum(sorted_times) / len(sorted_times) / pc.anneal_density[mode]
         anneal_window = max(anneal_window, orig_max_time)  # for case of very large outlier
         
         if mode == 'filled':
@@ -136,8 +137,6 @@ class PosScheduleStage(object):
                         del times2[i]
                         
         elif mode == 'ramped':
-            #sorted_times = sorted(times.values())
-            #sorted_posids = sorted(times, key=lambda k: times[k])
             resolution = 0.1 # sec
             for map_posids in self._power_supply_map.values():
                 posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
