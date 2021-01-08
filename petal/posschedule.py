@@ -228,7 +228,7 @@ class PosSchedule(object):
             return
         for kind in ['regular', 'expert']:
             received = self._all_requested_posids[kind]
-            accepted = set(self._requests.keys()) if kind == 'regular' else self.get_posids_with_expert_tables()
+            accepted = self.regular_requests_accepted if kind == 'regular' else self.get_posids_with_expert_tables()
             rejected = received - accepted
             if len(received) > 0:
                 prefix = f'num {kind} target requests'
