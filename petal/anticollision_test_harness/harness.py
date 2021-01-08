@@ -161,7 +161,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       verbose         = False,
                       phi_limit_on    = False,
                       save_debug      = True,
-                      anneal_mode     = 'filled',
+                      anneal_mode     = 'ramped',
                       )
     for key, val in sim_fail_freq.items():
         ptl.sim_fail_freq[key] = val

@@ -314,7 +314,7 @@ class Petal(object):
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
         if hasattr(self, 'index'):
-            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_TYPE')
+            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_ID')
             self.etcs = set(etcs) & self.posids
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
