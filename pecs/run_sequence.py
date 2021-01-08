@@ -429,7 +429,8 @@ if pecs_on:
     logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
     
     # apply new pos settings
-    apply_pos_settings(pos_settings)
+    new_settings = {posid: pos_settings.copy() for posid in cache_posids}
+    apply_pos_settings(new_settings)
     
     # set phi limit angle for the test
     old_phi_limits = pecs.ptlm.get_phi_limit_angle()
