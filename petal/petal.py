@@ -1171,7 +1171,8 @@ class Petal(object):
         fiducial, this call does NOT turn the fiducial physically on or off.
         It only saves a value.
         
-        Returns a boolean whether the value was accepted.
+        Returns a boolean whether the value was accepted, or in special cases,
+        None (see below).
         
         The boolean arg check_existing only changes things if the old value
         differs from new. A special return value of None is returned if the
@@ -1180,12 +1181,14 @@ class Petal(object):
         Comment allows associating a note string with the change. If a comment
         is provided, then check_existing will be automatically forced to True.
         """
+        if comment:
+            check_existing = True
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
         if key in pc.require_comment_to_store and not comment:
                 raise ValueError(f'setting {key} requires an accompanying comment string')
         state = self.states[device_id]
-        if check_existing and comment:
+        if check_existing:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
@@ -1195,10 +1198,13 @@ class Petal(object):
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
 
-    def batch_set_posfid_val(self, settings):
+    def batch_set_posfid_val(self, settings, check_existing=False, comment=''):
         """ Sets several values for several positioners or fiducials.
-            INPUT: settings ... dict (keyed by devid) of dicts {state key:value}
-                                same as output of batch_get_posfid_val
+            INPUT:  settings ... dict (keyed by devid) of dicts {state key:value}
+                                 same as output of batch_get_posfid_val
+                    check_existing ... return None and make no changes if new value matches existing
+                    comment ... add string to log_note associated with value, forces check_existing=True
+                    
             OUTPUT: accepts ... dict (keyed by devid) of dicts {state key:bool}
                                 where the bool indicates if the value was accepted
 
@@ -1210,7 +1216,7 @@ class Petal(object):
             if devid in devids:
                 accepts[devid] = {}
                 for setting, value in sets.items():
-                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value)
+                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value, check_existing, comment)
         return accepts
     
     def get_posids_with_commit_pending(self):
