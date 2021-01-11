@@ -5,7 +5,7 @@ parser.add_argument('-tl', '--theta_lower_limit', type=float, default=None, help
 parser.add_argument('-pu', '--phi_upper_limit', type=float, default=None, help='Angle which no posid should exceed on phi.')
 parser.add_argument('-pl', '--phi_lower_limit', type=float, default=None, help='Angle which no posid should be below on phi.')
 max_iter = 5
-parser.add_argument('-iter', '--iterations', type=int, default=1, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
+parser.add_argument('-iter', '--iterations', type=int, default=2, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
 park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
 parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}.')
