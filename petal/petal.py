@@ -899,7 +899,8 @@ class Petal(object):
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
-        if fidids == 'all' and setting=='off':
+        # 20210112 - MS says don't use all_fiducials_off - KF
+        if False #fidids == 'all' and setting=='off':
             self.printfunc('set_fiducials: calling comm.all_fiducials_off')
             ret = self.comm.all_fiducials_off()
             if 'FAILED' in ret:
