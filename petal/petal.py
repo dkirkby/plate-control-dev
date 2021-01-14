@@ -163,6 +163,7 @@ class Petal(object):
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
+        self.db_commit_on = False
         if db_commit_on and DB_COMMIT_AVAILABLE and not self.simulator_on:
             self.enable_db_commit()
         self.local_commit_on = local_commit_on
