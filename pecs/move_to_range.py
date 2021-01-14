@@ -5,7 +5,7 @@ parser.add_argument('-tl', '--theta_lower_limit', type=float, default=None, help
 parser.add_argument('-pu', '--phi_upper_limit', type=float, default=None, help='Angle which no posid should exceed on phi.')
 parser.add_argument('-pl', '--phi_lower_limit', type=float, default=None, help='Angle which no posid should be below on phi.')
 max_iter = 5
-parser.add_argument('-iter', '--iterations', type=int, default=1, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
+parser.add_argument('-iter', '--iterations', type=int, default=2, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
 park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
 parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}.')
@@ -13,6 +13,7 @@ modes = ['posintTP', 'poslocTP']
 parser.add_argument('-m', '--mode', type=str, default=modes[0], help=f'str, controls which tp coordinate type checks are done in. Options: {modes}. Defaults to {modes[0]}.')
 default_padding = 10.0
 parser.add_argument('-p', '--angle_padding', type=float, default=default_padding, help=f'Float, angle padding by which to exceed limits when only one limit is specified. Defaults to {default_padding}.')
+parser.add_argument('-d', '--disable', action='store_true', help='Argue to disable positioners that remain out of range at the end of iterations.')
 uargs = parser.parse_args()
 assert uargs.iterations < max_iter, f'cannot exceed {max_iter} iterations.'
 command = uargs.mode
@@ -92,3 +93,6 @@ if not out_of_limits:
     print(f'SUCCESS! All {len(cs.posids)} selected positioners within desired limits!')
 else:
     print(f'FAILED. {len(out_of_limits)} positioners remain beyond desired limits. POSIDS: {sorted(list(out_of_limits))}')
+    if uargs.disable:
+        print('Disabling posids that remain out of range.')
+        cs.ptlm.disable_positioners(out_of_limits, comment='move_to_range: disabled because still out of range.')

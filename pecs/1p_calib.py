@@ -15,12 +15,13 @@ def_frac = 1.0
 parser.add_argument('-m', '--mode', type=str, default=def_mode, help=f'Which pair or tp angles to adjust, posTP or offsetsTP. Default is {def_mode}.')
 parser.add_argument('-t', '--tp_tol', type=float, default=def_tol, help=f'Minimum error in mm over which to update TP. Default is {def_tol} mm.')
 parser.add_argument('-f', '--tp_frac', type=float, default=def_frac, help=f'Percentatge of error to apply in the TP update. Maximum 1.0. Default is {def_frac}.')
-parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
-parser.add_argument('-n', '--no_update', action='store_true', help='suppress auto-updating of TP values')
-parser.add_argument('-prep', '--prepark', action='store_true', help='automatically do an initial parking move prior to the measurement')
+parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default in PECS config.')
+parser.add_argument('-n', '--no_update', action='store_true', help='suppress auto-updating of TP values. Defaults to False.')
+parser.add_argument('-prep', '--prepark', action='store_true', help='automatically do an initial parking move prior to the measurement. Defaults to False.')
 parser.add_argument('-ud', '--use_disabled', action='store_true', help='Use disabled positioners in calibration as well. (All measured positioners will be used.)')
 max_fvc_iter = 10
 parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
+parser.add_argument('-u', '--check_unmatched', action='store_true', help='Whether or not to check and disable unmatched positioners and their neighbors. Defaults to False.')
 uargs = parser.parse_args()
 assert uargs.mode in ['posTP', 'offsetsTP'], 'mode argument must be either posTP or offsetsTP!'
 assert uargs.tp_frac <= 1.0, 'Updates fraction cannot be greater than 1.0!'
@@ -29,7 +30,7 @@ assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_m
 import pandas as pd
 
 def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac=1.0,
-             match_radius=None, num_meas=1, use_disabled=False):
+             match_radius=None, num_meas=1, use_disabled=False, check_unmatched=False):
     '''
     Function to do a onepoint calibration with given PECS isntance.
     args:
@@ -49,7 +50,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
     note = pecs.decorate_note(log_note=f'1p_calib_{mode}')
     if move:
         pecs.ptlm.park_positioners(pecs.posids, mode='normal', log_note=f'Moving for 1p_calib_{mode}')
-    _, meas, matched, _ = pecs.fvc_measure(test_tp=False, check_unmatched=False,
+    _, meas, matched, _ = pecs.fvc_measure(test_tp=False, check_unmatched=check_unmatched,
                                            match_radius=match_radius, num_meas=num_meas)
     if use_disabled:
         calib_pos = meas.loc[sorted(matched)]
@@ -69,7 +70,7 @@ if __name__ == '__main__':
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
                        tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
-                       num_meas=uargs.num_meas, use_disabled=uargs.use_disabled)
+                       num_meas=uargs.num_meas, use_disabled=uargs.use_disabled, check_unmatched=uargs.check_unmatched)
     if uargs.mode == 'posTP':
         key1, key2 = 'POS_T', 'POS_P'
     else:
