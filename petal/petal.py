@@ -163,10 +163,8 @@ class Petal(object):
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
-        self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
-        if self.db_commit_on:
-            os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
-            self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
+        if db_commit_on and DB_COMMIT_AVAILABLE and not self.simulator_on:
+            self.enable_db_commit()
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
@@ -1238,6 +1236,14 @@ class Petal(object):
         """
         return self.comm.pbget(key)
 
+    def enable_db_commit(self):
+        '''
+        Allows committing to DB (runs in init when not simulated)
+        '''
+        self.db_commit_on = True
+        os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+        self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
+
     def commit(self, mode='move', log_note='', calib_note=''):
         '''Commit move data or calibration data to DB and/or local config and
         log files.
@@ -1295,7 +1301,7 @@ class Petal(object):
         '''
         assert mode in {'move', 'calib'}, f'invalid mode {mode} for _send_to_db_as_necessary'
         is_move = mode == 'move'
-        if self.db_commit_on and not self.simulator_on:
+        if self.db_commit_on:
             if is_move:
                 type1, type2 = 'pos_move', 'fid_data'
             else:
@@ -1318,7 +1324,8 @@ class Petal(object):
                                        f'commit requests for expid {self._exposure_id}, iteration ' +
                                        f'{self._exposure_iter}. These have the potential to overwrite data.')
                     self._devids_committed_this_exposure |= committed_posids
-        
+        else:
+            self.printfunc('DB commit not available.')
         # known minor issue: if local_log_on simultaneously with DB, these may clear the note field
         if is_move:
             for state in self.altered_states:
@@ -1371,7 +1378,8 @@ class Petal(object):
         OUTPUTS:
             No outputs
         '''
-        if not self.db_commit_on or self.simulator_on:
+        if not self.db_commit_on:
+            self.printfunc('DB commit not available.')
             return
         allowed_keys = pc.late_commit_defaults.keys()
         valid_posids = {p for p in data.keys() if p in self.posids}
