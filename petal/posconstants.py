@@ -139,6 +139,7 @@ axis_labels = ('theta', 'phi')
 err_thresh = False # tracing error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
 up_frac = 1.0 # amount of update to apply to posTP
+unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
