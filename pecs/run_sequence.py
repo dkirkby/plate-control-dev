@@ -3,7 +3,9 @@
 Perform a sequence of moves + FVC measurements on hardware. (Note that any positioner
 calibration parameters or motor settings altered during the sequence are stored only
 in memory, so a re-initialization of the petal software should restore you to the
-original state, as defined by the posmove and constants databases.)
+original state, as defined by the posmove and constants databases. Also, parking moves
+will include final antibacklash rotations, regardless of the antibacklash settings
+for the main body of the sequence.)
 """
 
 import os
@@ -462,7 +464,9 @@ def do_pause():
     if last_move_time == KeyboardInterrupt:
         logger.info('Keyboard interrupt detected.')
         raise StopIteration
-        
+
+parking_overrides = {'FINAL_CREEP_ON': True, 'ANTIBACKLASH_ON': True}      
+  
 def park(park_option, is_prepark=True):
     '''Perform (or skip if appropriate) parking based on argued park_option.'''
     global last_move_time
@@ -482,6 +486,24 @@ def park(park_option, is_prepark=True):
     if is_prepark:
         last_move_time = time.time()
     logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
+    original_settings = {}
+    override_settings = {}
+    for key in parking_overrides:
+        overridden_keys = set()
+        if pecs_on:
+            originals = pecs.quick_query(key=key, posids=all_to_park, mode='iterable') # quick_query returns a dict with keys=posids
+        else:
+            originals = {posid: pos_settings[key] if key in pos_settings else sequence.pos_defaults[key] for posid in all_to_park}
+        for posid, original in originals.items():
+            if original != parking_overrides[key]:
+                if posid not in override_settings:
+                    override_settings[posid] = {}
+                    original_settings[posid] = {}
+                original_settings[posid][key] = original
+                override_settings[posid][key] = parking_overrides[key]
+                overridden_keys.add(key)
+    for key in overridden_keys:
+        logger.info(f'During parking, {key} will be temporarily overridden with value: {parking_overrides[key]}')
     if real_moves:
         kwargs = {'posids': all_to_park,
                   'mode': 'normal',
@@ -496,7 +518,9 @@ def park(park_option, is_prepark=True):
             pecs.tp_frac = 1.0
             if orig_tp_frac != pecs.tp_frac:
                 logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
+        apply_pos_settings(override_settings)
         pecs.park_and_measure(**kwargs)
+        apply_pos_settings(original_settings)
         if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
             pecs.tp_frac = orig_tp_frac
             logger.info(f'Restored tp update error fraction to {pecs.tp_frac}')
