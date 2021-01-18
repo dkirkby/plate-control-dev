@@ -55,10 +55,10 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
 
 # Nominal polygon buffers. These are temporary angular and radial keepout expansions
 # applied during target. They add to any existing expansions --- not override.
-buffers = {'radP': 0.05,  # mm
-           'angP': 4.0,  # deg
-           'radT': 0.0,  # mm
-           'angT': 2.0,  # deg
+buffers = {'KEEPOUT_EXPANSION_PHI_RADIAL': 0.05,  # mm
+           'KEEPOUT_EXPANSION_PHI_ANGULAR': 10.0,  # deg
+           'KEEPOUT_EXPANSION_THETA_RADIAL': 0.0,  # mm
+           'KEEPOUT_EXPANSION_THETA_ANGULAR': 5.0,  # deg
            }
 if uargs.no_buffer:
     buffers = {}
@@ -165,6 +165,7 @@ def make_sequence_for_one_petal(table):
                       anticollision   = 'adjust',
                       verbose         = False,
                       phi_limit_on    = uargs.enable_phi_limit,
+                      save_debug      = False,
                       )
     
     # set up calibration parameters
@@ -176,22 +177,26 @@ def make_sequence_for_one_petal(table):
             state.store(key, row[key])
     ptl.collider.refresh_calibrations()
     
-    # store keepouts to disk for when varying them to generate targets
-    if buffers:
-        ptl.cache_keepouts()
+    def set_keepout_buffers(posids, sign=1):
+        '''Set keepout expansion buffers. Sign is +1 (add) or -1 (subtract) from existing.'''
+        if not buffers:
+            return
+        for key, val in buffers.items():
+            for posid in posids:
+                adjusted = ptl.states[posid]._val[key] + sign * val
+                ptl.states[posid].store(key, adjusted, register_if_altered=False)
+        ptl.collider.refresh_calibrations()
+        print(f'Keepout polygons on {len(posids)} pos adjusted by {sign:+2} * {buffers}.')
     
     # helper functions
     def generate_target_set(posids):
         '''Produces one target set, for the argued collection of posids. Returns a
         dict with keys = posids and values = target locations (poslocXY coordinates).
         '''
-        targets_obsTP = {}
+        targets_locTP = {}
         targets_posXY = {}
-        if buffers:
-            ptl.set_keepouts(posids=posids,
-                             classify_retracted=None,
-                             comment='temp expand during simulated target set generation',
-                             **buffers)
+        set_keepout_buffers(posids, sign=+1)
+        print(f'Generating target set for {len(posids)} positioners.')
         for posid in posids:
             attempts_remaining = 10000 # just to prevent infinite loop if there's a bug somewhere
             model = ptl.posmodels[posid]
@@ -200,7 +205,7 @@ def make_sequence_for_one_petal(table):
             if uargs.enable_phi_limit:
                 limit_xy = model.trans.poslocTP_to_poslocXY([0, ptl.typical_phi_limit_angle])
                 max_patrol = min(max_patrol, np.hypot(limit_xy[0], limit_xy[1]))
-            while posid not in targets_obsTP and attempts_remaining:
+            while posid not in targets_locTP and attempts_remaining:
                 bad_target = False
                 rangeT = model.targetable_range_posintT
                 rangeP = model.targetable_range_posintP
@@ -211,16 +216,24 @@ def make_sequence_for_one_petal(table):
                     bad_target = True
                 else:
                     this_posXY = [x,y]
-                    this_posTP = model.trans.poslocXY_to_posintTP(this_posXY)[0]
-                    this_obsTP = model.trans.posintTP_to_poslocTP(this_posTP)
+                    this_posTP, unreachable = model.trans.poslocXY_to_posintTP(this_posXY)
+                    assert not unreachable, f'proposed target for {posid} this_posTP={this_posTP} would be unreachable'
+                    this_locTP = model.trans.posintTP_to_poslocTP(this_posTP)
                     if not uargs.allow_interference:
                         target_interference = False
                         for neighbor in ptl.collider.pos_neighbors[posid]:
-                            if neighbor in targets_obsTP:
-                                if ptl.collider.spatial_collision_between_positioners(posid, neighbor, this_obsTP, targets_obsTP[neighbor]):
+                            static_neighbor = not ptl.posmodels[neighbor].is_enabled or \
+                                              ptl.posmodels[neighbor].classified_as_retracted
+                            if neighbor in targets_locTP or static_neighbor:
+                                if static_neighbor:
+                                    neighbor_locTP = ptl.posmodels[neighbor].expected_current_poslocTP
+                                else:
+                                    neighbor_locTP = targets_locTP[neighbor]
+                                if ptl.collider.spatial_collision_between_positioners(
+                                        posid, neighbor, this_locTP, neighbor_locTP):
                                     target_interference = True
                                     break
-                        out_of_bounds = ptl.collider.spatial_collision_with_fixed(posid, this_obsTP)
+                        out_of_bounds = ptl.collider.spatial_collision_with_fixed(posid, this_locTP)
                         out_of_range_T = min(rangeT) > this_posTP[0] or max(rangeT) < this_posTP[0]
                         out_of_range_P = min(rangeP) > this_posTP[1] or max(rangeP) < this_posTP[1]
                         if target_interference or out_of_bounds or out_of_range_T or out_of_range_P:
@@ -228,14 +241,13 @@ def make_sequence_for_one_petal(table):
                 if bad_target:
                     attempts_remaining -= 1
                 else:
-                    targets_obsTP[posid] = this_obsTP
+                    targets_locTP[posid] = this_locTP
                     targets_posXY[posid] = this_posXY
             if attempts_remaining <= 0:
                 v = model.state._val
                 print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
                       f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')        
-        if buffers:
-            ptl.restore_keepouts()
+        set_keepout_buffers(posids, sign=-1)
         return targets_posXY
     
     def generate_request_set(targets):
@@ -341,7 +353,7 @@ if __name__ == '__main__':
     details += f'\nCalibrations data source: {calibs_file_path}'
     if uargs.comment:
         details += f'\nComment: {uargs.comment}'
-    details += f'\nBuffers: {buffers}'
+    details += f'\nKeepout polygon buffers: {buffers}'
     posids = big_seq.get_posids()
     big_seq.short_name=f'nptls_{len(tables):02}_npos_{len(posids):03}_ntarg_{uargs.num_moves:03}_{timestamp}'
     big_seq.long_name='Test move sequence generated by make_sequence.py'
@@ -350,5 +362,5 @@ if __name__ == '__main__':
         os.path.os.makedirs(save_dir)
     path = big_seq.save(save_dir)
     print('Sequence generation complete!')
-    print(f'\n{big_seq}\n')
+    # print(f'\n{big_seq}\n')
     print(f'Saved to file: {path}\n')

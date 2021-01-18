@@ -10,7 +10,7 @@ import numpy as np
 import datetime
 import pandas
 import sys
-sys.path.append('../petal')
+sys.path.append(os.path.abspath('../petal'))
 import posconstants as pc
 
 pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
