@@ -420,9 +420,11 @@ class PosCollider(object):
 
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
+        R1_nom = pc.nominals['LENGTH_R1']['value']
+        R2_nom = pc.nominals['LENGTH_R2']['value']
         for posid in self.posids:
-            R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
-            R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
+            R1_error = self.R1[posid] - R1_nom  # true R1 err desired, since it is kinematically real
+            R2_error = max(self.R2[posid] - R2_nom, 0.0)  # only expand phi (not contract) it, since this is just distance to fiber, and contraction might not represent true mechanical shape
             expansions = self.keepout_expansions[posid]
             keepout_P = self.general_keepout_P.translated(0,0) # effectively just a copy operation
             keepout_T = self.general_keepout_T.translated(0,0) # effectively just a copy operation
