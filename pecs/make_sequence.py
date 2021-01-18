@@ -56,9 +56,9 @@ required = {'POS_ID', 'DEVICE_LOC', 'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T',
 # Nominal polygon buffers. These are temporary angular and radial keepout expansions
 # applied during target. They add to any existing expansions --- not override.
 buffers = {'KEEPOUT_EXPANSION_PHI_RADIAL': 0.05,  # mm
-           'KEEPOUT_EXPANSION_PHI_ANGULAR': 10.0,  # deg
+           'KEEPOUT_EXPANSION_PHI_ANGULAR': 6.0,  # deg
            'KEEPOUT_EXPANSION_THETA_RADIAL': 0.0,  # mm
-           'KEEPOUT_EXPANSION_THETA_ANGULAR': 5.0,  # deg
+           'KEEPOUT_EXPANSION_THETA_ANGULAR': 3.0,  # deg
            }
 if uargs.no_buffer:
     buffers = {}
@@ -217,9 +217,10 @@ def make_sequence_for_one_petal(table):
                 else:
                     this_posXY = [x,y]
                     this_posTP, unreachable = model.trans.poslocXY_to_posintTP(this_posXY)
-                    assert not unreachable, f'proposed target for {posid} this_posTP={this_posTP} would be unreachable'
+                    if unreachable:
+                        bad_target = True
                     this_locTP = model.trans.posintTP_to_poslocTP(this_posTP)
-                    if not uargs.allow_interference:
+                    if not uargs.allow_interference and not unreachable:
                         target_interference = False
                         for neighbor in ptl.collider.pos_neighbors[posid]:
                             static_neighbor = not ptl.posmodels[neighbor].is_enabled or \
