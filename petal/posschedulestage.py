@@ -83,62 +83,71 @@ class PosScheduleStage(object):
             if posid in d:
                 del d[posid]
 
-    def anneal_tables(self, anneal_time=None):
+    def anneal_tables(self, suppress_automoves=False, mode='filled'):
         """Adjusts move table timing, to attempt to reduce peak power consumption
         of the overall array.
 
-            anneal_time  ... Time in seconds over which to spread out moves in this stage
-                             to reduce overall power density consumed by the array. You
-                             can also argue None if no spreading should be done.
+            anneal_time ... Time in seconds over which to spread out moves in this stage
+                            to reduce overall power density consumed by the array.
+                             
+            suppress_automoves ... Boolean, if True, don't include auto-generated final
+                                   creep and antibacklash moves in the move times. Typically
+                                   you want this True only for stages which are not the last
+                                   one in the sequence.
+            
+            mode ... 'filled' --> try to most efficiently fill time with moves
+                     'ramped' --> try to ramp up/down the power (takes more time)
 
         If anneal_time is less than the time it takes to execute the longest move
         table, then that longer execution time will be used instead of anneal_time.
         """
-        if anneal_time == None:
+        assert mode in pc.anneal_density, f'unrecognized anneal mode {mode}'
+        times = {posid: table.total_time(suppress_automoves=suppress_automoves)
+                 for posid, table in self.move_tables.items()
+                 if not(table.is_motionless)}
+        if not times:
             return
-        postprocessed = {posid:table.for_schedule() for posid,table in self.move_tables.items()}
-        times = {posid:post['net_time'][-1] for posid,post in postprocessed.items()}
-        orig_max_time = max(times.values())
-        new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
-        supply_map = {supply: [p for p in posids if p in postprocessed]  # list type is intentional, so easy to check below for last element
-                      for supply, posids in self._power_supply_map.items()}
-        for posids in supply_map.values():
-            group = []
-            group_time = 0
-            
-            # 2020-10-02 [JHS] This sorting step was required to resolve a complex, and non-deterministic bug
-            # in move scheduling. That bug was first encountered during exposure_id 3047, exposure_iter 46,
-            # on petal 1, 2020-10-01. I never managed to track down how adding a sort here resolves the issue.
-            # But in principle, since there is no random number generation going on anywhere in the code, our
-            # best assumption was that *some* unordered for-loop operation was causing wrong behavior on some
-            # runs. The line below is the only place I found where adding a sorting step had any tangible impact
-            # on the move tables that get generated. And after I added it, the error never arose again, in 85
-            # consecutive runs of replay.py upon the 3047.46 move data. Then I turned off the sorted() call as
-            # a test, and counted errors on 10% of runs (9 of 85 attempts). Also, I noted that without this sort,
-            # the total move table times were non-deterministic, varying with each run. (That alone is a good
-            # enough reason to include it.)
-            posids = sorted(posids)
-            
-            for posid in posids:
-                group.append(posid)
-                group_time += times[posid]
-                if group_time > new_max_time or posid == posids[-1]:
-                    n = len(group)
-                    nominal_spacing = new_max_time / (n + 1)
-                    center = 0
-                    for i in range(n):
-                        p = group[i]
-                        center += nominal_spacing
-                        start = center - times[p]/2
-                        if start < 0:
-                            start = 0
-                        finish = start + times[p]
-                        if finish > new_max_time:
-                            start = new_max_time - times[p]
-                        self.move_tables[p].insert_new_row(0)
-                        self.move_tables[p].set_prepause(0, start)
-                    group = []
-                    group_time = 0
+        sorted_times = sorted(times.values())[::-1]
+        sorted_posids = sorted(times, key=lambda k: times[k])[::-1]
+        orig_max_time = max(sorted_times)
+        anneal_window = sum(sorted_times) / len(sorted_times) / pc.anneal_density[mode]
+        anneal_window = max(anneal_window, orig_max_time)  # for case of very large outlier
+        
+        if mode == 'filled':
+            def first_within(x, vec):
+                for i, test in enumerate(vec):
+                    if test <= x:
+                        return i
+                return None
+            for map_posids in self._power_supply_map.values():
+                posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
+                times2 = [sorted_times[i] for i in range(len(sorted_posids)) if sorted_posids[i] in map_posids]
+                prepause = 0.0
+                while posids:
+                    open_time = anneal_window - prepause
+                    i = first_within(open_time, times2)
+                    if i == None:
+                        prepause = 0.0
+                    else:
+                        posid = posids[i]
+                        self.move_tables[posid].insert_new_row(0)
+                        self.move_tables[posid].set_prepause(0, prepause)
+                        prepause += times2[i]
+                        del posids[i]
+                        del times2[i]
+                        
+        elif mode == 'ramped':
+            resolution = 0.1 # sec
+            for map_posids in self._power_supply_map.values():
+                posids = [p for p in sorted_posids if p in map_posids]  # maintains sorted-by-time order
+                prepause = 0.0
+                which = 0
+                while posids:
+                    posid = posids.pop(which)
+                    prepause = 0.0 if prepause + times[posid] > anneal_window else prepause + resolution
+                    self.move_tables[posid].insert_new_row(0)
+                    self.move_tables[posid].set_prepause(0, prepause)
+                    which = -1 if which == 0 else 0
 
     def equalize_table_times(self):
         """Makes all move tables in the stage have an equal total time length,

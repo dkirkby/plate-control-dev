@@ -123,6 +123,8 @@ class PosSchedStats(object):
         
     def add_hardware_move_tables(self, tables):
         """Records stats (not necessarily each whole table) on tables."""
+        if not tables:
+            return
         lengths = [t['nrows'] for t in tables]
         self.numbers['max num table rows'][-1] = max(lengths)
         self.numbers['avg num table rows'][-1] = np.mean(lengths)

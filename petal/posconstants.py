@@ -116,8 +116,8 @@ else:
 #  2020-06-25 [JHS] For usage of new petalboxes with 20 can channels, an alternate
 #  map will need to be provided here. Selection of which map to use will need to
 #  be given by some configuration argument during petal initialization.
-power_supply_canbus_map = {'V1':{'can10', 'can11', 'can13', 'can22', 'can23'},
-                           'V2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
+power_supply_canbus_map = {'V1': {'can10', 'can11', 'can13', 'can22', 'can23'},
+                           'V2': {'can12', 'can14', 'can15', 'can16', 'can17'}}
 
 # Constants
 deg = '\u00b0'
@@ -147,6 +147,14 @@ near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop c
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 theta_hardstop_ambig_tol = 8.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
+
+# Annealing spreads out motor power consumption in time, as well as naturally reducing
+# potential collision frequency. See posschedulestage.py for more info. Do *not* increase
+# the anneal_density values below on a whim. These values were chosen to broadly ensure
+# not too many motors spinning simultaneously.
+anneal_density = {'filled': 0.5,
+                  'ramped': 0.35,
+                  }
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()

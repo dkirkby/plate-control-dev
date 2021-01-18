@@ -35,26 +35,7 @@ class PosSchedule(object):
                                 power_supply_map = self.petal.power_supply_map,
                                 verbose          = self.verbose,
                                 printfunc        = self.printfunc
-                            ) for name in self.stage_order}
-        
-        # Anneal times spread out power density in time, as well as naturally reducing
-        # potential collision frequency. See comments in PosScheduleStage regarding
-        # implementation. Move time considerations as of 2020-10-09 [JHS]:
-        #   cruise 180 deg ... 180 / 176.07 deg/s --> 1.02 sec
-        #   cruise 360 deg ... 360 / 176.07 deg/s --> 2.04 sec
-        #   creep 3 deg ... 3 / 2.67 deg/s --> 1.12 sec
-        # Rationales for the values below are:
-        #   direct ... typ slowest case is ~ 3 deg creep corr move + 2x final auto-creeps --> 3.4 sec
-        #   retract ... phi cruise --> 1.0 sec
-        #   rotate ... theta cruise --> 2.0 sec
-        #   extend ... phi cruise + 2x final auto-creeps --> 3.2 sec
-        #   expert ... common case is homing, with cruise search distances 510 deg theta + 259 deg phi --> 4.4 sec
-        # Then in all cases I multiply by a factor 1.5, to give the annealing some room to spread.
-        # I think these numbers are functional, and not too inefficient. Next level of refinement
-        # would be to run a sizeable sample of targets / correction moves (maybe 1000 each) and
-        # analyze resulting stage times.
-        self.anneal_time = {'direct':5.1, 'retract':1.5, 'rotate':3.0, 'extend':4.8, 'expert':6.6}  # unit seconds
-        
+                            ) for name in self.stage_order}        
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
@@ -67,7 +48,7 @@ class PosSchedule(object):
     
     @property
     def regular_requests_accepted(self):
-        return {self.has_regular_request_already(posid) for posid in self._requests}
+        return {posid for posid in self._requests if self.has_regular_request_already(posid)}
     
     @property
     def expert_requests_accepted(self):
@@ -115,7 +96,7 @@ class PosSchedule(object):
         self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
-        target_str = f'{uv_type}=({u:.3f}, {v:.3f})'
+        target_str = f'{uv_type}=({u:6.3f}, {v:6.3f})'
         if self.has_regular_request_already(posid):
             self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
             return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
@@ -247,7 +228,7 @@ class PosSchedule(object):
             return
         for kind in ['regular', 'expert']:
             received = self._all_requested_posids[kind]
-            accepted = set(self._requests.keys()) if kind == 'regular' else self.get_posids_with_expert_tables()
+            accepted = self.regular_requests_accepted if kind == 'regular' else self.get_posids_with_expert_tables()
             rejected = received - accepted
             if len(received) > 0:
                 prefix = f'num {kind} target requests'
@@ -315,13 +296,12 @@ class PosSchedule(object):
         """Returns a conservative period of time (in seconds) that one should
         wait for move table execution, before assuming some failure must have
         occurred. An internal time estimate is done. Then this estimate is
-        multiplied by the argued safety_factor, and returned. No guarantee is
-        made about the efficiency of the time estimate that is returned. For
-        example, in many cases the estimate may be much longer than the actual
-        move time.
+        multiplied by the argued safety_factor, and returned.
         """
-        anneal_time_sum = sum(t for t in self.anneal_time.values())
-        return anneal_time_sum * safety_factor
+        times = {table.total_time(suppress_automoves=False) for table in self.move_tables.values()}
+        if times:
+            return max(times) * safety_factor
+        return 0.0
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
@@ -436,6 +416,49 @@ class PosSchedule(object):
             s += '\n' + str(self.stages['final'].sweeps[posid])
             s += '\n'
         return s
+        
+    def plot_density(self, path=None):
+        '''Bins and plots total power density of motors as-scheduled. Useful for
+        checking effects of annealing. Assumes that sweeps have been calculated
+        already and stored (c.f. store_collision_finding_results).'''
+        import matplotlib.pyplot as plt
+        import poscollider
+        import os
+        plt.ioff()
+        quantize_timestep = 0.02 # sec
+        plt.figure()
+        for supply, posids in self.petal.power_supply_map.items():
+            has_table = posids & set(self.move_tables)
+            if not any(has_table):
+                continue
+            num_moving = []
+            for posid in has_table:
+                table = self.move_tables[posid]
+                sweep = poscollider.PosSweep(posid)
+                sweep.fill_exact(init_poslocTP=table.init_poslocTP,
+                                 table=table.for_collider(suppress_automoves=False),
+                                 start_time=0)
+                sweep.quantize(timestep=quantize_timestep)
+                was_moving = {axis: [sweep.axis_was_moving(i, axis) for i in range(len(sweep.time))] for axis in [pc.T, pc.P]}
+                for axis, axis_was_moving in was_moving.items():
+                    longer = len(axis_was_moving) - len(num_moving)
+                    num_moving.extend([0] * longer)
+                    for i in range(len(axis_was_moving)):
+                        if axis_was_moving[i]:
+                            num_moving[i] += 1
+            time = [i * quantize_timestep for i in range(len(num_moving))]
+            plt.plot(time, num_moving, label=f'Power supply: {supply}')
+        plt.xlabel('time [sec]')
+        plt.ylabel('num motors moving')
+        plt.title(f'move schedule density - petal id {self.petal.petal_id}\n{pc.timestamp_str()}')
+        plt.legend()
+        if not path:
+            path = pc.dirs['temp_files']
+            path = os.path.join(path, f'density_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.png')
+        plt.tight_layout()
+        plt.savefig(path)
+        plt.clf()
+        self.printfunc(f'Saved density plot to {path}')
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -449,7 +472,6 @@ class PosSchedule(object):
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')
         self._direct_stage_conditioning(stage=self.stages['expert'],
-                                        anneal_time=self.anneal_time['expert'],
                                         should_freeze=should_freeze,
                                         should_anneal=should_anneal)
 
@@ -474,20 +496,18 @@ class PosSchedule(object):
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
         self._direct_stage_conditioning(stage=stage,
-                                        anneal_time=self.anneal_time['direct'],
                                         should_freeze=should_freeze,
                                         should_anneal=should_anneal)
 
-    def _direct_stage_conditioning(self, stage, anneal_time, should_freeze, should_anneal):
+    def _direct_stage_conditioning(self, stage, should_freeze, should_anneal):
         """Applies annealing and possibly freezing to a 'direct' or 'expert' stage.
 
             stage         ... instance of PosScheduleStage, needs to already have its move tables initialized
-            anneal_time   ... time in seconds, for annealing
             should_freeze ... boolean, says whether to check for collisions and freeze
             should_anneal ... boolean, enables/disables annealing
         """
         if should_anneal:
-            stage.anneal_tables(anneal_time)
+            stage.anneal_tables(suppress_automoves=False, mode=self.petal.anneal_mode)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -625,15 +645,15 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
+            not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(self.anneal_time[name])
+                stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
-            not_the_last_stage = name != self.RRE_stage_order[-1]
             while stage.colliding and attempts_sequence:
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind

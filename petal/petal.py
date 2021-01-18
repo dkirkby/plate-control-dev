@@ -81,8 +81,9 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
-        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius
         sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        anneal_mode     ... string, 'filled' --> more time-efficient, 'ramped' --> slower total power ramp-up
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -94,7 +95,7 @@ class Petal(object):
                  printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True, sync_mode='hard'):
+                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled'):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -176,6 +177,9 @@ class Petal(object):
         self.sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
         sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
         self.sched_stats_path = os.path.join(self.sched_stats_dir, sched_stats_filename)
+        
+        # schedule settings
+        self.anneal_mode = anneal_mode
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -711,9 +715,11 @@ class Petal(object):
                 debug_table[key] = [str(x) for x in debug_table[key]]
             debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
             exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-            filename = f'hwtables_ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}.csv'
-            debug_path = os.path.join(pc.dirs['temp_files'], filename)
+            filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}'
+            debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
             debug_table.write(debug_path, overwrite=True)
+            density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
+            self.schedule.plot_density(density_path)
             
         return failed_posids, n_retries      
             
