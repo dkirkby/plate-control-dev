@@ -917,7 +917,8 @@ class Petal(object):
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
-        if fidids == 'all' and setting=='off':
+        # 20210112 - MS says don't use all_fiducials_off - KF
+        if False: #fidids == 'all' and setting=='off':
             self.printfunc('set_fiducials: calling comm.all_fiducials_off')
             ret = self.comm.all_fiducials_off()
             if 'FAILED' in ret:
@@ -1257,6 +1258,14 @@ class Petal(object):
         key ... string, corresponds to petalbox pbget method keys (eg 'TELEMETRY', 'CONF_FILE')
         """
         return self.comm.pbget(key)
+
+    def enable_db_commit(self):
+        '''
+        Allows committing to DB (runs in init when not simulated)
+        '''
+        self.db_commit_on = True
+        os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+        self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
 
     def commit(self, mode='move', log_note='', calib_note=''):
         '''Commit move data or calibration data to DB and/or local config and

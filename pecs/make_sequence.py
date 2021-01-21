@@ -165,6 +165,7 @@ def make_sequence_for_one_petal(table):
                       anticollision   = 'adjust',
                       verbose         = False,
                       phi_limit_on    = uargs.enable_phi_limit,
+                      petalbox_id     = -1, # [2021-01-14 JHS] horrible hack, actual intent is to skip trying to read non-existent config file when at KPNO
                       save_debug      = False,
                       )
     
