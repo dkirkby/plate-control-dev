@@ -8,7 +8,13 @@ import time
 
 def start_logger(paths=None):
     '''Initializes a logger which will output log files to one or more paths.
-    Returns a logger instance. If no paths argument, then logs only to shell.'''
+    
+    Returns a tuple:
+        tuple[0] ... logger instance
+        tuple[1] ... file handler associated to logger
+        tuple[2] ... stream handler associated to logger
+    
+    If no paths argument, then logs only to shell.'''
     clear_logger()
     global logger
     if not paths:
@@ -29,7 +35,7 @@ def start_logger(paths=None):
     logger.addHandler(sh)
     for path in paths:
         logger.info(f'Logging to {path}')
-    return logger
+    return logger, fh, sh
 
 def clear_logger():
     '''Mysteriously (to me) this doesn't seem to work on the second run of script in

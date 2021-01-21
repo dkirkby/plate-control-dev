@@ -38,6 +38,7 @@ parser.add_argument('-post', '--postpark', type=str, default=default_park, help=
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
 parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents (duty cycle) for the duration of the test. Overrides any values in the online system or sequence file. Must be an integer between 1 and 100')
+parser.add_argument('-v', '--verbose', action='store_true', help='turn on verbosity at terminal window (note that the log file on disk will always be verbose)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -65,6 +66,7 @@ assert start_move <= final_move, f'start_move {start_move} > final_move {final_m
 is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
+import logging
 import simple_logger
 import traceback # Log excepted exceptions
 try:
@@ -79,11 +81,17 @@ log_dir = pc.dirs['sequence_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
-logger = simple_logger.start_logger(log_path)
+logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
+logger_fh.setLevel(logging.DEBUG)
+if uargs.verbose:
+    logger_sh.setLevel(logging.DEBUG)
+else:
+    logger_sh.setLevel(logging.INFO)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
 logger.info(f'Input file: {uargs.infile}')
 subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
-logger.info(f'Contents:\n\n{seq}{subseq_str}')
+logger.debug(f'Complete contents:\n\n{seq}{subseq_str}')
+logger.info(f'Contents:\n\n{seq.str(max_lines=50)}{subseq_str}')
 assert2 = simple_logger.assert2
 input2 = simple_logger.input2
 
@@ -502,7 +510,7 @@ def park(park_option, is_prepark=True):
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
-    logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
+    logger.debug(f'Requested positioners: {sorted(set(all_to_park))}')
     original_settings = {}
     override_settings = {}
     for key in parking_overrides:
@@ -590,8 +598,8 @@ try:
                     posids = [p for p in operable if p in targ_errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
                     no_err_val = set(operable) - set(posids)
                     if any(no_err_val):
-                        logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
-                                    f' missing error results. Excluded posids: {no_err_val}')
+                        logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to missing error results.')
+                        logger.debug(f'Excluded posids: {no_err_val}')
                     # note below how order is preserved for target0 and target1
                     # lists, on the assumption that get_posids() returns a list
                     submove = sequence.Move(command='poslocdXdY',
@@ -621,9 +629,10 @@ try:
                 continue
             kwargs.update(move_meas_settings)
             descriptive_dict = submove.to_dict(sparse=True, posids=posids)
-            logger.info(f'Move command: {descriptive_dict}')
+            logger.debug(f'Move command: {descriptive_dict}')
             if submove.is_uniform:
-                logger.info(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
+                logger.info(f'Num requested positioners: {len(posid)}')
+                logger.debug(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)

@@ -97,6 +97,7 @@ class Sequence(object):
         self.creation_date = get_datestr()
         pos_settings = {} if pos_settings is None else pos_settings
         self.pos_settings = pos_settings
+        self._max_print_lines = np.inf
     
     save_as_metadata = ['short_name', 'long_name', 'details', 'creation_date', 'pos_settings']
 
@@ -217,6 +218,14 @@ class Sequence(object):
             new.append(move)
         return new
     
+    def str(self, max_lines=np.inf):
+        '''Returns same as __str__ except limits printed table length to max_lines.'''
+        old_max_print_lines = self._max_print_lines
+        self._max_print_lines = max_lines
+        s = self.__str__()
+        self._max_print_lines = old_max_print_lines
+        return s
+    
     def __str__(self):
         s = self._meta_str()
         s += '\n'
@@ -230,6 +239,11 @@ class Sequence(object):
             else:
                 align += ['>']
         lines = table.pformat_all(align=align)
+        overage = len(lines) - self._max_print_lines
+        if overage > 0:
+            tail = int(np.floor(self._max_print_lines/2))
+            head = int(self._max_print_lines - tail)
+            lines = lines[:head] + ['...'] + lines[-tail:]
         s += '\n'.join(lines)
         if len(lines) > 50:
             # repeat headers and metadata for convenience with long tables
