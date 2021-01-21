@@ -726,7 +726,7 @@ class Petal(object):
         """Send the motor current and period settings to the positioners.
         
         INPUTS:  None
-        Returns
+        Returns SUCCESS/FAILED
         """
         if self.simulator_on:
             if self.verbose:
