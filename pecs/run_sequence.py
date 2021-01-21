@@ -212,6 +212,23 @@ if uargs.motor_current:
     logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
 logger.info(f'Positioner settings for this test: {pos_settings}')
 
+# settings info to store in LOG_NOTE fields
+posids = get_posids()
+lognote_settings_noms = {'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0}
+lognote_settings_strs = {posid: '' for posid in posids}
+for key, nominal in lognote_settings_noms.items():
+    if pecs_on:
+        current = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
+    else:
+        current = {posid: nominal for posid in posids}
+        current[posids[0]] = nominal / 2  # just a dummy non-nominal value
+    for posid, value in current.items():
+        if value != nominal:
+            lognote_settings_strs[posid] = pc.join_notes(lognote_settings_strs[posid], f'{key}={value}')
+for posid, note in lognote_settings_strs.items():
+    if note:
+        logger.info(f'{posid}: {note}')
+
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
     '''Gathers current positioner settings and caches them to disk. Only does so
@@ -530,8 +547,7 @@ def park(park_option, is_prepark=True):
 
 # do the sequence
 logger.info('Beginning the move sequence\n')
-# storage for exceptions
-exception_here = None
+exception_here = None  # storage for exceptions
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
@@ -583,8 +599,12 @@ try:
                                             target1=[-targ_errs[posid][1] for posid in posids],
                                             posids=posids,
                                             log_note=move.get_log_notes(posids),
-                                            allow_corr=move.allow_corr)
+                                            allow_corr=move.allow_corr)                    
                 request = submove.make_request(posids=posids, log_note=extra_log_note)
+                these_notes = request[['DEVICE_ID', 'LOG_NOTE']].to_dict(orient='list')
+                for i, posid in enumerate(these_notes['DEVICE_ID']):
+                    these_notes['LOG_NOTE'][i] = pc.join_notes(these_notes['LOG_NOTE'][i], lognote_settings_strs[posid])
+                request.update(these_notes)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
