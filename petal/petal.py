@@ -311,7 +311,6 @@ class Petal(object):
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
         self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
-        self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
         if hasattr(self, 'index'):
             etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_ID')
@@ -728,28 +727,41 @@ class Petal(object):
         """Send the motor current and period settings to the positioners.
         
         INPUTS:  None
+        Returns SUCCESS/FAILED
         """
         if self.simulator_on:
             if self.verbose:
                 self.printfunc('Simulator skips sending motor parameters to positioners.')
-            return
-        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-        currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
-        periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
-        enabled = self.enabled_posmodels(self.posids)
-        for posid, posmodel in enabled.items():
-            canid = posmodel.canid
-            busid = posmodel.busid
-            p = {key:posmodel.state._val[key] for key in parameter_keys}
-            currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-            currents_by_busid[busid][canid] = [currents, currents]
-            periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-            if self.verbose:
-                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
-                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
-        self.comm.pbset('currents', currents_by_busid)
-        self.comm.pbset('periods', periods_by_busid)
-        self.printfunc(f'Set motor parameters for {len(enabled)} positioners')
+            return 'SUCCESS'
+        pospwr = self.get_pbdata_val('pospwr')
+        state = set(list(pospwr.values()))
+        if len(state) == 1:
+            state = state.pop()
+        else:
+            state = 'mixed'
+        if state == 'on':
+            parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+            currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
+            periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
+            enabled = self.enabled_posmodels(self.posids)
+            for posid, posmodel in enabled.items():
+                canid = posmodel.canid
+                busid = posmodel.busid
+                p = {key:posmodel.state._val[key] for key in parameter_keys}
+                currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+                currents_by_busid[busid][canid] = [currents, currents]
+                periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+                if self.verbose:
+                    vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+                    self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+            self.comm.pbset('currents', currents_by_busid)
+            self.comm.pbset('periods', periods_by_busid)
+            self.printfunc(f'Set motor parameters for {len(enabled)} positioners')
+            return 'SUCCESS'
+        else:
+            ret = f'set_motor_parameters called when POSPWR is {state}. POSPWR must be on to set parameters.'
+            self.printfunc(f'WARNING: {ret}')
+            return f'FALIED: {ret}'
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -1060,6 +1072,9 @@ class Petal(object):
                     # fids off
                     for fid in self.fidids:
                         self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
+                else:
+                    # Inform PC about motor parameters
+                    self.set_motor_parameters()
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
