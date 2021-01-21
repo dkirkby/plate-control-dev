@@ -27,11 +27,18 @@ subset7b = {21, 22, 26, 27, 28, 33, 34}
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = 'all' # note pre-cooked options above
+device_loc_to_command = subset7b # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
 retract_and_disable = set() #{87,88} # enter device locations to simulate those positioners as retracted and disabled
 retracted_TP = [0, 110]
+
+# Set any non 1.0 output ratio scales
+# format of dict: keys = posids, values = subdicts like {'T': 0.7} or {'P': 0.2, 'T': 0.4} etc
+scale_changes = {'M02182': {'T': 0.5},
+                 'M01981': {'P': 0.3},
+                 'M06389': {'T': 0.2, 'P': 0.4},
+                 }
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
@@ -57,7 +64,7 @@ note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -195,6 +202,11 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 ptl.collider.posids_to_animate = posids_to_animate
                 ptl.collider.fixed_items_to_animate = fixed_items_to_animate
         ptl.start_gathering_frames()
+    for posid in scale_changes:
+        if posid not in ptl.posids:
+            continue
+        for axis, scale in scale_changes[posid].items():
+            ptl.set_posfid_val(posid, key=f'GEAR_CALIB_{axis}', value=scale)
     m = 0
     mtot = len(move_request_sequence)
     for move_requests_id, move_request_data in move_request_sequence.items():
