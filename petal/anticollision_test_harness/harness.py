@@ -39,6 +39,7 @@ scale_changes = {'M02182': {'T': 0.5},
                  'M01981': {'P': 0.3},
                  'M06389': {'T': 0.2, 'P': 0.4},
                  }
+set_scale_changes_as_retracted = True
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
@@ -53,7 +54,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_single' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_triple' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -64,7 +65,7 @@ note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -76,7 +77,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
@@ -180,6 +181,14 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.sched_stats_path = stats_path
         ptl.schedule_stats.clear_cache_after_save = False
         ptl.schedule_stats.add_note('POS_PARAMS_ID: ' + str(pos_param_id))
+    for posid in scale_changes:
+        if posid not in ptl.posids:
+            continue
+        for axis, scale in scale_changes[posid].items():
+            ptl.set_posfid_val(posid, key=f'GEAR_CALIB_{axis}', value=scale)
+        if set_scale_changes_as_retracted:
+            ptl.set_posfid_val(posid, key='CLASSIFIED_AS_RETRACTED', value=True)
+    ptl.collider.refresh_calibrations()
     if should_animate:
         ptl.animator.cropping_on = True
         ptl.animator.label_size = anim_label_size
@@ -202,11 +211,6 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 ptl.collider.posids_to_animate = posids_to_animate
                 ptl.collider.fixed_items_to_animate = fixed_items_to_animate
         ptl.start_gathering_frames()
-    for posid in scale_changes:
-        if posid not in ptl.posids:
-            continue
-        for axis, scale in scale_changes[posid].items():
-            ptl.set_posfid_val(posid, key=f'GEAR_CALIB_{axis}', value=scale)
     m = 0
     mtot = len(move_request_sequence)
     for move_requests_id, move_request_data in move_request_sequence.items():
@@ -235,6 +239,15 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                     posid = ptl.devices[loc_id]
                     command = data['command']
                     target = [data['u'], data['v']]
+                    
+                    # hack to dynamically contract targets when testing retracted + scale change
+                    if posid in scale_changes and ptl.get_posfid_val(posid, 'CLASSIFIED_AS_RETRACTED') and command=='poslocXY':
+                        radius = np.hypot(*target)
+                        if radius > 3.2:
+                            new_radius = random.random() * 3.2
+                            angle = np.arctan2(target[1], target[0])
+                            target = [new_radius * np.cos(angle), new_radius* np.sin(angle)]
+                            
                     requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
                     if export_targets_this_submove:
                         hw_move_args['target0'].append(target[0])
