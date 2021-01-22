@@ -13,9 +13,9 @@ import sys
 sys.path.append(os.path.abspath('../petal'))
 import posconstants as pc
 
-pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
-                'CURR_CRUISE': 70,
-                'CURR_CREEP': 70,
+pos_defaults = {'CURR_SPIN_UP_DOWN': 100,
+                'CURR_CRUISE': 100,
+                'CURR_CREEP': 100,
                 'CREEP_PERIOD': 2,
                 'SPINUPDOWN_PERIOD': 12,
                 'FINAL_CREEP_ON': True,
@@ -97,6 +97,7 @@ class Sequence(object):
         self.creation_date = get_datestr()
         pos_settings = {} if pos_settings is None else pos_settings
         self.pos_settings = pos_settings
+        self._max_print_lines = np.inf
     
     save_as_metadata = ['short_name', 'long_name', 'details', 'creation_date', 'pos_settings']
 
@@ -217,6 +218,14 @@ class Sequence(object):
             new.append(move)
         return new
     
+    def str(self, max_lines=np.inf):
+        '''Returns same as __str__ except limits printed table length to max_lines.'''
+        old_max_print_lines = self._max_print_lines
+        self._max_print_lines = max_lines
+        s = self.__str__()
+        self._max_print_lines = old_max_print_lines
+        return s
+    
     def __str__(self):
         s = self._meta_str()
         s += '\n'
@@ -230,6 +239,11 @@ class Sequence(object):
             else:
                 align += ['>']
         lines = table.pformat_all(align=align)
+        overage = len(lines) - self._max_print_lines
+        if overage > 0:
+            tail = int(np.floor(self._max_print_lines/2))
+            head = int(self._max_print_lines - tail)
+            lines = lines[:head] + ['...'] + lines[-tail:]
         s += '\n'.join(lines)
         if len(lines) > 50:
             # repeat headers and metadata for convenience with long tables
@@ -253,7 +267,8 @@ class Sequence(object):
         if self.details:
             s += f'\n{self.details}'
         s += f'\nSettings: {self.pos_settings}'
-        s += f'\nTotal moves = {len(self)}'
+        s += f'\nNumber of rows = {len(self.to_table())}'
+        s += f'\nNumber of moves = {len(self)}'
         return s
     
     def _validate_move(self, move):

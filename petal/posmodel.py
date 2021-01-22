@@ -48,6 +48,8 @@ class PosModel(object):
     @property
     def _spinupdown_distance(self):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
+        if self.state._val['CURR_SPIN_UP_DOWN'] == 0:
+            return 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
         return self._spinupdown_dist_per_period * self.state._val['SPINUPDOWN_PERIOD']
 
     @property

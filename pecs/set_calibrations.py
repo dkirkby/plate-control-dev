@@ -66,7 +66,7 @@ except:
 log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
 log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
 log_paths = [os.path.join(d, log_name) for d in log_dirs]
-logger = simple_logger.start_logger(log_paths)
+logger, _, _ = simple_logger.start_logger(log_paths)
 logger.info(f'Running {script_name} to set positioner calibration parameters.')
 logger.info(f'Input file is: {args.infile}')
 logger.info(f'Table contains {len(table)} rows')
