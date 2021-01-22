@@ -13,9 +13,9 @@ import sys
 sys.path.append(os.path.abspath('../petal'))
 import posconstants as pc
 
-pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
-                'CURR_CRUISE': 70,
-                'CURR_CREEP': 70,
+pos_defaults = {'CURR_SPIN_UP_DOWN': 100,
+                'CURR_CRUISE': 100,
+                'CURR_CREEP': 100,
                 'CREEP_PERIOD': 2,
                 'SPINUPDOWN_PERIOD': 12,
                 'FINAL_CREEP_ON': True,
@@ -267,7 +267,8 @@ class Sequence(object):
         if self.details:
             s += f'\n{self.details}'
         s += f'\nSettings: {self.pos_settings}'
-        s += f'\nTotal moves = {len(self)}'
+        s += f'\nNumber of rows = {len(self.to_table())}'
+        s += f'\nNumber of moves = {len(self)}'
         return s
     
     def _validate_move(self, move):
