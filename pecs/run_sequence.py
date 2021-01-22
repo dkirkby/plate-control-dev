@@ -222,8 +222,10 @@ logger.info(f'Positioner settings for this test: {pos_settings}')
 
 # settings info to store in LOG_NOTE fields
 posids = get_posids()
-lognote_settings_noms = {'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0}
+lognote_settings_noms = sequence.pos_defaults.copy()
+lognote_settings_noms.update({'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0})
 lognote_settings_strs = {posid: '' for posid in posids}
+lognote_settings_strs_exist = False
 for key, nominal in lognote_settings_noms.items():
     if pecs_on:
         current = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
@@ -233,9 +235,12 @@ for key, nominal in lognote_settings_noms.items():
     for posid, value in current.items():
         if value != nominal:
             lognote_settings_strs[posid] = pc.join_notes(lognote_settings_strs[posid], f'{key}={value}')
-for posid, note in lognote_settings_strs.items():
-    if note:
-        logger.info(f'{posid}: {note}')
+            lognote_settings_strs_exist = True
+if lognote_settings_strs_exist:
+    logger.info('The following positioners have special settings during this test:')
+    for posid, note in lognote_settings_strs.items():
+        if note:
+            logger.info(f'{posid}: {note}')
 
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
