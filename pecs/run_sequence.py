@@ -220,28 +220,6 @@ if uargs.motor_current:
     logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
 logger.info(f'Positioner settings for this test: {pos_settings}')
 
-# settings info to store in LOG_NOTE fields
-posids = get_posids()
-lognote_settings_noms = sequence.pos_defaults.copy()
-lognote_settings_noms.update({'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0})
-lognote_settings_strs = {posid: '' for posid in posids}
-lognote_settings_strs_exist = False
-for key, nominal in lognote_settings_noms.items():
-    if pecs_on:
-        current = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
-    else:
-        current = {posid: nominal for posid in posids}
-        current[posids[0]] = nominal / 2  # just a dummy non-nominal value
-    for posid, value in current.items():
-        if value != nominal:
-            lognote_settings_strs[posid] = pc.join_notes(lognote_settings_strs[posid], f'{key}={value}')
-            lognote_settings_strs_exist = True
-if lognote_settings_strs_exist:
-    logger.info('The following positioners have special settings during this test:')
-    for posid, note in lognote_settings_strs.items():
-        if note:
-            logger.info(f'{posid}: {note}')
-
 # caching / retrieval / application of positioner settings
 def cache_current_pos_settings(posids):
     '''Gathers current positioner settings and caches them to disk. Only does so
@@ -482,6 +460,28 @@ real_moves = pecs_on and not uargs.no_movement
 cooldown_margin = 1.0  # seconds
 cycle_time = uargs.cycle_time + cooldown_margin if real_moves else 2.0
 last_move_time = 'no moves done yet'
+
+# settings info to store in LOG_NOTE fields
+posids = get_posids()
+lognote_settings_noms = sequence.pos_defaults.copy()
+lognote_settings_noms.update({'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0})
+lognote_settings_strs = {posid: '' for posid in posids}
+lognote_settings_strs_exist = False
+for key, nominal in lognote_settings_noms.items():
+    if pecs_on:
+        current = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
+    else:
+        current = {posid: pos_settings[key] if key in pos_settings else nominal for posid in posids}        
+        current[posids[0]] = nominal / 2  # just a dummy non-nominal value
+    for posid, value in current.items():
+        if value != nominal:
+            lognote_settings_strs[posid] = pc.join_notes(lognote_settings_strs[posid], f'{key}={value}')
+            lognote_settings_strs_exist = True
+if lognote_settings_strs_exist:
+    logger.info('The following positioners have \'special\' settings during this test:')
+    for posid, note in lognote_settings_strs.items():
+        if note:
+            logger.info(f'{posid}: {note}')
 
 def do_pause():
     '''Convenience wrapper for pause_between_moves(), utilizing a global to
