@@ -229,12 +229,17 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
 option_groups = {'NOMINAL': {},
                  'CRUISEONLY':
                      {'FINAL_CREEP_ON': False,
-                      'ANTIBACKLASH_ON': False,
                       'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+                      'SPINUPDOWN_PERIOD': 8, # to keep total accel+decel distance < backlash. i.e. 8*_spinupdown_dist_per_period*2 + 3.3)/337 = 2.67 < 3.0
+                      'BACKLASH': 3.0,  # just making sure, though this is almost always already the default
                       },
-                 'CRUISEONLY_NOSPINUPDOWN':
+                 'CRUISEONLY_NOANTIBACKLASH':
                      {'FINAL_CREEP_ON': False,
                       'ANTIBACKLASH_ON': False,
+                      'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+                      },                     
+                 'CRUISEONLY_NOSPINUPDOWN':
+                     {'FINAL_CREEP_ON': False,
                       'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
                       'CURR_SPIN_UP_DOWN': 0,
                       'SPINUPDOWN_PERIOD': 1, # smallest finite value
