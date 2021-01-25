@@ -323,7 +323,8 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
-            self.stats.add_expert_table_time(time.perf_counter() - timer_start)
+            total_time = time.perf_counter() - timer_start
+            self.stats.add_expert_table_time(total_time)
         return None
             
     def expert_mode_is_on(self):
@@ -454,10 +455,10 @@ class PosSchedule(object):
         plt.legend()
         if not path:
             path = pc.dirs['temp_files']
-            path = os.path.join(path, f'density_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.png')
+            path = os.path.join(path, f'density_ptlid{self.petal.petal_id:02}_{pc.filename_timestamp_str()}.png')
         plt.tight_layout()
         plt.savefig(path)
-        plt.clf()
+        plt.close()
         self.printfunc(f'Saved density plot to {path}')
 
     def _schedule_expert_tables(self, anticollision, should_anneal):
