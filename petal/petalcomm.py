@@ -4,6 +4,7 @@ import time
 import Pyro4
 import sys
 from DOSlib.advertise import Seeker
+import posconstants as pc
 
 class PetalComm(object):
     """
@@ -149,9 +150,8 @@ class PetalComm(object):
         can_ids = [] if can_ids is None else can_ids
         try:
             retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
-            if type(retcode) != bool:
-                print(retcode)
-            return retcode
+            assert pc.is_boolean(retcode), f'non-boolean return value {retcode}'
+            return pc.boolean(retcode)
         except Exception as e:
             print('FAILED: Can not execute ready_for_tables. Exception: %s' % str(e))
             print(bus_ids, can_ids)
