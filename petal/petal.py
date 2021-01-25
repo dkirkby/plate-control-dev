@@ -760,7 +760,8 @@ class Petal(object):
         else:
             ret = f'set_motor_parameters called when POSPWR is {state}. POSPWR must be on to set parameters.'
             self.printfunc(f'WARNING: {ret}')
-            return f'FALIED: {ret}'
+            return f'FAILED: {ret}'
+
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
