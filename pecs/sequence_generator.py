@@ -82,25 +82,25 @@ for i in range(n_moves):
     seq.append(move)
 seqs.append(seq)
 
+
 # GENERIC XY TESTS
 # ----------------
 import xy_targets_generator
-n_targs = 24
+n_targs = [4, 24, 100]
 calib_seqs = {}
-for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
-    seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""}',
-                            long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}',
-                            )
-    targs = xy_targets_generator.filled_annulus(n_points=n_targs,
-                                                r_min=0.0,
-                                                r_max=3.1 if limited else 6.0,
-                                                random=False)
-    for targ in targs:
-        move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
-        seq.append(move)
-    seqs.append(seq)
-    if limited == True:
-        calib_seqs['xy'] = seq  # for re-use in calibration script below
+for n in n_targs:
+    for limited in [True]:  # [JHS] as of 2020-08-27 I'm not yet releasing the unlimited version into the wild, until anticollision is well-tested
+        seq = sequence.Sequence(short_name=f'xytest uniform{" limited" if limited else ""} {n}',
+                                long_name=f'rectilinear grid of test points, same local xy for all pos{", limited patrol" if limited else ""}',
+                                )
+        targs = xy_targets_generator.filled_annulus(n_points=n,
+                                                    r_min=0.0,
+                                                    r_max=3.1 if limited else 6.0,
+                                                    random=False)
+        for targ in targs:
+            move = sequence.Move(command='poslocXY', target0=targ[0], target1=targ[1], allow_corr=True)
+            seq.append(move)
+        seqs.append(seq)
 
 
 # BASIC HOMING SEQUENCES
@@ -127,10 +127,8 @@ seqs.append(seq)
 cmd = 'posintTP'
 settings = {'ALLOW_EXCEED_LIMITS': True}
 name_note = ', travel limits OFF'
-for axis in ['theta', 'phi']:
-    seq = sequence.Sequence(short_name=f'arc {axis}',
-                            long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}',
-                            pos_settings=settings)
+
+def arc_targets(axis, n_points, start, step):
     if axis == 'theta':
         thetas = [-170+i*20 for i in range(18)]
         phi = 130
@@ -139,12 +137,19 @@ for axis in ['theta', 'phi']:
         theta = 0
         phis = [120+i*3 for i in range(18)]
         targets = [[theta, phi] for phi in phis]
-    for i in range(len(targets)):
-        target = targets[i]
+    return targets
+targets = {'theta': arc_targets('theta', n_points=18, start=-170, step=20),
+           'phi': arc_targets('phi', n_points=18, start=120, step=3),
+           }
+for axis, targs in targets.items():
+    seq = sequence.Sequence(short_name=f'arc {axis}',
+                            long_name=f'rotate {axis} repeatedly, for use in circle fits{name_note}',
+                            pos_settings=settings)
+    for i in range(len(targs)):
+        target = targs[i]
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', allow_corr=False)
         seq.append(move)
     seqs.append(seq)
-    calib_seqs[axis] = seq  # for re-use in calibration script below
     
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
@@ -172,10 +177,18 @@ seq = sequence.Sequence(short_name='RC calib',
                         )
 move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note='homing', allow_corr=False)
 seq.append(move)
+targets = {'xy': xy_targets_generator.filled_annulus(n_points=24, r_min=0.0, r_max=3.1, random=False),
+           'theta': arc_targets('theta', n_points=18, start=-170, step=20),
+           'phi': arc_targets('phi', n_points=18, start=120, step=3),
+           }
 for key in ['theta', 'phi', 'xy']:
-    for move in calib_seqs[key]:
-        move.log_note = f'{key} {"arc" if key in ["theta", "phi"] else "grid"}'
-        move.allow_corr = False
+    targs = targets[key]
+    cmd = 'posintTP' if key in {'theta', 'phi'} else 'poslocXY'
+    for i in range(len(targs)):
+        target = targs[i]
+        move = sequence.Move(command=cmd, target0=target[0], target1=target[1],
+                             log_note=f'{key} {"arc" if key in ["theta", "phi"] else "grid"}',
+                             allow_corr=False)
         seq.append(move)
 seqs.append(seq)
 
@@ -213,6 +226,35 @@ def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_d
         seq.append(move)
     return seq
 
+option_groups = {'NOMINAL': {},
+                 'CRUISEONLY':
+                     {'FINAL_CREEP_ON': False,
+                      'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+                      'SPINUPDOWN_PERIOD': 8, # to keep total accel+decel distance < backlash. i.e. 8*_spinupdown_dist_per_period*2 + 3.3)/337 = 2.67 < 3.0
+                      'BACKLASH': 3.0,  # just making sure, though this is almost always already the default
+                      },
+                 'CRUISEONLY_NOANTIBACKLASH':
+                     {'FINAL_CREEP_ON': False,
+                      'ANTIBACKLASH_ON': False,
+                      'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+                      },                     
+                 'CRUISEONLY_NOSPINUPDOWN':
+                     {'FINAL_CREEP_ON': False,
+                      'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
+                      'CURR_SPIN_UP_DOWN': 0,
+                      'SPINUPDOWN_PERIOD': 1, # smallest finite value
+                      },
+                 'CREEPONLY':
+                     {'ONLY_CREEP': True,
+                      'FINAL_CREEP_ON': False,
+                      },
+                 'FASTCREEP':
+                     {'ONLY_CREEP': True,
+                      'CREEP_PERIOD': 1,
+                      'FINAL_CREEP_ON': False,
+                      },
+                 }
+
 # Common values for "wiggle" inputs
 forward_deltas = {'cruise0': [1, 4, 16, 32],
                   'cruise1': [1, 4, 8, 12],
@@ -233,11 +275,8 @@ seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forwar
 details = '''Setup: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON
 Moves: Several moves at cruise speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in typical cruise mode.'''
-options = {'FINAL_CREEP_ON': False,
-           'ANTIBACKLASH_ON': False,
-           'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'] # smallest finite value
-           }
 prefix = 'cruiseonly'
+options = option_groups[prefix.upper()]
 long_suffix = 'cruise-only, at otherwise nominal settings'
 seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['cruise0'], options))
 seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['cruise1'], options))
@@ -246,13 +285,8 @@ seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forwar
 details = '''Setup: Turn off parameters FINAL_CREEP_ON and ANTIBACKLASH_ON. Set CURR_SPIN_UP_DOWN = 0.
 Moves: Several moves at cruise speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in typical cruise mode.'''
-options = {'FINAL_CREEP_ON': False,
-           'ANTIBACKLASH_ON': False,
-           'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
-           'CURR_SPIN_UP_DOWN': 0,
-           'SPINUPDOWN_PERIOD': 1 # smallest finite value
-          }
-prefix = 'cruise nospinupdown'
+prefix = 'cruiseonly nospinupdown'
+options = option_groups[prefix.upper().replace(' ','_')]
 long_suffix = 'cruise-only, with spinup/down power disabled'
 seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['cruise0'], options))
 seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['cruise1'], options))
@@ -261,9 +295,8 @@ seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forwar
 details = '''Setup: Turn on parameter ONLY_CREEP.
 Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Measure the effective output ratio in creep mode.'''
-options = {'ONLY_CREEP': True,
-           'FINAL_CREEP_ON': False}
 prefix = 'creeponly'
+options = option_groups[prefix.upper()]
 long_suffix = 'creep-only, at otherwise nominal settings'
 seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['creep'], options))
 seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['creep'], options))
@@ -272,10 +305,8 @@ seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forwar
 details = '''Setup: Halve the creep period thereby doubling the creep speed.
 Moves: Several moves at creep speed. In each direction, at several step sizes.
 Purpose: Determine whether creep performance can be improved under existing firmware (v5.0) constraints.'''
-options = {'ONLY_CREEP': True,
-           'CREEP_PERIOD': 1,
-           'FINAL_CREEP_ON': False}
 prefix = 'fastcreep'
+options = option_groups[prefix.upper()]
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 seqs.append(typ_motortest_sequence(prefix, 'Theta', long_suffix, details, forward_deltas['creep'], options))
 seqs.append(typ_motortest_sequence(prefix,   'Phi', long_suffix, details, forward_deltas['creep'], options))
@@ -312,6 +343,26 @@ for axis in {'THETA', 'PHI'}:
         move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note='', allow_corr=False)
         seq.append(move)
     seqs.append(seq)
+
+# simple positioning tests for robots with calibrated scale errors
+for axis, targets in {'THETA': [[x, 130] for x in [0, +60, -60, +120, -120]],
+                      'PHI': [[0, x] for x in [150, 160, 140, 170, 130]],
+                      }.items():
+    for key, options in option_groups.items():
+        seq = sequence.Sequence(short_name=f'SIMPLESCALE_{key}_{axis}',
+                                long_name=f'Simplified test for positioner(s) with {axis} output scale != 1.0',
+                                details='',
+                                pos_settings=options.copy(),
+                                )
+        for target in targets:
+            move = sequence.Move(command='poslocTP',
+                                 target0=target[0],
+                                 target1=target[1],
+                                 log_note='',
+                                 allow_corr=True,
+                                 )
+            seq.append(move)
+        seqs.append(seq)
 
 # SAVE ALL TO DISK
 # ----------------

@@ -3,7 +3,9 @@
 Perform a sequence of moves + FVC measurements on hardware. (Note that any positioner
 calibration parameters or motor settings altered during the sequence are stored only
 in memory, so a re-initialization of the petal software should restore you to the
-original state, as defined by the posmove and constants databases.)
+original state, as defined by the posmove and constants databases. Also, parking moves
+will include final antibacklash rotations, regardless of the antibacklash settings
+for the main body of the sequence.)
 """
 
 import os
@@ -36,6 +38,7 @@ parser.add_argument('-post', '--postpark', type=str, default=default_park, help=
 parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the test at this move index (defaults to move 0)')
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
 parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents (duty cycle) for the duration of the test. Overrides any values in the online system or sequence file. Must be an integer between 1 and 100')
+parser.add_argument('-v', '--verbose', action='store_true', help='turn on verbosity at terminal window (note that the log file on disk will always be verbose)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -63,6 +66,7 @@ assert start_move <= final_move, f'start_move {start_move} > final_move {final_m
 is_subsequence = start_move != 0 or final_move != len(seq) - 1
 
 # set up a log file
+import logging
 import simple_logger
 import traceback # Log excepted exceptions
 try:
@@ -77,11 +81,17 @@ log_dir = pc.dirs['sequence_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_run_sequence.log'
 log_path = os.path.join(log_dir, log_name)
-logger = simple_logger.start_logger(log_path)
+logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
+logger_fh.setLevel(logging.DEBUG)
+if uargs.verbose:
+    logger_sh.setLevel(logging.DEBUG)
+else:
+    logger_sh.setLevel(logging.INFO)
 logger.info(f'Running {script_name} to perform a positioner move + measure sequence.')
 logger.info(f'Input file: {uargs.infile}')
 subseq_str = f'\n\nA subset of this sequence is to be performed:\n start move_idx = {start_move:3}\n final move_idx = {final_move:3}' if is_subsequence else ''
-logger.info(f'Contents:\n\n{seq}{subseq_str}')
+logger.debug(f'Complete contents:\n\n{seq}{subseq_str}')
+logger.info(f'Contents:\n\n{seq.str(max_lines=50)}{subseq_str}')
 assert2 = simple_logger.assert2
 input2 = simple_logger.input2
 
@@ -200,17 +210,12 @@ if uargs.match_radius == None and pecs_on:
 move_meas_settings = {key: uargs.__dict__[key] for key in ['match_radius', 'check_unmatched', 'test_tp', 'anticollision']}
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
-# motor settings (must be made known to petal.py and FIPOS)
-motor_current_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
-motor_settings = motor_current_settings | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
-other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
-
-# hanlde any overrides of positioner settings
-use_online_value = 'use_online_value'
+# organize positioner settings
+motor_current_keys = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'}
+motor_settings_keys = motor_current_keys | {'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 pos_settings = seq.pos_settings.copy()
-seq_has_motor_currents = any(key in motor_current_settings for key in seq.pos_settings)
 if uargs.motor_current:
-    new = {key: uargs.motor_current for key in motor_current_settings}
+    new = {key: uargs.motor_current for key in motor_current_keys}
     pos_settings.update(new)
     logger.info(f'Motor currents: uniformly set at the run_sequence command line, value={uargs.motor_current}')
 logger.info(f'Positioner settings for this test: {pos_settings}')
@@ -272,8 +277,7 @@ def apply_pos_settings(settings):
             else:
                 test = isinstance(value, type(default))
             assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
-            value = these_settings[key]                
-    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings) #ptlcall('set_posfid_val', posid, key, value, check_existing=True)
+    accepted_by_petal = pecs.ptlm.batch_set_posfid_val(settings, check_existing=True)
     for accepted in accepted_by_petal.values():
         for posid, these_accepted in accepted.items():
             for key, val_accepted in these_accepted.items():
@@ -281,7 +285,7 @@ def apply_pos_settings(settings):
                 if val_accepted == False:  # val_accepted == None is in fact is ok --- just means no change needed
                     assert2(False, f'unable to set {key}={value} for {posid}')
                 elif val_accepted == True:  # again, distinct from the None case
-                    if key in motor_settings:
+                    if key in motor_settings_keys:
                         motor_update_petals.add(role)
     logger.info('apply_pos_settings: Positioner settings updated in memory')
     if motor_update_petals:
@@ -428,10 +432,14 @@ def get_parkable_neighbors(posids):
 
 # setup prior to running sequence
 if pecs_on:
-    # cache the pos settings
+    # cache the existing pos settings
     cache_posids = get_posids()
     cache_path = cache_current_pos_settings(cache_posids)
     logger.info(f'Initial settings of positioner(s) cached to: {cache_path}')
+    
+    # apply new pos settings
+    new_settings = {posid: pos_settings.copy() for posid in cache_posids}
+    apply_pos_settings(new_settings)
     
     # set phi limit angle for the test
     old_phi_limits = pecs.ptlm.get_phi_limit_angle()
@@ -453,6 +461,28 @@ cooldown_margin = 1.0  # seconds
 cycle_time = uargs.cycle_time + cooldown_margin if real_moves else 2.0
 last_move_time = 'no moves done yet'
 
+# settings info to store in LOG_NOTE fields
+posids = get_posids()
+lognote_settings_noms = sequence.pos_defaults.copy()
+lognote_settings_noms.update({'GEAR_CALIB_T': 1.0, 'GEAR_CALIB_P': 1.0})
+lognote_settings_strs = {posid: '' for posid in posids}
+lognote_settings_strs_exist = False
+for key, nominal in lognote_settings_noms.items():
+    if pecs_on:
+        current = pecs.quick_query(key=key, posids=posids, mode='iterable')  # quick_query returns a dict with keys=posids
+    else:
+        current = {posid: pos_settings[key] if key in pos_settings else nominal for posid in posids}        
+        current[posids[0]] = nominal / 2  # just a dummy non-nominal value
+    for posid, value in current.items():
+        if value != nominal:
+            lognote_settings_strs[posid] = pc.join_notes(lognote_settings_strs[posid], f'{key}={value}')
+            lognote_settings_strs_exist = True
+if lognote_settings_strs_exist:
+    logger.info('The following positioners have \'special\' settings during this test:')
+    for posid, note in lognote_settings_strs.items():
+        if note:
+            logger.info(f'{posid}: {note}')
+
 def do_pause():
     '''Convenience wrapper for pause_between_moves(), utilizing a global to
     track the timing.'''
@@ -464,7 +494,9 @@ def do_pause():
     if last_move_time == KeyboardInterrupt:
         logger.info('Keyboard interrupt detected.')
         raise StopIteration
-        
+
+parking_overrides = {'FINAL_CREEP_ON': True, 'ANTIBACKLASH_ON': True}      
+  
 def park(park_option, is_prepark=True):
     '''Perform (or skip if appropriate) parking based on argued park_option.'''
     global last_move_time
@@ -483,7 +515,25 @@ def park(park_option, is_prepark=True):
     extra_note = sequence.sequence_note_prefix + seq.normalized_short_name
     if is_prepark:
         last_move_time = time.time()
-    logger.info(f'Requested positioners: {sorted(set(all_to_park))}')
+    logger.debug(f'Requested positioners: {sorted(set(all_to_park))}')
+    original_settings = {}
+    override_settings = {}
+    for key in parking_overrides:
+        overridden_keys = set()
+        if pecs_on:
+            originals = pecs.quick_query(key=key, posids=all_to_park, mode='iterable') # quick_query returns a dict with keys=posids
+        else:
+            originals = {posid: pos_settings[key] if key in pos_settings else sequence.pos_defaults[key] for posid in all_to_park}
+        for posid, original in originals.items():
+            if original != parking_overrides[key]:
+                if posid not in override_settings:
+                    override_settings[posid] = {}
+                    original_settings[posid] = {}
+                original_settings[posid][key] = original
+                override_settings[posid][key] = parking_overrides[key]
+                overridden_keys.add(key)
+    for key in overridden_keys:
+        logger.info(f'During parking, {key} will be temporarily overridden with value: {parking_overrides[key]}')
     if real_moves:
         kwargs = {'posids': all_to_park,
                   'mode': 'normal',
@@ -498,7 +548,9 @@ def park(park_option, is_prepark=True):
             pecs.tp_frac = 1.0
             if orig_tp_frac != pecs.tp_frac:
                 logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
+        apply_pos_settings(override_settings)
         pecs.park_and_measure(**kwargs)
+        apply_pos_settings(original_settings)
         if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
             pecs.tp_frac = orig_tp_frac
             logger.info(f'Restored tp update error fraction to {pecs.tp_frac}')
@@ -508,8 +560,7 @@ def park(park_option, is_prepark=True):
 
 # do the sequence
 logger.info('Beginning the move sequence\n')
-# storage for exceptions
-exception_here = None
+exception_here = None  # storage for exceptions
 try:
     if uargs.prepark:
         park(park_option=uargs.prepark, is_prepark=True)
@@ -552,8 +603,8 @@ try:
                     posids = [p for p in operable if p in targ_errs]  # exclude any pos that had no err result in previous submove (e.g. unmatched case)
                     no_err_val = set(operable) - set(posids)
                     if any(no_err_val):
-                        logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to'
-                                    f' missing error results. Excluded posids: {no_err_val}')
+                        logger.info(f'{len(no_err_val)} positioners excluded from next submove, due to missing error results.')
+                        logger.debug(f'Excluded posids: {no_err_val}')
                     # note below how order is preserved for target0 and target1
                     # lists, on the assumption that get_posids() returns a list
                     submove = sequence.Move(command='poslocdXdY',
@@ -561,8 +612,12 @@ try:
                                             target1=[-targ_errs[posid][1] for posid in posids],
                                             posids=posids,
                                             log_note=move.get_log_notes(posids),
-                                            allow_corr=move.allow_corr)
+                                            allow_corr=move.allow_corr)                    
                 request = submove.make_request(posids=posids, log_note=extra_log_note)
+                these_notes = request[['DEVICE_ID', 'LOG_NOTE']].to_dict(orient='list')
+                for i, posid in enumerate(these_notes['DEVICE_ID']):
+                    these_notes['LOG_NOTE'][i] = pc.join_notes(these_notes['LOG_NOTE'][i], lognote_settings_strs[posid])
+                request.update(these_notes)
                 if submove_num == 0:
                     initial_request = request
                 if pecs_on:
@@ -579,9 +634,10 @@ try:
                 continue
             kwargs.update(move_meas_settings)
             descriptive_dict = submove.to_dict(sparse=True, posids=posids)
-            logger.info(f'Move command: {descriptive_dict}')
+            logger.debug(f'Move command: {descriptive_dict}')
             if submove.is_uniform:
-                logger.info(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
+                logger.info(f'Num requested positioners: {len(posid)}')
+                logger.debug(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
                 results = move_measure_func(**kwargs)

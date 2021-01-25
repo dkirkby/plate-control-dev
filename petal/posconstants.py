@@ -139,19 +139,24 @@ axis_labels = ('theta', 'phi')
 err_thresh = False # tracing error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
 up_frac = 1.0 # amount of update to apply to posTP
+unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
-theta_hardstop_ambig_tol = 5.0 # deg, for determining when within ambiguous zone of theta hardstops
+theta_hardstop_ambig_tol = 8.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
 keepout_typ_angular_padding = 3.5 # deg, per DESI-0899-v14
 low_risk_rotation = keepout_typ_angular_padding - 0.1 # deg, delta theta or phi smaller than this threshold have low risk if hardware should fail to execute them as scheduled
 
 # Annealing spreads out motor power consumption in time, as well as naturally reducing
-# potential collision frequency. See posschedulestage.py for more info.
-anneal_density = 0.5  # after taking the quantile cut, spread out the window per this factor
+# potential collision frequency. See posschedulestage.py for more info. Do *not* increase
+# the anneal_density values below on a whim. These values were chosen to broadly ensure
+# not too many motors spinning simultaneously.
+anneal_density = {'filled': 0.5,
+                  'ramped': 0.35,
+                  }
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()
@@ -163,8 +168,8 @@ nominals['OFFSET_X']         = {'value':   0.0, 'tol': 1000.0}
 nominals['OFFSET_Y']         = {'value':   0.0, 'tol': 1000.0}
 nominals['PHYSICAL_RANGE_T'] = {'value': 370.0, 'tol':   50.0}
 nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
-nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
-nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
+nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.99}
+nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.99}
 
 # Tolerance for theta guesses when performing xy2tp transform
 default_t_guess_tol = 30.0  # deg
@@ -380,6 +385,7 @@ def decipher_posflags(flags, sep=';', verbose=True):
     flags = np.array(flags).reshape(-1,).astype(int)  # 1d to enable indexing
 
     return [decipher_flag(flag, sep, verbose) for flag in flags]
+
 
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in

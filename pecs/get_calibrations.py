@@ -35,7 +35,7 @@ else:
     log_timestamp = pc.filename_timestamp_str()
     log_name = log_timestamp + '_get_calibrations.log'
     log_path = os.path.join(log_dir, log_name)
-logger = simple_logger.start_logger(log_path)
+logger, _, _ = simple_logger.start_logger(log_path)
 assert2 = simple_logger.assert2
 
 # validate petal ids

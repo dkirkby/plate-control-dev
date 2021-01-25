@@ -23,8 +23,11 @@ from astropy.table import Table as AstropyTable
 # Set KPNO_SIM to True
 KPNO_SIM = False
 
-if KPNO_SIM:
+try:
     from DOSlib.positioner_index import PositionerIndex
+    INDEX_AVAILABLE = True
+except ImportError:
+    INDEX_AVAILABLE = False
 
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
@@ -79,8 +82,9 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
-        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum ra
+        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius
         sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        anneal_mode     ... string, 'filled' --> more time-efficient, 'ramped' --> slower total power ramp-up
         auto_disabling_on ... boolean, for experts only, controls whether to disable positioners if they fail to communicate over CAN
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
@@ -90,10 +94,11 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=False,
+                 printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True, auto_disabling_on=True):
+                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled',
+                 auto_disabling_on=True):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -136,9 +141,15 @@ class Petal(object):
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
+        if INDEX_AVAILABLE and not hasattr(self, 'index'): #Don't overwrite PetalApp's index
+            self.index = PositionerIndex()
+
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
+        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        assert sync_mode.lower() in ['hard','soft'], f'Invalid sync mode: {sync_mode}'
+        self.sync_mode = sync_mode
         self.auto_disabling_on = auto_disabling_on
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
@@ -156,10 +167,9 @@ class Petal(object):
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
-        self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
-        if self.db_commit_on:
-            os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
-            self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
+        self.db_commit_on = False
+        if db_commit_on and DB_COMMIT_AVAILABLE and not self.simulator_on:
+            self.enable_db_commit()
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
@@ -170,6 +180,9 @@ class Petal(object):
         self.sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
         sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
         self.sched_stats_path = os.path.join(self.sched_stats_dir, sched_stats_filename)
+        
+        # schedule settings
+        self.anneal_mode = anneal_mode
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -302,6 +315,9 @@ class Petal(object):
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
+        if hasattr(self, 'index'):
+            etcs = self.index.find_by_arbitrary_keys(DEVICE_TYPE='ETC', PETAL_ID=self.petal_id, key='DEVICE_ID')
+            self.etcs = set(etcs) & self.posids
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
@@ -316,7 +332,7 @@ class Petal(object):
         else:
             kwargs['configfile'] = collider_file
         self.collider = poscollider.PosCollider(**kwargs)
-        self.anticol_settings = self.collider.config
+        self.anticol_settings = self.collider.config  # for case where petal does not yet have anticol_settings
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
@@ -844,7 +860,7 @@ class Petal(object):
         if disable_limit_angle:
             self.limit_angle = None
         requests = {}
-        posids = {posids} if isinstance(posids, str) else set(posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         err_prefix = 'quick_move: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert cmd in pc.valid_move_commands, f'{err_prefix} invalid move command {cmd}'
@@ -892,8 +908,7 @@ class Petal(object):
                     should_anneal ... see comments in schedule_moves() function, defaults to True
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle, defaults to False
         '''
-        if posids == 'all':
-            posids = self.all_enabled_posids()
+        posids = self._validate_posids_arg(posids, skip_unknowns=False)
         n_repeats = int(n_repeats)
         delay = float(delay)
         assert n_repeats > 0, f'dance: invalid arg {n_repeats} for n_repeats'
@@ -940,7 +955,8 @@ class Petal(object):
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
-        if fidids == 'all' and setting=='off':
+        # 20210112 - MS says don't use all_fiducials_off - KF
+        if False: #fidids == 'all' and setting=='off':
             self.printfunc('set_fiducials: calling comm.all_fiducials_off')
             ret = self.comm.all_fiducials_off()
             if 'FAILED' in ret:
@@ -1095,6 +1111,9 @@ class Petal(object):
                     # fids off
                     for fid in self.fidids:
                         self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
+                else:
+                    # Inform PC about motor parameters
+                    self.set_motor_parameters()
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -1206,7 +1225,8 @@ class Petal(object):
         fiducial, this call does NOT turn the fiducial physically on or off.
         It only saves a value.
         
-        Returns a boolean whether the value was accepted.
+        Returns a boolean whether the value was accepted, or in special cases,
+        None (see below).
         
         The boolean arg check_existing only changes things if the old value
         differs from new. A special return value of None is returned if the
@@ -1215,12 +1235,14 @@ class Petal(object):
         Comment allows associating a note string with the change. If a comment
         is provided, then check_existing will be automatically forced to True.
         """
+        if comment:
+            check_existing = True
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
         if key in pc.require_comment_to_store and not comment:
                 raise ValueError(f'setting {key} requires an accompanying comment string')
         state = self.states[device_id]
-        if check_existing and comment:
+        if check_existing:
             old = state._val[key] if key in state._val else None
             if old == value:
                 return None
@@ -1230,10 +1252,13 @@ class Petal(object):
             self.set_posfid_val(device_id, comment_field, comment)
         return accepted
 
-    def batch_set_posfid_val(self, settings):
+    def batch_set_posfid_val(self, settings, check_existing=False, comment=''):
         """ Sets several values for several positioners or fiducials.
-            INPUT: settings ... dict (keyed by devid) of dicts {state key:value}
-                                same as output of batch_get_posfid_val
+            INPUT:  settings ... dict (keyed by devid) of dicts {state key:value}
+                                 same as output of batch_get_posfid_val
+                    check_existing ... return None and make no changes if new value matches existing
+                    comment ... add string to log_note associated with value, forces check_existing=True
+                    
             OUTPUT: accepts ... dict (keyed by devid) of dicts {state key:bool}
                                 where the bool indicates if the value was accepted
 
@@ -1245,7 +1270,7 @@ class Petal(object):
             if devid in devids:
                 accepts[devid] = {}
                 for setting, value in sets.items():
-                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value)
+                    accepts[devid][setting] = self.set_posfid_val(devid, setting, value, check_existing, comment)
         return accepts
     
     def get_posids_with_commit_pending(self):
@@ -1284,6 +1309,14 @@ class Petal(object):
         key ... string, corresponds to petalbox pbget method keys (eg 'TELEMETRY', 'CONF_FILE')
         """
         return self.comm.pbget(key)
+
+    def enable_db_commit(self):
+        '''
+        Allows committing to DB (runs in init when not simulated)
+        '''
+        self.db_commit_on = True
+        os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+        self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
 
     def commit(self, mode='move', log_note='', calib_note=''):
         '''Commit move data or calibration data to DB and/or local config and
@@ -1342,7 +1375,7 @@ class Petal(object):
         '''
         assert mode in {'move', 'calib'}, f'invalid mode {mode} for _send_to_db_as_necessary'
         is_move = mode == 'move'
-        if self.db_commit_on and not self.simulator_on:
+        if self.db_commit_on:
             if is_move:
                 type1, type2 = 'pos_move', 'fid_data'
             else:
@@ -1365,7 +1398,8 @@ class Petal(object):
                                        f'commit requests for expid {self._exposure_id}, iteration ' +
                                        f'{self._exposure_iter}. These have the potential to overwrite data.')
                     self._devids_committed_this_exposure |= committed_posids
-        
+        else:
+            self.printfunc('DB commit not available.')
         # known minor issue: if local_log_on simultaneously with DB, these may clear the note field
         if is_move:
             for state in self.altered_states:
@@ -1418,7 +1452,8 @@ class Petal(object):
         OUTPUTS:
             No outputs
         '''
-        if not self.db_commit_on or self.simulator_on:
+        if not self.db_commit_on:
+            self.printfunc('DB commit not available.')
             return
         allowed_keys = pc.late_commit_defaults.keys()
         valid_posids = {p for p in data.keys() if p in self.posids}
@@ -2071,7 +2106,7 @@ class Petal(object):
         conf_data = self.comm.pbget('conf_file')
         return conf_data['disabled_by_relay']
     
-    def get_posids_with_accepted_requests(self, kind='all'):
+    def get_requested_posids(self, kind='all'):
         '''Returns set of posids with requests in the current schedule.
         
         INPUT:  kind ... 'all', 'regular', or 'expert'
@@ -2436,6 +2471,9 @@ class Petal(object):
             if hasattr(self, 'disabled_fids') and ids == 'all':
                 for fid in self.disabled_fids:
                     self.pos_flags[fid] = self.flags.get('FIDUCIAL', self.missing_flag) | self.flags.get('NOTCTLENABLED', self.missing_flag)
+            if hasattr(self, 'etcs'):
+                for etc in self.etcs:
+                    self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
                 # Unsets flags in reset_mask

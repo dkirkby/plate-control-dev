@@ -242,7 +242,7 @@ class PosSchedule(object):
             return
         for kind in ['regular', 'expert']:
             received = self._all_requested_posids[kind]
-            accepted = set(self._requests.keys()) if kind == 'regular' else self.get_posids_with_expert_tables()
+            accepted = self.regular_requests_accepted if kind == 'regular' else self.get_posids_with_expert_tables()
             rejected = received - accepted
             if len(received) > 0:
                 prefix = f'num {kind} target requests'
@@ -263,7 +263,7 @@ class PosSchedule(object):
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
         self._combine_stages_into_final()
-        self.printfunc(f'Move tables calculated done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
+        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
         finalcheck_timer_start = time.perf_counter()
         final = self.stages['final']
         if anticollision:
@@ -290,6 +290,7 @@ class PosSchedule(object):
                 colliding_sweeps, collision_pairs = c, p # for readability
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
+        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
@@ -317,7 +318,9 @@ class PosSchedule(object):
         multiplied by the argued safety_factor, and returned.
         """
         times = {table.total_time(suppress_automoves=False) for table in self.move_tables.values()}
-        return max(times) * safety_factor
+        if times:
+            return max(times) * safety_factor
+        return 0.0
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
@@ -524,7 +527,7 @@ class PosSchedule(object):
             should_anneal ... boolean, enables/disables annealing
         """
         if should_anneal:
-            stage.anneal_tables(suppress_automoves=False)
+            stage.anneal_tables(suppress_automoves=False, mode=self.petal.anneal_mode)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -664,7 +667,7 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
-                stage.anneal_tables(suppress_automoves=not_the_last_stage)
+                stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))

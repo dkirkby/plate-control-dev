@@ -42,7 +42,7 @@ log_dir = pc.dirs['calib_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = log_timestamp + '_disambig_theta.log'
 log_path = os.path.join(log_dir, log_name)
-logger = simple_logger.start_logger(log_path)
+logger, _, _ = simple_logger.start_logger(log_path)
 logger.info(f'Running {script_name} to ascertain true theta near hardstops.')
 assert2 = simple_logger.assert2
 
