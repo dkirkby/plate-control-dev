@@ -1559,7 +1559,14 @@ class Petal(object):
         used. Historically it was static and stateful. Here I made it properly dynamic.
         Perhaps can be removed entirely.
         '''
-        return [self.get_posfid_val(devid, 'CTRL_ENABLED') for devid in self.posids | self.fidids]
+        out = []
+        key = 'CTRL_ENABLED'
+        for devid in self.posids | self.fidids:
+            if key in self.states[devid]._val:
+                enabled = self.get_posfid_val(devid, 'CTRL_ENABLED')
+                if enabled:
+                    out += [devid]
+        return out
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
