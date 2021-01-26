@@ -148,8 +148,8 @@ class Petal(object):
         self.save_debug = save_debug
         self.simulator_on = simulator_on
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        assert sync_mode.lower() in ['hard','soft'], f'Invalid sync mode: {sync_mode}'
-        self.sync_mode = sync_mode
+        self.sync_mode = sync_mode.lower()
+        assert sync_mode in ['hard', 'soft'], f'Invalid sync mode: {sync_mode}'
         self.auto_disabling_on = auto_disabling_on
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
@@ -759,7 +759,7 @@ class Petal(object):
             errstr, errdata = sendex.sim_send_and_execute_tables(hw_tables, case=case)
         else:
             self._wait_while_moving()
-            errstr, errdata = self.comm.send_and_execute_tables(hw_tables)
+            errstr, errdata = self.comm.send_and_execute_tables(hw_tables, self.sync_mode)
         
         # process petalcontroller's success/fail data
         self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')

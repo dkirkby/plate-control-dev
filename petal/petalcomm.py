@@ -158,7 +158,7 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_and_execute_tables(self, move_tables):
+    def send_and_execute_tables(self, move_tables, sync_mode):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
@@ -179,7 +179,11 @@ class PetalComm(object):
         they conform to the interface given in posconstants.
         """
         try:
-            output = self._call_device('send_and_execute_tables', move_tables_ex=move_tables)
+            assert sync_mode in ['hard', 'soft']
+            output = self._call_device('send_and_execute_tables',
+                                       move_tables_ex=move_tables,
+                                       sync=sync_mode,
+                                       )
             sendex.validate(output)
             return output
         except Exception as e:
