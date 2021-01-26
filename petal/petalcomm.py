@@ -180,10 +180,7 @@ class PetalComm(object):
         """
         try:
             assert sync_mode in ['hard', 'soft']
-            output = self._call_device('send_and_execute_tables',
-                                       move_tables_ex=move_tables,
-                                       sync=sync_mode,
-                                       )
+            output = self._call_device('send_and_execute_tables', move_tables, sync_mode)
             sendex.validate(output)
             return output
         except Exception as e:
