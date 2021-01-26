@@ -1562,7 +1562,7 @@ class Petal(object):
         key = 'CTRL_ENABLED'
         ids = self.posids | self.fidids
         has_key = [devid for devid in ids if key in self.states[devid]._val]
-        return [self.get_posfid_val(devid, key) for devid in has_key]
+        return [devid for devid in has_key if self.get_posfid_val(devid, key)]
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
