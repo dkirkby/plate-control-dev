@@ -65,7 +65,6 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
 
 if __name__ == '__main__':
     from pecs import PECS
-    from pecs import PECS
     input(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
     cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
     updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
