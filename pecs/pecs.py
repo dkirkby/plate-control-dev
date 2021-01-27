@@ -696,7 +696,8 @@ class PECS:
         for key in ['posintT', 'posintP']:
             this_data = self.quick_query_df(key=key, posids=posids)
             exppos = exppos.join(this_data, on='DEVICE_ID', rsuffix=suffix)
-        result = merged.join(exppos, on='DEVICE_ID')
+        posint_keys = [key for key in exppos.columns if 'posint' in key]
+        result = merged.merge(exppos[posint_keys], on='DEVICE_ID')
         
         return result
     
