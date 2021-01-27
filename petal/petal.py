@@ -732,25 +732,24 @@ class Petal(object):
         OUTPUT:
             set containing any posids for which sending the table failed
         """
-        msg_prefix = 'send_and_execute_moves:'
         self.schedule.plot_density()
         
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
-            self.printfunc(f'{msg_prefix} no tables to send')
+            self.printfunc('no tables to send')
             if retry_posids:
                 return retry_posids  # in this context, the retry positioners are interpreted as having failed
             return set()
         posids_to_try = {t['posid'] for t in hw_tables}
         s1 = pc.plural('table', hw_tables)
         s2 = pc.plural('retry', n_retries)
-        self.printfunc(f'{msg_prefix} {len(hw_tables)} move {s1} to send')
-        self.printfunc(f'{msg_prefix} {n_retries} {s2} remaining (if comm failure should occur during this attempt)')
+        self.printfunc(f'{len(hw_tables)} move {s1} to send')
+        self.printfunc(f'{n_retries} {s2} remaining')
             
         # send to hardware (or simulator)
         if self.simulator_on:
-            self.printfunc(f'{msg_prefix} simulator skips sending {len(hw_tables)} move {pc.plural("table", hw_tables)} to hardware')
+            self.printfunc(f'simulator skips sending {len(hw_tables)} move {pc.plural("table", hw_tables)} to hardware')
             sim_fail = random.random() <= self.sim_fail_freq['send_tables']
             if sim_fail:
                 case = sendex.next_sim_case()
@@ -762,7 +761,7 @@ class Petal(object):
             errstr, errdata = self.comm.send_and_execute_tables(hw_tables, self.sync_mode)
         
         # process petalcontroller's success/fail data
-        self.printfunc(f'{msg_prefix} petalcontroller returned "{errstr}"')
+        self.printfunc(f'petalcontroller returned "{errstr}"')
         comm_fail_cases = {sendex.PARTIAL_SEND, sendex.FAIL_SEND}
         should_cleanup_pos_data = True
         if errstr == sendex.SUCCESS:
@@ -771,7 +770,7 @@ class Petal(object):
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
                 s = pc.plural('positioner', posids)
-                response_msg = f'{msg_prefix} petalcontroller labeled {len(posids)} {s} as "{key}"'
+                response_msg = f'petalcontroller labeled {len(posids)} {s} as "{key}"'
                 if posids:
                     response_msg += f': {posids}'
                 self.printfunc(response_msg)
@@ -779,13 +778,13 @@ class Petal(object):
         else:
             failures = posids_to_try
             errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata.items()} if errstr == sendex.FAIL_TEMPLIMIT else errdata
-            self.printfunc(f'{msg_prefix} "{errstr}" data: {errdata2}')
+            self.printfunc(f'"{errstr}" data: {errdata2}')
             self._cancel_move(reset_flags='all')
             should_cleanup_pos_data = False  # cancel move already takes care of all cleanup
         successes = posids_to_try - failures
         for result, posids in {'SUCCESS': successes, 'FAILURE': failures}.items():
             if any(posids):
-                self.printfunc(f'{msg_prefix} petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
+                self.printfunc(f'petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
         if should_cleanup_pos_data:
             self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
         
@@ -828,7 +827,7 @@ class Petal(object):
         if not self.simulator_on:
             self._wait_while_moving()
         self._clear_schedule()
-        self.printfunc(f'{msg_prefix} Done')
+        self.printfunc('Done')
         
         # 2021-01-26 [JHS] dummy return value is for the sake of PetalApp's old print
         # messages and alarms etc during the separated send/execute sequence. Once we
