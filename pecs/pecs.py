@@ -661,6 +661,7 @@ class PECS:
         ordered_data = [data[posid] for posid in posids]
         listed = {'DEVICE_ID': ordered_posids, key: ordered_data}
         df = pd.DataFrame(listed)
+        df.set_index('DEVICE_ID')
         return df
     
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched, exppos):
