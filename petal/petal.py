@@ -829,7 +829,14 @@ class Petal(object):
             self._wait_while_moving()
         self._clear_schedule()
         self.printfunc(f'{msg_prefix} Done')
-        return failures
+        
+        # 2021-01-26 [JHS] dummy return value is for the sake of PetalApp's old print
+        # messages and alarms etc during the separated send/execute sequence. Once we
+        # transition to combined send_and_execute, this dummy return should be removed,
+        # and PetalApp updated to reflect the reality of what happened.
+        dummy_n_retries = 0
+        
+        return failures, dummy_n_retries
     
     def send_move_tables(self):
         assert False, 'BUG!! This call to send_move_tables is deprecated! Use send_and_execute_moves() instead.'
