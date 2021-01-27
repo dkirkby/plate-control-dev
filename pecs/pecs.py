@@ -681,7 +681,7 @@ class PECS:
         # get expected (tracked) posintTP angles --- these are now *after* any
         # updating by test_and_update_tp, so may not match the original tracked
         # values --- hence the special suffix
-        suffix = '_after_feedback'
+        suffix = '_after_updates'
         exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
                                           participating_petals=self.ptl_roles)
                   .set_index('DEVICE_ID')[['X1', 'X2']])
