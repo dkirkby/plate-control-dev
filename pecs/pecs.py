@@ -342,12 +342,9 @@ class PECS:
 
         # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
         posids = exppos.index.tolist()
-        tracked_by_posid = {self.quick_query(key=key, posids=posids) for key in ['posintT', 'posintP']}
-        tracked = {'DEVICE_ID': posids}
-        for key in tracked_by_posid:
-            tracked[key] = [tracked_by_posid[key][posid] for posid in posids]
-        tracked_df = pd.DataFrame(tracked)
-        exppos.join(tracked_df, on='DEVICE_ID')
+        for key in ['posintT', 'posintP']:
+            this_data = self.quick_query_df(key=key, posids=posids)
+            exppos = exppos.join(this_data, on='DEVICE_ID')
 
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                       test_tp=test_tp, auto_update=True,
@@ -410,10 +407,10 @@ class PECS:
         if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
-        _, meapos, matched, _ = self.fvc_measure(
+        exppos, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
             check_unmatched=check_unmatched, test_tp=test_tp, num_meas=num_meas)
-        result = self._merge_match_and_rename_fvc_data(request, meapos, matched)
+        result = self._merge_match_and_rename_fvc_data(request, meapos, matched, exppos)
         self.ptlm.clear_exposure_info()
         return result
     
@@ -654,8 +651,19 @@ class PECS:
         else:
             assert False, f'unrecognized return type {type(check_val)} from quick_query()'
         return combined
+        
+    def quick_query_df(self, key, posids='all'):
+        '''Wrapper for quick_query which returns a pandas DataFrame, whose
+        index is 'DEVICE_ID' and data column is key.
+        '''
+        data = self.quick_query(key=key, posids=posids)
+        ordered_posids = list(data)
+        ordered_data = [data[posid] for posid in posids]
+        listed = {'DEVICE_ID': ordered_posids, key: ordered_data}
+        df = pd.DataFrame(listed)
+        return df
     
-    def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
+    def _merge_match_and_rename_fvc_data(self, request, meapos, matched, exppos):
         '''Returns results of fvc measurement after checking for target matches
         and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
@@ -663,6 +671,7 @@ class PECS:
         request ... pandas dataframe with index column DEVICE_ID and request data
         meapos ... pandas dataframe with index column DEVICE_ID and fvc data
         matched ... set of posids
+        exppos ... pandas dataframe with index column DEVICE_ID and expected positions data
         '''
         # meapos may contain not only matched but all posids in expected pos
         posids_to_match = set(request['DEVICE_ID']) | set(self.posids)
@@ -682,13 +691,12 @@ class PECS:
         # updating by test_and_update_tp, so may not match the original tracked
         # values --- hence the special suffix
         suffix = '_after_updates'
-        exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
-                                          participating_petals=self.ptl_roles)
-                  .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': f'posintT{suffix}',
-                               'X2': f'posintP{suffix}'},
-                      inplace=True)
+        posids = exppos.index.tolist()
+        for key in ['posintT', 'posintP']:
+            this_data = self.quick_query_df(key=key, posids=posids)
+            exppos = exppos.join(this_data, on='DEVICE_ID', rsuffix=suffix)
         result = merged.join(exppos, on='DEVICE_ID')
+        
         return result
     
     def _batch_transform(self, frame, cs1, cs2):
