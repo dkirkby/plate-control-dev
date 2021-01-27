@@ -339,10 +339,21 @@ class PECS:
         submeas = {}
         if num_meas > 1:
             submeas = self.summarize_submeasurements(meapos)
+
+        # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
+        posids = exppos.index.tolist()
+        tracked_by_posid = {self.quick_query(key=key, posids=posids) for key in ['posintT', 'posintP']}
+        tracked = {'DEVICE_ID': posids}
+        for key in tracked_by_posid:
+            tracked[key] = [tracked_by_posid[key][posid] for posid in posids]
+        tracked_df = pd.DataFrame(tracked)
+        exppos.join(tracked_df, on='DEVICE_ID')
+
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                       test_tp=test_tp, auto_update=True,
                                       err_thresh=self.max_err, up_tol=self.tp_tol,
                                       up_frac=self.tp_frac, postscript=submeas)
+
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request=None, match_radius=None, check_unmatched=False,
@@ -667,11 +678,16 @@ class PECS:
         mask = merged['FLAGS'].notnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
-        # get expected (tracked) posintTP angles
+        # get expected (tracked) posintTP angles --- these are now *after* any
+        # updating by test_and_update_tp, so may not match the original tracked
+        # values --- hence the special suffix
+        suffix = '_after_feedback'
         exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
                                           participating_petals=self.ptl_roles)
                   .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
+        exppos.rename(columns={'X1': f'posintT{suffix}',
+                               'X2': f'posintP{suffix}'},
+                      inplace=True)
         result = merged.join(exppos, on='DEVICE_ID')
         return result
     
