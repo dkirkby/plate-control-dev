@@ -620,6 +620,9 @@ def is_integer(x):
 def is_float(x):
     return isinstance(x, (float, np.floating))
 
+def is_number(x):
+    return is_integer(x) or is_float(x)
+
 def is_string(x):
     return isinstance(x, (str, np.str))
 

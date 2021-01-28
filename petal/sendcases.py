@@ -69,16 +69,16 @@ class SendExecCases():
         '''Validates output from send_and_execute_tables() provided by petalcontroller.
         Throws an assertion if invalid, otherwise silent.
         '''
-        def assert2(test):
-            assert test, f'petalcontroller return data not understood:\n{pc_response}'
-        assert2(len(pc_response) == 2)
-        assert2(isinstance(pc_response, (tuple, list)))
+        def assert2(test, detail=''):
+            assert test, f'petalcontroller return data not understood:\n{pc_response}\n{detail}'
+        assert2(len(pc_response) == 2, f'bad length {len(pc_response)} for pc_response')
+        assert2(isinstance(pc_response, (tuple, list)), 'not a tuple or list')
         errstr = pc_response[0]
         data = pc_response[1]
-        assert2(errstr in self.defs)
+        assert2(errstr in self.defs, f'undefined errstr {errstr}')
         expected_fmt = self.defs[errstr]
         expected_type = type(expected_fmt)
-        assert2(type(data) == expected_type)
+        assert2(type(data) == expected_type, f'unexpected type {type(data)} for {data}, expected {expected_type}')
         if errstr == self.SUCCESS:
             assert2(data == self.defs[errstr])
         elif errstr == self.FAIL_PWROFF:
@@ -87,8 +87,11 @@ class SendExecCases():
             assert2(all(x in self.valid_canbus_ids for x in data))
         elif expected_type == dict and len(expected_fmt) > 0:
             for k, v in expected_fmt.items():
-                assert2(k in data)
-                assert2(isinstance(data[k], v))
+                assert2(k in data, f'key {k} not found in pc_response')
+                if v in {int, float}:
+                    assert2(pc.is_number(data[k]), f'expected a number, not {data[k]}')
+                else:
+                    assert2(isinstance(data[k], v), f'unexpected type {type(v)} not {data[k]}')
     
     def simdata(self, case, tables):
         '''Generates simulated data matching a given case.
