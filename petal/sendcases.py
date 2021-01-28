@@ -57,7 +57,7 @@ class SendExecCases():
             self.FAIL_TEMPLIMIT: {},  # keys = canids, values = temperatures. only includes the cases that exceed an acceptance threshold value
             }
         
-        self.valid_power_supplies = {'PS1', 'PS2'}
+        self.valid_power_supplies = {'V1', 'V2'}
         self.valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
         
         self.sim_subcases_cycle = sorted(self.send_fail_format)
