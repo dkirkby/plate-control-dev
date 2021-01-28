@@ -120,20 +120,10 @@ class PetalComm(object):
         """
         timeout = kwargs.pop('pyrotimeout', 20.0)
         try:
-            # kh: to prevent blocking calls if the connection is down
             self.device['proxy']._pyroTimeout = timeout
             return getattr(self.device['proxy'],cmd)(*args, **kwargs)
-        except:
-            if 'pyro_uri' in self.device:
-                try:
-                    self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-                    # kh: to prevent blocking calls if the connection is down
-                    self.device['proxy']._pyroTimeout = timeout
-                    return getattr(self.device['proxy'],cmd)(*args, **kwargs)
-                except Exception as e:
-                    raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
-            # Failed to get status from device
-            raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
+        except Exception as e:
+            raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
 
     def ready_for_tables(self, bus_ids=None, can_ids=None):
         """Checks if all the positioners identified by can_id are ready to receive
