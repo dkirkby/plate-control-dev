@@ -777,6 +777,9 @@ class Petal(object):
                     response_msg += f': {posids}'
                 self.printfunc(response_msg)
             failures = set().union(*combined.values())
+            
+            # also print to log any undefined (debug) keys and their values
+            
         else:
             failures = posids_to_try
             errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata.items()} if errstr == sendex.FAIL_TEMPLIMIT else errdata
