@@ -157,7 +157,9 @@ class Petal(object):
         
         if not(self.simulator_on):
             import petalcomm
-            self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
+            self.comm = petalcomm.PetalComm(self.petalbox_id,
+                                            user_interactions_enabled=user_interactions_enabled,
+                                            printfunc=self.printfunc)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
             # get ops_state from petalcontroller
             try:
