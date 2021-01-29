@@ -778,10 +778,18 @@ class Petal(object):
                 self.printfunc(response_msg)
             failures = set().union(*combined.values())
             
-            # also print to log any undefined (debug) keys and their values
+            # 2021-01-29 [JHS] todo:
+            #  1. also print to log any undefined (debug) keys and their values
+            #  2. check the validation in sendcases.py and make sure it accepts these extra key/vals
             
         else:
             failures = posids_to_try
+            
+            # 2021-01-29 [JHS] todo:
+            #  1. update special handling of FAIL_TEMPLIMIT case, to parse the dicts of canids better
+            #  2. check the validation in sendcases.py and make sure it accepts 'other' key + vals
+            # (c.f. updated google sheet definition @ https://docs.google.com/spreadsheets/d/1LTP7NiufblIGSQPPXWq6GGFA24KK7ni6bSq5etqzjNw/edit#gid=0)
+            
             errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata.items()} if errstr == sendex.FAIL_TEMPLIMIT else errdata
             self.printfunc(f'"{errstr}" data: {errdata2}')
             self._cancel_move(reset_flags='all')
