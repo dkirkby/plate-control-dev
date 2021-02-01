@@ -171,7 +171,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       phi_limit_on    = False,
                       save_debug      = True,
                       anneal_mode     = 'ramped',
-                      auto_disabling_on = True,
+#                      auto_disabling_on = True,
                       )
     if expand_keepouts:
         ptl.set_keepouts(posids='all', radT=0.05, radP=0.05, angT=5, angP=10)
