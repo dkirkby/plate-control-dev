@@ -48,8 +48,8 @@ assert2 = simple_logger.assert2
 
 # set up pecs
 from pecs import PECS
-pecs = PECS(interactive=True)
-pecs.logger = logger
+pecs = PECS(interactive=True, logger=logger)
+pecs.input = simple_logger.input2
 logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
 pecs.tp_tol = 0.0   # correct POS_T, POS_P for FVC measurements above this err value
 pecs.tp_frac = 1.0  # when correcting POS_T, POS_P, do so by this fraction of err distance

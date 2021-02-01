@@ -64,18 +64,40 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
     return updates
 
 if __name__ == '__main__':
+    # set up a log file
+    import logging
+    import simple_logger
+    import traceback
+    import os
+    import posconstants as pc
     from pecs import PECS
-    from pecs import PECS
-    input(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
-    cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}')
-    updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
-                       tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
-                       num_meas=uargs.num_meas, use_disabled=uargs.use_disabled, check_unmatched=uargs.check_unmatched)
-    if uargs.mode == 'posTP':
-        key1, key2 = 'POS_T', 'POS_P'
-    else:
-        key1, key2 = 'OFFSET_T', 'OFFSET_P'
-    updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']]
-    updates.sort_values('ERR_XY', inplace=True, ascending=False)
-    print(updates)
+
+    log_dir = pc.dirs['sequence_logs']
+    log_timestamp = pc.filename_timestamp_str()
+    log_name = log_timestamp + '_1p_calib.log'
+    log_path = os.path.join(log_dir, log_name)
+    logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
+    logger_fh.setLevel(logging.DEBUG)
+    logger_sh.setLevel(logging.INFO)
+    simple_logger.input2(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
+    cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}', logger=logger)
+    cs.input = simple_logger.input2
+    try:
+        updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
+                           tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
+                           num_meas=uargs.num_meas, use_disabled=uargs.use_disabled, check_unmatched=uargs.check_unmatched)
+        if uargs.mode == 'posTP':
+            key1, key2 = 'POS_T', 'POS_P'
+        else:
+            key1, key2 = 'OFFSET_T', 'OFFSET_P'
+        updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']]
+        updates.sort_values('ERR_XY', inplace=True, ascending=False)
+        logger.info('Updates sorted by descending ERR_XY:')
+        logger.info(updates.to_string())
+    except Exception as e:
+        logger.error('1p_calib crashed! See traceback below:')
+        logger.critical(traceback.format_exc())
+        logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
     cs.fvc_collect()
+    logger.info(f'Log file: {log_path}')
+    simple_logger.clear_logger()

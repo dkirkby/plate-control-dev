@@ -39,7 +39,8 @@ class PECS:
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS', device_locs=None, no_expid=False, posids=None):
+                 test_name='PECS', device_locs=None, no_expid=False, posids=None,
+                logger=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -52,6 +53,8 @@ class PECS:
         self.start_time = pc.now()
         self.test_name = test_name
         self.interactive = interactive
+        if logger is not None:
+            self.logger = logger
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
@@ -59,6 +62,7 @@ class PECS:
         if self.exposure_dir is None:
             self.exposure_dir = '/exposures/desi/'
         self.printfunc = printfunc
+        self.input = input
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
@@ -67,7 +71,7 @@ class PECS:
                                constants_version=self.constants_version,
                                use_desimeter=self.use_desimeter,
                                match_to_positioner_centers=self.match_to_positioner_centers,
-                               use_arcprep=self.use_arcprep)
+                               use_arcprep=self.use_arcprep, logger=self.logger)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         elif not(fvc): # if FVC is False don't startup FVC stuff
@@ -78,7 +82,7 @@ class PECS:
             self.print(f"Reusing existing FVC proxy: "
                        f"{self.fvc.get('instrument')}")
         if ptlm is None:
-            self.ptlm = PetalMan()
+            self.ptlm = PetalMan(logger=self.logger)
             pcids = [self._role2pcid(role)
                      for role in self.ptlm.participating_petals]
             # Only use petals that are availible in Petalman
@@ -107,23 +111,10 @@ class PECS:
         if self.interactive:
             self.home_adc() #asks to home, not automatic
             self.turn_on_fids()
+            self.turn_on_illuminator()
         #Setup exposure ID last incase aborted doing the above
         if not(no_expid):
             self._get_expid()
-
-    def exp_setup(self):
-        '''
-        Temp function to setup fptestdata while PECS still has some integration with it
-        '''
-        assert hasattr(self, 'data'), (
-            'FPTestData must be initialised before calling exposure setup.')
-        self.test_name = self.data.test_name
-        self.exp.program = self.test_name
-        self.data.set_dirs(self.exp.id)
-        self.start_time = self.data.t_i
-        self.fvc.save_centers = True
-        # fvc centre jsons are written by non-msdos account, note access
-        self.fvc.save_centers_path = self.data.dir
 
     def _get_expid(self):
         '''
@@ -137,7 +128,7 @@ class PECS:
         self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
     def print(self, msg):
-        if hasattr(self, 'logger'):
+        if self.logger is not None:
             self.logger.info(msg)  # use broadcast logger to log to all pcids
         else:
             self.printfunc(msg)
@@ -150,7 +141,7 @@ class PECS:
             return False
         else:
             return self._parse_yn(
-                input(f'Invalid input: {yn_str}, must be y/n:'))
+                self.input(f'Invalid input: {yn_str}, must be y/n:'))
 
     def ptl_setup(self, pcids, posids=None, illumination_check=False, device_locs=None):
         '''input pcids must be a list of integers'''
@@ -210,8 +201,8 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = input('Please enter integer PCIDs seperated by spaces. '
-                      'Leave blank to select petal specified in cfg: ')
+        pcids = self.input('Please enter integer PCIDs seperated by spaces. '
+                           'Leave blank to select petal specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
@@ -223,8 +214,8 @@ class PECS:
         return pcids
 
     def _interactively_get_posids(self):
-        user_text = input('Please list canids (can??) or posids, seperated by '
-                          'spaces. Leave blank to select all positioners: ')
+        user_text = self.input('Please list canids (can??) or posids, seperated by '
+                               'spaces. Leave blank to select all positioners: ')
         enabled_only, kwarg = True, {}
         if user_text == '':
             self.print('Defaulting to all enabled positioners...')
@@ -339,10 +330,18 @@ class PECS:
         submeas = {}
         if num_meas > 1:
             submeas = self.summarize_submeasurements(meapos)
+
+        # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
+        posids = exppos.index.tolist()
+        for key in ['posintT', 'posintP']:
+            this_data = self.quick_query_df(key=key, posids=posids)
+            exppos = exppos.join(this_data, on='DEVICE_ID')
+
         self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                       test_tp=test_tp, auto_update=True,
                                       err_thresh=self.max_err, up_tol=self.tp_tol,
                                       up_frac=self.tp_frac, postscript=submeas)
+
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request=None, match_radius=None, check_unmatched=False,
@@ -399,10 +398,10 @@ class PECS:
         if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
-        _, meapos, matched, _ = self.fvc_measure(
+        exppos, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
             check_unmatched=check_unmatched, test_tp=test_tp, num_meas=num_meas)
-        result = self._merge_match_and_rename_fvc_data(request, meapos, matched)
+        result = self._merge_match_and_rename_fvc_data(request, meapos, matched, exppos)
         self.ptlm.clear_exposure_info()
         return result
     
@@ -472,25 +471,61 @@ class PECS:
 
     def home_adc(self):
         if self.adc_available:
-            try:
-                adc = SimpleProxy('ADC')
-                if self._parse_yn(input('Home ADC? (y/n): ')):
+            do_home = self._parse_yn(self.input('Home ADC? (y/n): ')) if self.interactive else True
+            if do_home:
+                try:
+                    adc = SimpleProxy('ADC')
                     self.print('Homing ADC...')
                     retcode = adc._send_command('home', controllers=[1, 2])
                     self.print(f'ADC.home returned code: {retcode}')
-            except Exception as e:
-                print(f'Exception homing ADC, {e}')
-        else:
-            return
+                except Exception as e:
+                    print(f'Exception homing ADC, {e}')
 
     def turn_on_fids(self):
-        if self._parse_yn(input('Turn on fiducials (y/n): ')):
+        do_on = self._parse_yn(self.input('Turn on fiducials (y/n): ')) if self.interactive else True
+        if do_on:
             responses = self.ptlm.set_fiducials(setting='on',
                             participating_petals=list(self.ptlm.Petals.keys()))
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
         self.print(f'Petals report fiducials in the following states: {responses}')
+
+    def turn_on_illuminator(self):
+        if self.specman_available:
+            do_on = self._parse_yn(self.input('Turn on illuminator? (y/n): ')) if self.interactive else True
+            if do_on:
+                try:
+                    specman = SimpleProxy('SPECMAN')
+                    self.print('Turning on illuminator')
+                    specs = [p.replace('PETAL', 'SP') for p in self.illuminated_pcids]
+                    retcode = specman._send_command('illuminate', action='on', participating_spectrographs=specs)
+                    self.print(f'SPECMAN.illuminate returned code: {retcode}')
+                except Exception as e:
+                    print(f'Exception when trying to turn on illumination, {e}') 
+
+    def turn_off_fids(self):
+        do_off = self._parse_yn(self.input('Turn off fiducials (y/n): ')) if self.interactive else True
+        if do_off:
+            responses = self.ptlm.set_fiducials(setting='off',
+                            participating_petals=list(self.ptlm.Petals.keys()))
+            # Set fiducials for all availible petals
+        else:
+            responses = self.ptlm.get_fiducials()
+        self.print(f'Petals report fiducials in the following states: {responses}')
+
+    def turn_off_illuminator(self):
+        if self.specman_available:
+            do_off = self._parse_yn(self.input('Turn off illuminator? (y/n): ')) if self.interactive else True
+            if do_off:
+                try:
+                    specman = SimpleProxy('SPECMAN')
+                    self.print('Turning on illuminator')
+                    specs = [p.replace('PETAL', 'SP') for p in self.illuminated_pcids]
+                    retcode = specman._send_command('illuminate', action='off', participating_spectrographs=specs)
+                    self.print(f'SPECMAN.illuminate returned code: {retcode}')
+                except Exception as e:
+                    print(f'Exception when trying to turn off illumination, {e}') 
 
 
     def fvc_collect(self):
@@ -529,8 +564,8 @@ class PECS:
     def pause(self, press_enter=False):
         '''pause operation between positioner moves for heat monitoring'''
         if self.pause_interval is None or press_enter:
-            input('Paused for heat load monitoring for unspecified interval. '
-                  'Press enter to continue: ')
+            self.input('Paused for heat load monitoring for unspecified interval. '
+                       'Press enter to continue: ')
         elif self.pause_interval == 0:  # no puase needed, just continue
             self.print('pause_interval = 0, continuing without pause...')
         elif self.pause_interval > 0:
@@ -643,8 +678,20 @@ class PECS:
         else:
             assert False, f'unrecognized return type {type(check_val)} from quick_query()'
         return combined
+        
+    def quick_query_df(self, key, posids='all'):
+        '''Wrapper for quick_query which returns a pandas DataFrame, whose
+        index is 'DEVICE_ID' and data column is key.
+        '''
+        data = self.quick_query(key=key, posids=posids)
+        ordered_posids = list(data)
+        ordered_data = [data[posid] for posid in posids]
+        listed = {'DEVICE_ID': ordered_posids, key: ordered_data}
+        df = pd.DataFrame(listed)
+        df = df.set_index('DEVICE_ID')
+        return df
     
-    def _merge_match_and_rename_fvc_data(self, request, meapos, matched):
+    def _merge_match_and_rename_fvc_data(self, request, meapos, matched, exppos):
         '''Returns results of fvc measurement after checking for target matches
         and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
@@ -652,6 +699,7 @@ class PECS:
         request ... pandas dataframe with index column DEVICE_ID and request data
         meapos ... pandas dataframe with index column DEVICE_ID and fvc data
         matched ... set of posids
+        exppos ... pandas dataframe with index column DEVICE_ID and expected positions data
         '''
         # meapos may contain not only matched but all posids in expected pos
         posids_to_match = set(request['DEVICE_ID']) | set(self.posids)
@@ -667,12 +715,17 @@ class PECS:
         mask = merged['FLAGS'].notnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
         
-        # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP', drop_devid=False,
-                                          participating_petals=self.ptl_roles)
-                  .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
-        result = merged.join(exppos, on='DEVICE_ID')
+        # get expected (tracked) posintTP angles --- these are now *after* any
+        # updating by test_and_update_tp, so may not match the original tracked
+        # values --- hence the special suffix
+        suffix = '_after_updates'
+        posids = exppos.index.tolist()
+        for key in ['posintT', 'posintP']:
+            this_data = self.quick_query_df(key=key, posids=posids)
+            exppos = exppos.join(this_data, on='DEVICE_ID', rsuffix=suffix)
+        posint_keys = [key for key in exppos.columns if 'posint' in key]
+        result = merged.merge(exppos[posint_keys], on='DEVICE_ID')
+        
         return result
     
     def _batch_transform(self, frame, cs1, cs2):

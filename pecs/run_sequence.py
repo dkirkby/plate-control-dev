@@ -113,12 +113,12 @@ logger.info(f'Minimum move cycle time: {uargs.cycle_time} sec')
 # set up PECS (online control system)
 try:
     from pecs import PECS
-    kwargs = {'interactive': True}
+    kwargs = {'interactive': True, 'logger': logger}
     specified_posids = seq.get_posids()
     if any(specified_posids):
         kwargs['posids'] = specified_posids
     pecs = PECS(**kwargs)
-    pecs.logger = logger
+    pecs.input = input2
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
     _get_posids = lambda: list(pecs.get_enabled_posids('sub', include_posinfo=False))
