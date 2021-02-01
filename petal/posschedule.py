@@ -91,7 +91,6 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         if stats_enabled:
-            timer_start = time.perf_counter()
             self.stats.add_request()
         self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
@@ -177,7 +176,6 @@ class PosSchedule(object):
                        }
         self._requests[posid] = new_request
         if stats_enabled:
-            self.stats.add_requesting_time(time.perf_counter() - timer_start)
             self.stats.add_request_accepted()
         return None
 
@@ -905,13 +903,16 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            self.stats.add_scheduling_time(time.perf_counter() - self.__timer_start)
             freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
             if freeze_collisions:
                 self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
-        self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
+        self.printfunc(f'Num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
+        total_time = time.perf_counter() - self.__timer_start
+        if self.stats.is_enabled():
+            self.stats.add_scheduling_time(total_time)
+        self.printfunc(f'Total time to calculate and check schedules = {total_time:.3f} sec')
         if self.petal.animator_on and anim_tables:
             final = self.stages['final']
             dummy_stats = posschedstats.PosSchedStats(enabled=False)
