@@ -146,15 +146,17 @@ class Petal(object):
         self.save_debug = save_debug
         self.simulator_on = simulator_on
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        assert sync_mode.lower() in ['hard','soft'], f'Invalid sync mode: {sync_mode}'
-        self.sync_mode = sync_mode
+        self.sync_mode = sync_mode.lower()
+        assert sync_mode in ['hard', 'soft'], f'Invalid sync mode: {sync_mode}'
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0} 
         
         if not(self.simulator_on):
             import petalcomm
-            self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
+            self.comm = petalcomm.PetalComm(self.petalbox_id,
+                                            user_interactions_enabled=user_interactions_enabled,
+                                            printfunc=self.printfunc)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
             # get ops_state from petalcontroller
             try:
@@ -405,6 +407,7 @@ class Petal(object):
 
             In cases where return_posids_only=True ... you will just get a set of posids back, no dict.
         """
+        self._start_request_timer()
         marked_for_delete = set()
         for posid in requests:
             if posid not in self.posids:
@@ -425,11 +428,12 @@ class Petal(object):
                 self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
+        self._stop_request_timer()
         if return_posids_only:
             return set(requests.keys())
         return requests
 
-    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False, prepause=0):
+    def request_direct_dtdp(self, requests, cmd_prefix='', return_posids_only=False, prepause=0, should_time=True):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
         amounts at their theta and phi shafts.
 
@@ -474,6 +478,8 @@ class Petal(object):
                                    made to request_direct_dtdp()
 
             prepause ... wait this long before moving (useful for debugging)
+            
+            should_time ... whether to run a timer
 
 
         OUTPUT:
@@ -494,6 +500,8 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
+        if should_time:
+            self._start_request_timer()
         max_prepause = 60  # sec
         assert 0 <= prepause <= max_prepause, f'prepause={prepause} sec is out of allowed range'
         self._initialize_pos_flags(ids = {posid for posid in requests})
@@ -522,11 +530,13 @@ class Petal(object):
                 self._print_and_store_note(posid, f'direct_dtdp: {error}')
         for posid in denied:
             del requests[posid]
+        if should_time:
+            self._stop_request_timer()
         if return_posids_only:
             return set(requests.keys())
         return requests
 
-    def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note=''):
+    def request_limit_seek(self, posids, axisid, direction, cmd_prefix='', log_note='', should_time=True):
         """Request hardstop seeking sequence for a single positioner or all positioners
         in iterable collection posids. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
@@ -541,7 +551,10 @@ class Petal(object):
             axisid ... 0 for theta or 1 for phi axis
             direction ... +1 or -1
             cmd_prefix ... optional, allows adding a descriptive string to the log
+            should_time ... whether to run a timer
         """
+        if should_time:
+            self._start_request_timer()
         posids = {posids} if isinstance(posids, str) else set(posids)
         self._initialize_pos_flags(ids = posids)
         for posid in posids:
@@ -569,6 +582,8 @@ class Petal(object):
             error = self.schedule.expert_add_table(table)
             if error:
                 self._print_and_store_note(posid, f'limit seek axis {axisid}: {error}')
+        if should_time:
+            self._stop_request_timer()
 
     def request_homing(self, posids, axis='both', debounce=True, log_note=''):
         """Request homing sequence for positioners in single posid or iterable
@@ -594,6 +609,7 @@ class Petal(object):
                          more for contextual info not known to the petal, like name
                          of a human operator, or whether the sky was blue that day, etc.
         """
+        self._start_request_timer()
         axis = 'phi_only' if axis == 'phi' else axis  # deal with common typo
         axis = 'theta_only' if axis == 'theta' else axis  # deal with common typo
         assert axis in {'both', 'phi_only', 'theta_only'}, f'Error in request_homing, unrecognized arg axis={axis}'
@@ -606,13 +622,13 @@ class Petal(object):
             if axis in {'both', 'phi_only'}:
                 directions[pc.P] = +1 # force this, because anticollision logic depends on it
                 phi_note = pc.join_notes(log_note, 'homing phi')
-                self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note=phi_note)
+                self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note=phi_note, should_time=False)
             if axis in {'both', 'theta_only'}:
                 directions[pc.T] = model.axis[pc.T].principle_hardstop_direction
                 theta_note = 'homing theta'
                 if phi_note == None:
                     theta_note = pc.join_notes(log_note, theta_note)
-                self.request_limit_seek(posid, pc.T, directions[pc.T], cmd_prefix='T', log_note=theta_note)
+                self.request_limit_seek(posid, pc.T, directions[pc.T], cmd_prefix='T', log_note=theta_note, should_time=False)
             hardstop_debounce = [0,0]
             postmove_cleanup_cmds = {pc.T: '', pc.P:''}
             for i, direction in directions.items():
@@ -626,7 +642,8 @@ class Petal(object):
             if debounce:
                 request = {posid:{'target': hardstop_debounce,
                                   'postmove_cleanup_cmds': postmove_cleanup_cmds}}
-                self.request_direct_dtdp(request, cmd_prefix='debounce')
+                self.request_direct_dtdp(request, cmd_prefix='debounce', should_time=False)
+        self._stop_request_timer()
                 
     def schedule_moves(self, anticollision='default', should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -705,22 +722,9 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-
         if self.save_debug:
-            # debugging code, will save the move table dictionaries
-            # as they are when sent to petalcontroller
-            debug_table = AstropyTable(hw_tables)
-            for key in ['motor_steps_P', 'motor_steps_T', 'move_time', 'postpause', 'speed_mode_P', 'speed_mode_T']:
-                debug_table[key] = [str(x) for x in debug_table[key]]
-            debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
-            exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
-            filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}'
-            debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
-            debug_table.write(debug_path, overwrite=True)
-            density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
-            self.schedule.plot_density(density_path)
-            
-        return failed_posids, n_retries      
+            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        return failed_posids, n_retries
             
     def set_motor_parameters(self):
         """Send the motor current and period settings to the positioners.
@@ -2161,6 +2165,25 @@ class Petal(object):
         if self.schedule_stats.is_enabled() and any(hw_tables):
             self.schedule_stats.add_hardware_move_tables(hw_tables)
         return hw_tables
+    
+    def _write_schedule_debug_data_to_disk(self, hw_tables, failed_posids=None):
+        '''Saves a list of hardware-ready move table dictionaries to disk. These are
+        the format used when sent to the petalcontroller. May be useful for debugging.
+        Optional inclusion of collection of posids to identify as failed_to_send in
+        the output table.
+        '''
+        debug_table = AstropyTable(hw_tables)
+        list_keys = ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P', 'move_time', 'postpause']
+        for key in list_keys:
+            debug_table[key] = [str(x) for x in debug_table[key]]
+        failed_posids = set() if not failed_posids else failed_posids
+        debug_table['failed_to_send'] = [True if posid in failed_posids else False for posid in debug_table['posid']]
+        exp_str = f'{self._exposure_id if self._exposure_id else ""}_{self._exposure_iter if self._exposure_iter else ""}'
+        filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}'
+        debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
+        debug_table.write(debug_path, overwrite=True)
+        density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
+        self.schedule.plot_density(density_path)
 
     def _postmove_cleanup(self):
         """This always gets called after performing a set of moves, so that
@@ -2497,6 +2520,17 @@ class Petal(object):
         '''
         self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
+        
+    def _start_request_timer(self):
+        '''For measuring move request processing time.'''
+        self.__request_timer_start = time.perf_counter()
+        
+    def _stop_request_timer(self):
+        '''For measuring move request processing time.'''
+        total_time = time.perf_counter() - self.__request_timer_start
+        if self.schedule_stats.is_enabled():
+            self.schedule_stats.add_requesting_time(total_time)
+        self.printfunc(f'Requests processed in {total_time:.3f} sec')
         
     def get_collider_polygons(self):
         '''Gets the point data for all polygons known to the collider as 2xN
