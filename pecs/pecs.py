@@ -37,6 +37,11 @@ class PECS:
         For different hardware setups, you need to intialize including the
         correct config file for that local setup. This will be stored in
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
+
+        KF - 20210201: A Note on PCIDs, PCID means Petal Controller ID, mistakenly
+                       used as an alternate name for petal loc which it actually refers to.
+                       pcid is only used internal to the code (to be purged later), all
+                       printouts now properly refer to it as petal loc.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
                  test_name='PECS', device_locs=None, no_expid=False, posids=None,
@@ -87,8 +92,8 @@ class PECS:
                      for role in self.ptlm.participating_petals]
             # Only use petals that are availible in Petalman
             self.pcids = list(set(self.pcids) & set(pcids))
-            self.print(f'PetalMan proxy initialised with active petal '
-                       f'role numbers (PCIDs): {pcids}')
+            self.print(f'PetalMan proxy initialized with active petal '
+                       f'role numbers (locs): {pcids}')
         else:
             self.ptlm = ptlm
             self.print(f'Reusing existing PetalMan proxy with active petals: '
@@ -146,11 +151,11 @@ class PECS:
     def ptl_setup(self, pcids, posids=None, illumination_check=False, device_locs=None):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
-                   f'selected petals, PCIDs: {pcids}')
+                   f'selected petals, locs: {pcids}')
         if illumination_check:
             for pcid in pcids:  # illumination check
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
-                    f'PC{pcid:02} must be illuminated.')
+                    f'PETAL{pcid} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
         self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
@@ -201,15 +206,15 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = self.input('Please enter integer PCIDs seperated by spaces. '
-                           'Leave blank to select petal specified in cfg: ')
+        pcids = self.input('Please enter integer petal locs seperated by spaces. '
+                           'Leave blank to select petals specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
             assert f'PETAL{pcid}' in self.ptlm.Petals.keys(), (
-                f'PC{pcid:02} unavailable, all available ICS petal roles: '
+                f'PETAL{pcid} unavailable, all available ICS petal roles: '
                 f'{self.ptlm.Petals.keys()}')
-        self.print(f'Selected {len(self.pcids)} petals, PCIDs: {self.pcids}')
+        self.print(f'Selected {len(self.pcids)} petals, Petal Locs: {self.pcids}')
         self.ptlm.participating_petals = [self._pcid2role(p) for p in pcids]
         return pcids
 
