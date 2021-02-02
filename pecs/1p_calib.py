@@ -80,8 +80,7 @@ if __name__ == '__main__':
     logger_fh.setLevel(logging.DEBUG)
     logger_sh.setLevel(logging.INFO)
     simple_logger.input2(f'Running one point calibration for {uargs.mode}. Hit enter to continue. ')
-    cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}', logger=logger)
-    cs.input = simple_logger.input2
+    cs = PECS(interactive=True, test_name=f'1p_calib_{uargs.mode}', logger=logger, inputfunc=simple_logger.input2)
     try:
         updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
                            tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,

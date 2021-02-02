@@ -45,7 +45,7 @@ class PECS:
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
                  test_name='PECS', device_locs=None, no_expid=False, posids=None,
-                logger=None):
+                logger=None, inputfunc=input):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -59,6 +59,7 @@ class PECS:
         self.test_name = test_name
         self.interactive = interactive
         self.logger = logger
+        self.input = inputfunc
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
@@ -66,7 +67,6 @@ class PECS:
         if self.exposure_dir is None:
             self.exposure_dir = '/exposures/desi/'
         self.printfunc = printfunc
-        self.input = input
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
