@@ -93,7 +93,8 @@ if __name__ == '__main__':
         updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']]
         updates.sort_values('ERR_XY', inplace=True, ascending=False)
         logger.info('Updates sorted by descending ERR_XY:')
-        logger.info(updates.to_string())
+        logger.debug(updates.to_string())
+        logger.info(updates.to_string(max_rows=100))
     except Exception as e:
         logger.error('1p_calib crashed! See traceback below:')
         logger.critical(traceback.format_exc())

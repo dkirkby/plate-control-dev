@@ -58,8 +58,7 @@ class PECS:
         self.start_time = pc.now()
         self.test_name = test_name
         self.interactive = interactive
-        if logger is not None:
-            self.logger = logger
+        self.logger = logger
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
@@ -503,7 +502,7 @@ class PECS:
                 try:
                     specman = SimpleProxy('SPECMAN')
                     self.print('Turning on illuminator')
-                    specs = [p.replace('PETAL', 'SP') for p in self.illuminated_pcids]
+                    specs = [f'SP{p}' for p in self.illuminated_pcids]
                     retcode = specman._send_command('illuminate', action='on', participating_spectrographs=specs)
                     self.print(f'SPECMAN.illuminate returned code: {retcode}')
                 except Exception as e:
@@ -526,7 +525,7 @@ class PECS:
                 try:
                     specman = SimpleProxy('SPECMAN')
                     self.print('Turning on illuminator')
-                    specs = [p.replace('PETAL', 'SP') for p in self.illuminated_pcids]
+                    specs = [f'SP{p}' for p in self.illuminated_pcids]
                     retcode = specman._send_command('illuminate', action='off', participating_spectrographs=specs)
                     self.print(f'SPECMAN.illuminate returned code: {retcode}')
                 except Exception as e:
