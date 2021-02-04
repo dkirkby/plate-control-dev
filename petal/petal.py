@@ -1843,7 +1843,7 @@ class Petal(object):
                       'valid_ops': sorted(valid_ops)}
             return valids
         if value != '' and op == '':
-            op == '=='
+            op = '=='
         msg_prefix = 'quick_query:'
         err_prefix = f'{msg_prefix} error,'
         assert key in valid_keys, f'{err_prefix} invalid key {key}'
