@@ -19,6 +19,7 @@ pecs/seed_offsets_xy.py -text
 pecs/sequence.py -text
 pecs/sequence_generator.py -text
 pecs/set_calibrations.py -text
+pecs/set_calibrations_example_scale_factors.csv -text
 pecs/simple_logger.py -text
 pecs/update_posTP_from_measXY.py -text
 pecs/xy_targets_generator.py -text
