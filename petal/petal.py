@@ -2453,6 +2453,8 @@ class Petal(object):
             self.pos_flags[devid] |= self.flags.get('BROKENFIBER', self.missing_flag)
             self.pos_flags[devid] |= self.flags.get('BADPOSFID', self.missing_flag)
             self.disabled_devids.append(devid)
+        if not self.get_posfid_val(devid, 'CTRL_ENABLED'):
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
 
     def _apply_all_state_enable_settings(self):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
