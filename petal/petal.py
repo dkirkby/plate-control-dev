@@ -957,6 +957,8 @@ class Petal(object):
             ret = self.comm.pbget('FIDUCIALS')
 
         settings_done = {}
+        n_missing = 0
+        n_failed = 0
         for i in range(len(enabled)):
             set_duty = duties[i]
             # protect against missing fiducials in ret
@@ -965,18 +967,25 @@ class Petal(object):
                     self.printfunc('WARNING: set_fiducials: disagreement in fiducial set duty and returned duty, ID: %s' % enabled[i])
                     set_duty = ret[busids[i]][canids[i]]
                     error = True
+                    n_failed += 1
             elif not save_as_default:
                 # Use remembered state, fid not responding but only if not saving defaults
                 self.printfunc('WARNING: set_fiducials: fiducials %s not returned by petalcontroller, state not set.' % enabled[i])
                 set_duty = self.get_posfid_val(enabled[i], 'DUTY_STATE')
                 error = True
+                n_missing += 1
             self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty, check_existing=True)
             settings_done[enabled[i]] = set_duty
             if save_as_default:
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty, check_existing=True)
         self.commit(mode='both', log_note='set fiducial parameters')
         if error:
-            return 'FAILED: not all fiducials set. Try moving to READY if trying to turn them off.'
+            failed_str = 'FAILED: not all fiducials set.'
+            if n_missing != 0:
+                failed_str += f' {n_missing} fiducials were not responsive.'
+            if n_failed != 0:
+                failed_str += f' {n_failed} fiducials were not set to desired duty cycle.'
+            return failed_str
         else:
             return settings_done
 
