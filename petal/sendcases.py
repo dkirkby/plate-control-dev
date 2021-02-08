@@ -25,6 +25,9 @@ class SendExecCases():
         self.CLEARED = 'cleared'
         self.NORESPONSE = 'no_response'
         self.UNKNOWN = 'unknown'
+
+        self.valid_power_supplies = {'V1', 'V2'}
+        self.valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
         
         self.send_fail_format = {
             self.CLEARED: dict,  # any pos for which move tables were originally defined, but whose memories are now known to be clear
@@ -36,6 +39,11 @@ class SendExecCases():
             'current_rate': float,  # foo per hour
             'sec_until_ready': float,  # min time (seconds) we must wait until ready again to execute
             }
+        
+        self.temp_fail_format = {
+            busid: dict for busid in self.valid_canbus_ids  # positioners that exceed limit temperature, separated into dicts by busids, that have keys=canids and vals=temperatures
+            }
+        self.temp_fail_format['other'] = dict
         
         self.SUCCESS = 'SUCCESS'
         self.PARTIAL_SEND = 'PARTIAL SUCCESS: all required moves'
@@ -54,23 +62,30 @@ class SendExecCases():
             self.FAIL_BUSOFF:    [],  # list includes only the can buses that are disabled
             self.FAIL_MOVERATE:  self.rate_fail_format,
             self.FAIL_RESETRATE: self.rate_fail_format,
-            self.FAIL_TEMPLIMIT: {},  # keys = canids, values = temperatures. only includes the cases that exceed an acceptance threshold value
+            self.FAIL_TEMPLIMIT: self.temp_fail_format,
             }
-        
-        self.valid_power_supplies = {'V1', 'V2'}
-        self.valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
+
         
         self.sim_subcases_cycle = sorted(self.send_fail_format)
         self.sim_subcases_last = {self.PARTIAL_SEND: -1, self.FAIL_SEND: -1}
         self.sim_cases_cycle = self.sim_cases_sequence()
         self.sim_cases_last = -1
-            
+
     def validate(self, pc_response):
         '''Validates output from send_and_execute_tables() provided by petalcontroller.
         Throws an assertion if invalid, otherwise silent.
         '''
         def assert2(test, detail=''):
             assert test, f'petalcontroller return data not understood:\n{pc_response}\n{detail}'
+        
+        def validate_numeric(data, key_type=object):
+            '''Validates input dict data, ensuring that all values are numeric. Keys
+            are also checked to make sure they conform to the argued type.'''
+            for k, v in data.items():
+                assert2(isinstance(k, key_type), f'expected {key_type}, not {k}')
+                assert2(pc.is_number(v), f'expected a number, not {v}')
+            
+        require_all_expected_keys = {self.FAIL_MOVERATE, self.FAIL_RESETRATE, self.PARTIAL_SEND, self.FAIL_SEND}
         assert2(len(pc_response) == 2, f'bad length {len(pc_response)} for pc_response')
         assert2(isinstance(pc_response, (tuple, list)), 'not a tuple or list')
         errstr = pc_response[0]
@@ -85,13 +100,26 @@ class SendExecCases():
             assert2(all(x in self.valid_power_supplies for x in data))
         elif errstr == self.FAIL_BUSOFF:
             assert2(all(x in self.valid_canbus_ids for x in data))
-        elif expected_type == dict and len(expected_fmt) > 0:
-            for k, v in expected_fmt.items():
-                assert2(k in data, f'key {k} not found in pc_response')
-                if v in {int, float}:
-                    assert2(pc.is_number(data[k]), f'expected a number, not {data[k]}')
+        elif errstr == self.FAIL_TEMPLIMIT:
+            for key, subdict in data.items():
+                assert2(key in expected_fmt, f'unexpected key {key} in pc_response')
+                if 'can' in key:
+                    validate_numeric(subdict, key_type=int)
+                elif key == 'other':
+                    validate_numeric(subdict, key_type=object)
                 else:
-                    assert2(isinstance(data[k], v), f'unexpected type {type(v)} not {data[k]}')
+                    assert2(False, 'mismatch between expected_fmt and key-checking conditionals')
+        elif errstr in {self.PARTIAL_SEND, self.FAIL_SEND}:
+            for key, subdict in data.items():
+                if key not in expected_fmt:
+                    continue  # this is ok, for debug data, and we just skip any further validation
+                for key2, subdata2 in subdict.items():
+                    assert2(key2 in self.valid_canbus_ids, f'did not recognize bus id "{key2}"')
+                    for x in subdata2:
+                        assert2(pc.is_integer(x), f'unexpected non-integer canid "{x}"')
+        if errstr in require_all_expected_keys:
+            for key, value in expected_fmt.items():
+                assert2(key in data, f'expected key {key}, but not found in pc_response')
     
     def simdata(self, case, tables):
         '''Generates simulated data matching a given case.
@@ -124,7 +152,15 @@ class SendExecCases():
         if case == self.FAIL_TEMPLIMIT:
             num_fail = math.ceil(len(ids) * err_frac)
             fail_ids = random.sample(sorted(ids), num_fail)
-            return {x: 100.0 for x in fail_ids}
+            out = {}
+            for canid, busid in ids.items():
+                if canid not in fail_ids:
+                    continue
+                if busid not in out:
+                    out[busid] = {}
+                out[busid][canid] = 100.0
+            out['other'] = {'FPP1': 200.0, 'FPP2': 1000}
+            return out
         i = self.sim_subcases_last[case] + 1
         if i >= len(self.sim_subcases_cycle):
             i = 0
