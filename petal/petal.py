@@ -777,11 +777,9 @@ class Petal(object):
                     response_msg += f': {posids}'
                 self.printfunc(response_msg)
             failures = set().union(*combined.values())
-            
-            # 2021-01-29 [JHS] todo:
-            #  1. also print to log any undefined (debug) keys and their values
-            #  2. check the validation in sendcases.py and make sure it accepts these extra key/vals
-            
+            extra_keys = {key for key in errdata if key not in sendex.send_fail_format}
+            for key in extra_keys:
+                self.printfunc(f'petalcontroller also returned... {key}: {errdata[key]}')            
         else:
             failures = posids_to_try
             

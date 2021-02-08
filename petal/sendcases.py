@@ -150,6 +150,8 @@ class SendExecCases():
                 if busid not in out[self.CLEARED]:
                     out[self.CLEARED][busid] = []
                 out[self.CLEARED][busid].append(i)
+        out['extra1'] = 'extra dummy str data'
+        out['extra2'] = [f'extra dummy list data {i}' for i in range(5)]
         return out
     
     def sim_cases_sequence(self):
