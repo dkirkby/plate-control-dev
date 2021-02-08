@@ -26,7 +26,7 @@ class SendExecCases():
         self.NORESPONSE = 'no_response'
         self.UNKNOWN = 'unknown'
 
-        self.valid_power_supplies = {'V1', 'V2'}
+        self.valid_power_supplies = {'V1', 'V2', 'PS1', 'PS2'}
         self.valid_canbus_ids = {f'can{i:02}' for i in range(100)} | {f'can{i}' for i in range(10)}
         
         self.send_fail_format = {
@@ -53,6 +53,7 @@ class SendExecCases():
         self.FAIL_MOVERATE = 'FAILED: move rate limit'
         self.FAIL_RESETRATE = 'FAILED: power supply reset rate limit'
         self.FAIL_TEMPLIMIT = 'FAILED: temperature limit'
+        self.FAIL_OTHER = 'FAILED: other'
                 
         self.defs = {
             self.SUCCESS:        None,  # all requested move tables sent and executed ok
@@ -63,6 +64,7 @@ class SendExecCases():
             self.FAIL_MOVERATE:  self.rate_fail_format,
             self.FAIL_RESETRATE: self.rate_fail_format,
             self.FAIL_TEMPLIMIT: self.temp_fail_format,
+            self.FAIL_OTHER:     None,  # any object is accepted as the data value
             }
 
         
@@ -91,6 +93,8 @@ class SendExecCases():
         errstr = pc_response[0]
         data = pc_response[1]
         assert2(errstr in self.defs, f'undefined errstr {errstr}')
+        if errstr == self.FAIL_OTHER:
+            return  # no format validation of the (unknown) data
         expected_fmt = self.defs[errstr]
         expected_type = type(expected_fmt)
         assert2(type(data) == expected_type, f'unexpected type {type(data)} for {data}, expected {expected_type}')
@@ -133,6 +137,8 @@ class SendExecCases():
         assert case in self.defs
         if case == self.SUCCESS:
             return self.defs[case]
+        if case == self.FAIL_OTHER:
+            return random.choice([{'hello': 'goodbye'}, ['some list'], 'some string', 666])
         if case in {self.FAIL_MOVERATE, self.FAIL_RESETRATE}:
             out = self.defs[self.FAIL_MOVERATE].copy()
             out['current_rate'] = 3601.0
