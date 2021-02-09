@@ -635,7 +635,7 @@ try:
             descriptive_dict = submove.to_dict(sparse=True, posids=posids)
             logger.debug(f'Move command: {descriptive_dict}')
             if submove.is_uniform:
-                logger.info(f'Num requested positioners: {len(posid)}')
+                logger.info(f'Num requested positioners: {len(posids)}')
                 logger.debug(f'Requested positioners: {posids}')  # non-uniform cases already print a bunch of posids when displaying move command
             logger.info(f'Going to {move_with_submove_txt}')
             if real_moves:
