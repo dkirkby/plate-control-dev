@@ -1,4 +1,3 @@
-import sys
 import math
 import posconstants as pc
 import petaltransforms
@@ -299,7 +298,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def flatXY_to_ptlXY(self, flatXY):
         '''Direct transformation from flatXY to ptlXY coordinates.
         Note that this short-circuits a similar (but 10x slower) implementation
-        in petatransforms.'''
+        in petaltransforms.'''
         Q_rad = math.atan2(flatXY[1], flatXY[0])
         S = math.hypot(flatXY[0], flatXY[1])
         R = pc.S2R_lookup(S)
@@ -383,7 +382,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         R = math.hypot(ptlXY[0], ptlXY[1])
         ptlXYZ = [ptlXY[0], ptlXY[1], pc.R2Z_lookup(R)] # Z(R(ptlXY)) --> imperfect (but very close) invertibilty with obsXY_to_posintTP
         obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ, cast=True)
-        return [float(obsXYZ[0]), float(obsXYZ[1])]        
+        return [float(obsXYZ[0]), float(obsXYZ[1])]
+    
+    def poslocTP_to_ptlXYZ(self, poslocTP):
+        '''Composite transformation, performs poslocXY --> flatXY --> ptlXYZ.
+        '''
+        poslocXY = self.poslocTP_to_poslocXY(poslocTP)
+        flatXY = self.poslocXY_to_flatXY(poslocXY)
+        ptlXY = self.flatXY_to_ptlXY(flatXY)
+        R = math.hypot(ptlXY[0], ptlXY[1])
+        ptlXYZ = [ptlXY[0], ptlXY[1], pc.R2Z_lookup(R)]
+        return ptlXYZ
         
     # VECTOR ADDITIONS AND SUBTRACTIONS FOR MOTOR SHAFT COORDINATES
     def addto_posintTP(self, posintTP0, dtdp, range_wrap_limits='full'):

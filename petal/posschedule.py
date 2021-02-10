@@ -164,8 +164,10 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
+        targt_ptlXYZ = trans.poslocTP_to_ptlXYZ(targt_poslocTP)
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
+                       'targt_ptlXYZ': targt_ptlXYZ,
                        'posmodel': posmodel,
                        'posid': posid,
                        'command': uv_type,
@@ -887,7 +889,11 @@ class PosSchedule(object):
             if posid in self._requests:
                 req = self._requests[posid]
                 table.store_orig_command(string=req['command'], val1=req['cmd_val1'], val2=req['cmd_val2']) # keep the original commands with move tables
-                log_note_addendum = req['log_note'] # keep the original log notes with move tables
+                log_note_addendum = req['log_note']  # keep abs req target and the original log notes with move tables
+                for coord in ['posintTP', 'ptlXYZ']:
+                    coord_list = [f'{u:.3f}' for u in req[f'targt_{coord}']]
+                    coord_str = f'req_{coord}=[{", ".join(coord_list)}]'
+                    log_note_addendum = pc.join_notes(log_note_addendum, coord_str)
                 if stats_enabled:
                     match = self._table_matches_request(table.for_schedule(), req)
                     if posid in self.__original_request_posids and match:
