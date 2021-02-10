@@ -923,7 +923,6 @@ class PosSchedule(object):
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.append_log_note(log_note_addendum)
-            print(table.log_note)
                 
     def _schedule_moves_finish_logging(self, anim_tables=None):
         """Final logging and animation steps for the schedule_moves() function."""
