@@ -861,7 +861,7 @@ class Petal(object):
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
                     anticollsion  ... 'default', 'adjust', 'adjust_requested_only', 'freeze', or None. See comments in schedule_moves() function
-                    should_anneal ... see comments in schedule_moves() function
+                    should_anneal ... boolean, see comments in schedule_moves() function
                     disable_limit_angle ... boolean, when True will turn off any phi limit angle
                     
         Valid cmd options:
