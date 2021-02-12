@@ -122,20 +122,23 @@ class PetalComm(object):
         timeout = kwargs.pop('pyrotimeout', 20.0)
         handle = None
         n_retries = 2
-        for n in range(1, n_retries + 1):
+        for i in range(1, n_retries + 1):
             try:
                 self.device['proxy']._pyroTimeout = timeout
                 handle = getattr(self.device['proxy'], cmd)
+                if handle:
+                    break
             except Exception as e1:
                 self.printfunc(f'Exception while connecting to petalcontroller: {e1}')
-                if n < n_retries and 'pyro_uri' in self.device:
+                if i < n_retries and 'pyro_uri' in self.device:
                     uri = self.device['pyro_uri']
-                    self.printfunc(f'Trying to re-establish connection to {uri}, attempt {n}')
+                    self.printfunc(f'Trying to re-establish connection to {uri}, attempt {i}')
                     self.device['proxy'] = Pyro4.Proxy(uri)
         if not handle:
             raise RuntimeError(f'Failed to connect to {uri} and get handle for command {cmd}')
         try:
-            return handle(*args, **kwargs)
+            output = handle(*args, **kwargs)
+            return output
         except Exception as e2:
             raise RuntimeError(f'Exception for command {cmd}. Message: {e2}')            
 
@@ -184,7 +187,11 @@ class PetalComm(object):
         """
         try:
             assert sync_mode in ['hard', 'soft']
-            output = self._call_device('send_and_execute_tables', move_tables, sync_mode)
+            output = self._call_device('send_and_execute_tables',
+                                       move_tables,
+                                       sync_mode,
+                                       pyrotimeout=100,  # [2021-02-12] JHS + CAD, time for possible canbus and powersupply resets
+                                      )
             sendex.validate(output)
             return output
         except Exception as e:
