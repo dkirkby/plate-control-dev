@@ -5,6 +5,7 @@ pecs/1p_calib.py -text
 pecs/disambiguate_theta.py -text
 pecs/dummy_rc_calib.py -text
 pecs/expert_set_pos_vals.py -text
+pecs/fp_setup.py -text
 pecs/fvc_measure.py -text
 pecs/fvc_sim.py -text
 pecs/get_calibrations.py -text
