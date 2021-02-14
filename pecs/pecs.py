@@ -91,6 +91,7 @@ class PECS:
                      for role in self.ptlm.participating_petals]
             # Only use petals that are availible in Petalman
             self.pcids = list(set(self.pcids) & set(pcids))
+            self.ptlm.participating_petals = [self._pcid2role(p) for p in self.pcids]
             self.print(f'PetalMan proxy initialized with active petal '
                        f'role numbers (locs): {pcids}')
         else:

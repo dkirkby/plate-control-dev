@@ -41,7 +41,7 @@ def get_pos_set(which='enabled'):
 initial_disabled = get_pos_set('disabled')
 initial_enabled = get_pos_set('enabled')
 
-e = None #no exception
+err = None #no exception
 
 logger.info('FP_SETUP: enabling positioners...')
 cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
@@ -55,7 +55,7 @@ cs.turn_on_fids()
 try:
     logger.info('FP_SETUP: running 1p calibration...')
     enabled_before_1p = get_pos_set('enabled')
-    updates = onepoint(cs, mode='posintTP', move=False, commit=True, tp_tol=0.065,
+    updates = onepoint(cs, mode='posTP', move=False, commit=True, tp_tol=0.065,
                        tp_frac=1.0, num_meas=1, use_disabled=True, check_unmatched=True)
     enabled_after_1p = get_pos_set('enabled')
     updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', 'POS_T', 'POS_P', 'OLD_POS_T', 'OLD_POS_P']]
@@ -65,7 +65,7 @@ try:
     #logger.info(updates.to_string(max_rows=100))
     if update_error_report_thresh:
         selection = updates.loc[updates['ERR_XY'] > update_error_report_thresh]
-        if not(selection.empty()):
+        if len(selection):
             logger.warn(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
             logger.warn(f'FP_SETUP: update deatils: \n{selection}')
     disabled_during_1p = enabled_before_1p - enabled_after_1p
@@ -94,7 +94,7 @@ try:
 
     logger.info(f'FP_SETUP: running final 1p calibration...')
     enabled_before_1p2 = get_pos_set('enabled')
-    updates = onepoint(cs, mode='posintTP', move=False, commit=True, tp_tol=0.065,
+    updates = onepoint(cs, mode='posTP', move=False, commit=True, tp_tol=0.065,
                        tp_frac=1.0, num_meas=3, use_disabled=True, check_unmatched=True)
     enabled_after_1p2 = get_pos_set('enabled')
     updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', 'POS_T', 'POS_P', 'OLD_POS_T', 'OLD_POS_P']]
@@ -104,13 +104,14 @@ try:
     #logger.info(updates.to_string(max_rows=100))
     if update_error_report_thresh:
         selection = updates.loc[updates['ERR_XY'] > update_error_report_thresh]
-        if not(selection.empty()):
+        if len(selection):
             logger.warn(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
             logger.warn(f'FP_SETUP: update deatils: \n{selection}')
     disabled_during_1p2 = enabled_before_1p2 - enabled_after_1p2
     logger.info(f'FP_SETUP: {len(disabled_during_1p2)} disabled during initial 1p calib. Posids {disabled_during_1p2}')
     final_enabled = get_pos_set('enabled')
 except Exception as e:
+    err = e
     logger.error('FP_SETUP crashed! See traceback below:')
     logger.critical(traceback.format_exc())
     logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
@@ -126,7 +127,7 @@ cs.turn_off_illuminator()
 logger.info('FP_SETUP: turning off fiducials...')
 cs.turn_off_fids()
 
-if e is None:
+if err is None:
     logger.info('FP_SETUP: Successfully completed! Please record any following notes in the log book in addition to any other observations:')
     newly_enabled = final_enabled - initial_enabled
     if newly_enabled:
