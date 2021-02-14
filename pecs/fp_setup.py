@@ -20,6 +20,8 @@ simple_logger.input2(f'Alert: you are about to run the focalplane setup script t
 
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 
+logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
+
 #from 1p_calib import onepoint # doesn't work
 import importlib
 onept = importlib.import_module('1p_calib')
@@ -39,10 +41,16 @@ def get_pos_set(which='enabled'):
 initial_disabled = get_pos_set('disabled')
 initial_enabled = get_pos_set('enabled')
 
+e = None #no exception
+
 logger.info('FP_SETUP: enabling positioners...')
 cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
 
-e = None #no exception
+logger.info('FP_SETUP: turning on back illumination...')
+cs.turn_on_illuminator()
+
+logger.info('FP_SETUP: turning on fiducials...')
+cs.turn_on_fids()
 
 try:
     logger.info('FP_SETUP: running 1p calibration...')
@@ -111,6 +119,12 @@ except Exception as e:
         cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
     except:
         logger.critical('FP_SETUP: failed to return to initial state. DO NOT continue without consulting FP expert.')
+
+logger.info('FP_SETUP: turning off back illumination...')
+cs.turn_off_illuminator()
+
+logger.info('FP_SETUP: turning off fiducials...')
+cs.turn_off_fids()
 
 if e is None:
     logger.info('FP_SETUP: Successfully completed! Please record any following notes in the log book in addition to any other observations:')
