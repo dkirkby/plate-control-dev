@@ -44,7 +44,12 @@ initial_enabled = get_pos_set('enabled')
 err = None #no exception
 
 logger.info('FP_SETUP: enabling positioners...')
-cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
+ret = cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
+logger.info(f'FP_SETUP: enable_positioners returned: {ret}')
+if ret != 'SUCCESS':
+    logger.error('FP_SETUP: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
+    ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
+    logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
 
 logger.info('FP_SETUP: turning on back illumination...')
 cs.turn_on_illuminator()
@@ -85,7 +90,8 @@ try:
             for petal_id, table_str in details.items():
                 details_str += f'\n{petal_id}\n{table_str}\n'
         logger.warning(f'{len(ambig)} positioners remain *unresolved* and will be disabled. Details:\n{details_str}')
-        cs.ptlm.disable_positioners(ids=ambig, comment='FP setup - disabling positioners that remain in ambiguous theta range.')
+        ret = cs.ptlm.disable_positioners(ids=ambig, comment='FP setup - disabling positioners that remain in ambiguous theta range.')
+        logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
     else:
         logger.info('FP_SETUP: All selected ambiguous cases were resolved!')
     enabled_after_disambig = get_pos_set('enabled')
@@ -117,8 +123,10 @@ except Exception as e:
     logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
     try:
         logger.info('FP_SETUP: Re-disabling initially disabled positioners for safety...')
-        cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
+        ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
+        logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
     except:
+        logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
         logger.critical('FP_SETUP: failed to return to initial state. DO NOT continue without consulting FP expert.')
 
 logger.info('FP_SETUP: turning off back illumination...')
@@ -126,9 +134,10 @@ cs.turn_off_illuminator()
 
 logger.info('FP_SETUP: turning off fiducials...')
 cs.turn_off_fids()
+cs.fvc_collect()
 
 if err is None:
-    logger.info('FP_SETUP: Successfully completed! Please record any following notes in the log book in addition to any other observations:')
+    logger.info('FP_SETUP: Successfully completed! Please record any following notes in the night log in addition to any other observations:')
     newly_enabled = final_enabled - initial_enabled
     if newly_enabled:
         logger.info(f'FP_SETUP NOTE: recovered {len(newly_enabled)} positioner robots.')
@@ -136,9 +145,8 @@ if err is None:
         logger.info(f'FP_SETUP NOTE: {len(ambig)} positioners remaing in ambiguous theta range and are not used tonight: posids {ambig}')
     non_ambig_disabled = disabled_during_1p | disabled_during_1p2 | (disabled_during_disambig-ambig)
     if non_ambig_disabled:
-        logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors.')
+        logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors or communication errors.')
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
 
-cs.fvc_collect()
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
