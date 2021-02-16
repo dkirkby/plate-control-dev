@@ -741,6 +741,7 @@ class Petal(object):
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('no tables to send')
+            self._cancel_move(reset_flags='all')
             if retry_posids:
                 return retry_posids  # in this context, the retry positioners are interpreted as having failed
             return set()
