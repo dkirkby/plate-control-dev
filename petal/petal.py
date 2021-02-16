@@ -741,7 +741,7 @@ class Petal(object):
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('no tables to send')
-            self._cancel_move(reset_flags='all')
+            self._cancel_move(reset_flags='all', reset_notes='all')
             if retry_posids:
                 return retry_posids  # in this context, the retry positioners are interpreted as having failed
             return set()
@@ -786,7 +786,7 @@ class Petal(object):
             failures = posids_to_try
             errdata2 = {self.canids_to_posids[canid]: value for canid, value in errdata.items()} if errstr == sendex.FAIL_TEMPLIMIT else errdata
             self.printfunc(f'"{errstr}" data: {errdata2}')
-            self._cancel_move(reset_flags='all')
+            self._cancel_move(reset_flags='all', reset_notes='all')
             should_cleanup_pos_data = False  # cancel move already takes care of all cleanup
         successes = posids_to_try - failures
         for result, posids in {'SUCCESS': successes, 'FAILURE': failures}.items():
@@ -2336,13 +2336,14 @@ class Petal(object):
             self.previous_animator_total_time = self.animator_total_time
             self.previous_animator_move_number = self.animator_move_number
         
-    def _cancel_move(self, reset_flags=True):
+    def _cancel_move(self, reset_flags=True, reset_notes='all'):
         '''Resets schedule and performs posmodel cleanup commands.
         
         INPUTS:            
             reset_flags ... True --> reset posflags (for enabled positioners only)
                             False --> do not reset any posflags
                             'all' --> reset posflags for both enabled and disabled
+            reset_notes ... similar values like reset_flags
         '''
         self.printfunc('Canceling move. Tracking data in petal.py will be reset')
         if self.animator_on:
@@ -2352,6 +2353,12 @@ class Petal(object):
         if reset_flags:
             enabled_only = reset_flags != 'all'
             self._initialize_pos_flags(ids='all', enabled_only=enabled_only)
+        if reset_notes:
+            enabled_only = reset_notes != 'all'
+            posids = self.all_enabled_posids() if enabled_only else self.posids
+            for posid in posids:
+                self.states[posid].clear_log_notes()
+                self.states[posid].clear_calib_notes()
             
     def _reschedule(self, posids):
         '''Cancels existing move and reschedules. Intended for use when responding
@@ -2370,7 +2377,7 @@ class Petal(object):
             all_requests = self.schedule.get_regular_requests()
             posids = {p for p in posids if p in all_requests}
             requests_to_retry = {posid: all_requests[posid] for posid in posids}
-        self._cancel_move(reset_flags='all')
+        self._cancel_move(reset_flags='all', reset_notes=False)
         self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids)} positioner(s)')
         if expert_mode:
             for move_table in expert_tables_to_retry:
@@ -2557,7 +2564,7 @@ class Petal(object):
                 for fid in self.fidids:
                     self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
         #Reset values
-        self._cancel_move(reset_flags=False) 
+        self._cancel_move(reset_flags=False, reset_notes='all') 
         # Reset posflags, leave disabled flags alone for record
         self._initialize_pos_flags(enabled_only=True)
         self._apply_all_state_enable_settings()
