@@ -115,7 +115,7 @@ class PetalComm(object):
         """
         Call remote function
         Input:  cmd   = function name
-                args, kwargs are passed to the remove function
+                args, kwargs are passed to the remote function
         Returns: return value received from remote function
         """
         timeout = kwargs.pop('pyrotimeout', 20.0)
