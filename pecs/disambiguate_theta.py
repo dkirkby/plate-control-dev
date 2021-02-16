@@ -76,10 +76,10 @@ class disambig_class():
                                         }
 
         # global collections
-        self.enabled_posids = set(pecs.get_enabled_posids('all', include_posinfo=False))
-        self.allowed_to_fix = set(pecs.get_enabled_posids('sub', include_posinfo=False))
+        self.enabled_posids = set(self.pecs.get_enabled_posids('all', include_posinfo=False))
+        self.allowed_to_fix = set(self.pecs.get_enabled_posids('sub', include_posinfo=False))
         self.unambig = set()  # stores all posids that have been resolved
-        self.neighbor_data = pecs.ptlm.app_get("collider.pos_neighbors")
+        self.neighbor_data = self.pecs.ptlm.app_get("collider.pos_neighbors")
         self.neighbors = {}
         for these in self.neighbor_data.values():
             self.neighbors.update(these)
