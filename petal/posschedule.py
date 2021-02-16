@@ -110,22 +110,10 @@ class PosSchedule(object):
             self.stats.add_request()
         self._all_requested_posids['regular'].add(posid)
         posmodel = self.petal.posmodels[posid]
-        trans = posmodel.trans
-        target_str = f'{uv_type}=({u:6.3f}, {v:6.3f})'
-        if self.has_regular_request_already(posid):
-            self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
-            return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
-        if self._deny_request_because_disabled(posmodel):
-            return self._denied_str(target_str, POS_DISABLED_MSG)
-        if self._deny_request_because_starting_out_of_range(posmodel):
-            return self._denied_str(target_str, f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
-                                 f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
-        if not allow_initial_interference:
-            interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
-            if interfering_neighbors:
-                return self._denied_str(target_str, f'Interference at initial position with {interfering_neighbors}')
+        trans = posmodel.trans        
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
+        cmd_target_str = self._make_coord_str(uv_type, [u, v], prefix='user')
         
         # options used below, for control of t_guess parameter in some coord conversions
         t_guess_OFF = None  # Using this option always puts target poslocP within [0, 180].
@@ -134,6 +122,7 @@ class PosSchedule(object):
                                                             # poslocTP options that is closer to starting position.
                                                             # Here, poslocP may go outside [0, 180].
         
+        # get into uniform coordinate system
         lims = 'targetable'
         unreachable = False
         if uv_type == 'QS':
@@ -165,11 +154,33 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            return self._denied_str(target_str, 'Bad uv_type')
+            return self._denied_str(cmd_target_str, 'Bad uv_type')
+        
+        # other standard coordinates for validations and logging
+        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
+        targt_ptlXYZ = trans.poslocTP_to_ptlXYZ(targt_poslocTP)
+        target_str_posintTP = self._make_coord_str('posintTP', targt_posintTP, prefix='req')
+        target_str_ptlXYZ = self._make_coord_str('ptlXYZ', targt_ptlXYZ, prefix='req')
+        target_str = pc.join_notes(target_str_posintTP, target_str_ptlXYZ)
+        
+        # validations
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
+            target_str = target_str.replace('req', 'nearest')
+            target_str = pc.join_notes(cmd_target_str, target_str)
             return self._denied_str(target_str, 'Target not reachable.')
-        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
+        if self.has_regular_request_already(posid):
+            self.petal.pos_flags[posid] |= self.petal.flags.get('MULTIPLEREQUESTS', self.petal.missing_flag)
+            return self._denied_str(target_str, 'Cannot request more than one target per positioner in a given schedule.')
+        if self._deny_request_because_disabled(posmodel):
+            return self._denied_str(target_str, POS_DISABLED_MSG)
+        if self._deny_request_because_starting_out_of_range(posmodel):
+            return self._denied_str(target_str, f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
+                                 f' outside allowed range T={posmodel.full_range_posintT} and/or P={posmodel.full_range_posintP}')
+        if not allow_initial_interference:
+            interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
+            if interfering_neighbors:
+                return self._denied_str(target_str, f'Interference at initial position with {interfering_neighbors}')
         limit_err = self._deny_request_because_limit(posmodel, targt_poslocTP)
         if limit_err:
             return self._denied_str(target_str, limit_err)
@@ -180,16 +191,17 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-        targt_ptlXYZ = trans.poslocTP_to_ptlXYZ(targt_poslocTP)
+        
+        # form internal request dict
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
-                       'targt_ptlXYZ': targt_ptlXYZ,
                        'posmodel': posmodel,
                        'posid': posid,
                        'command': uv_type,
                        'cmd_val1': u,
                        'cmd_val2': v,
                        'log_note': log_note,
+                       'target_str': target_str,
                        'is_dummy': False,
                        }
         self._requests[posid] = new_request
@@ -339,7 +351,8 @@ class PosSchedule(object):
         self._all_requested_posids['expert'].add(move_table.posid)
         if self._deny_request_because_disabled(move_table.posmodel):
             sched_table = move_table.for_schedule()
-            target_str = f'expert_net_dtdp=({sched_table["net_dT"][-1]:.3f}, {sched_table["net_dP"][-1]:.3f})'
+            net_dtdp = [sched_table[key][-1] for key in ['net_dT', 'net_dP']]
+            target_str = self._make_coord_str('expert_net_dtdp', net_dtdp, prefix='')
             return self._denied_str(target_str, POS_DISABLED_MSG)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
@@ -595,11 +608,10 @@ class PosSchedule(object):
                 stage.del_table(posid)
                 if posid in requested_posids & overlapping:
                     req = user_requests[posid]
-                    target_str = f'{req["command"]}=({req["cmd_val1"]:.3f}, {req["cmd_val2"]:.3f})'
                     explanation = f'Interference at initial position with {overlaps_dict[posid]}. Could ' + \
                                   f'not resolve within {skip} timestep{"s" if skip != 1 else ""} ({skip*self.collider.timestep:.3f} ' + \
                                   f'sec) by debouncing polygons (jog distances = {db} deg).'
-                    deny_msg = self._denied_str(target_str, explanation)
+                    deny_msg = self._denied_str(req['target_str'], explanation)
                     self.petal._print_and_store_note(posid, deny_msg)  # since deleting request, must get into log_note now
                 del self._requests[posid]
             self._fill_enabled_but_nonmoving_with_dummy_requests()  # to repopulate deletions
@@ -725,6 +737,7 @@ class PosSchedule(object):
                            'cmd_val1': 0,
                            'cmd_val2': 0,
                            'log_note': 'generated by path adjustment scheduler for enabled but untargeted positioner',
+                           'target_str': '',
                            'is_dummy': True,
                            }
             self._requests[posid] = new_request
@@ -910,11 +923,7 @@ class PosSchedule(object):
             if posid in self._requests:
                 req = self._requests[posid]
                 table.store_orig_command(string=req['command'], val1=req['cmd_val1'], val2=req['cmd_val2']) # keep the original commands with move tables
-                log_note_addendum = req['log_note']  # keep abs req target and the original log notes with move tables
-                for coord in ['posintTP', 'ptlXYZ']:
-                    coord_list = [f'{u:.3f}' for u in req[f'targt_{coord}']]
-                    coord_str = f'req_{coord}=[{", ".join(coord_list)}]'
-                    log_note_addendum = pc.join_notes(log_note_addendum, coord_str)
+                log_note_addendum = pc.join_notes(req['log_note'], req['target_str']) # keep req target and the original log notes with move tables
                 if stats_enabled:
                     match = self._table_matches_request(table.for_schedule(), req)
                     if posid in self.__original_request_posids and match:
@@ -1035,6 +1044,16 @@ class PosSchedule(object):
         return safe, risky
     
     def _denied_str(self, target_str, msg_str):
-        return f'Target request denied: {target_str}. {msg_str}'
+        return pc.join_notes('Target request denied', target_str, msg_str)
+
+    def _make_coord_str(self, uv_type, uv, prefix=''):
+        '''Make a string showing a coordinate pair in a standard format.
+        '''
+        s = f'{prefix}_' if prefix else ''
+        s += f'{uv_type}='
+        uv_strs = [f'{x:.3f}' for x in uv]
+        uv_str = ", ".join(uv_strs)
+        s += f'({uv_str})'
+        return s
 
 POS_DISABLED_MSG = 'Positioner is disabled.'
