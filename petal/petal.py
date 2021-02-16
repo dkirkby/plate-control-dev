@@ -103,6 +103,7 @@ class Petal(object):
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
+        sendex.printfunc = printfunc
         # petal setup
         if None in [petalbox_id, petal_loc, fidids, posids, shape] or not hasattr(self, 'alignment'):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
@@ -748,7 +749,7 @@ class Petal(object):
         s2 = pc.plural('retry', n_retries)
         self.printfunc(f'{len(hw_tables)} move {s1} to send')
         self.printfunc(f'{n_retries} {s2} remaining')
-            
+        
         # send to hardware (or simulator)
         if self.simulator_on:
             self.printfunc(f'simulator skips sending {len(hw_tables)} move {pc.plural("table", hw_tables)} to hardware')
@@ -827,7 +828,7 @@ class Petal(object):
             self.printfunc(f'min move table time = {min(times):.4f} sec')
         if self.save_debug:
             self._write_schedule_debug_data_to_disk(hw_tables, failures)
-            
+
         # final cleanup
         if not self.simulator_on:
             self._wait_while_moving()

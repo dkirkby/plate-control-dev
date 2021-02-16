@@ -21,7 +21,8 @@ class SendExecCases():
     necessarily mean that one of the later error cases in the list would not also
     apply, had petalcontroller gotten to that check.
     """
-    def __init__(self):
+    def __init__(self, printfunc=print):
+        self.printfunc = printfunc
         self.CLEARED = 'cleared'
         self.NORESPONSE = 'no_response'
         self.UNKNOWN = 'unknown'
@@ -78,7 +79,10 @@ class SendExecCases():
         Throws an assertion if invalid, otherwise silent.
         '''
         def assert2(test, detail=''):
-            assert test, f'petalcontroller return data not understood:\n{pc_response}\n{detail}'
+            msg = f'petalcontroller return data not understood:\n{pc_response}\n{detail}'
+            if not test:
+                self.printfunc(f'AssertionError: {msg}')  # redundant because of oddities with logging in ICS
+            assert test, msg
         
         def validate_numeric(data, key_type=object):
             '''Validates input dict data, ensuring that all values are numeric. Keys
@@ -231,6 +235,8 @@ class SendExecCases():
     
 # so you only have to initialize this once, in order to use the guts
 sendex = SendExecCases()
+printfunc = lambda x: print(f'test {x}')
+sendex.printfunc = printfunc
 
 if __name__ == '__main__':
     dummy_tables = []
