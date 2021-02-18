@@ -421,8 +421,9 @@ class Petal(object):
                                     allow_initial_interference=allow_initial_interference)
             if error:
                 marked_for_delete.add(posid)
-                error_str = f'{"move request retry: " if _is_retry else ""}{error}'
-                self._print_and_store_note(posid, error_str)
+                if self.verbose:
+                    error_str = f'{"move request retry: " if _is_retry else ""}{error}'
+                    self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
         if return_posids_only:
