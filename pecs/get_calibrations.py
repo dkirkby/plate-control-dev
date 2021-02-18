@@ -259,7 +259,7 @@ try:
         mapped_query_keys = {query_keys_map[key] if key in query_keys_map else key for key in query_keys}
         missing = set(mapped_query_keys) - set(valid_keys)
         assert2(not(any(missing)), f'some keys are not available for petal {ptl.petal_id}: {missing}')
-        posids_ordered = sorted(ptl.posids)
+        posids_ordered = sorted(ptl.app_get('posids'))
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values

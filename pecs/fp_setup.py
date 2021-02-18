@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # set up a log file
 import logging
 import simple_logger
