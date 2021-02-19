@@ -152,3 +152,4 @@ if err is None:
 
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
+
