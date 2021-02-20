@@ -18,7 +18,7 @@ log_path = os.path.join(log_dir, log_name)
 logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
 logger_fh.setLevel(logging.DEBUG)
 logger_sh.setLevel(logging.INFO)
-simple_logger.input2(f'Alert: you are about to run the focalplane setup script to recover positioners or prepare the focalplane. This takes up to half an hour to execute. Hit enter to continue. ')
+simple_logger.input2(f'Alert: you are about to run the focalplane setup script to recover positioners or prepare the focalplane. This takes *up to half an hour* to execute. Hit enter to continue. ')
 
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 
@@ -48,10 +48,11 @@ err = None #no exception
 logger.info('FP_SETUP: enabling positioners...')
 ret = cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
 logger.info(f'FP_SETUP: enable_positioners returned: {ret}')
-if ret != 'SUCCESS':
+if not(ret == 'SUCCESS' or ret is None):
     logger.error('FP_SETUP: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
     ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
     logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
+    import sys; sys.exit(1)
 
 logger.info('FP_SETUP: turning on back illumination...')
 cs.turn_on_illuminator()
@@ -73,8 +74,8 @@ try:
     if update_error_report_thresh:
         selection = updates.loc[updates['ERR_XY'] > update_error_report_thresh]
         if len(selection):
-            logger.warn(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
-            logger.warn(f'FP_SETUP: update deatils: \n{selection}')
+            logger.warning(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
+            logger.warning(f'FP_SETUP: update deatils: \n{selection}')
     disabled_during_1p = enabled_before_1p - enabled_after_1p
     logger.info(f'FP_SETUP: {len(disabled_during_1p)} disabled during initial 1p calib. Posids {disabled_during_1p}')
 
@@ -113,8 +114,8 @@ try:
     if update_error_report_thresh:
         selection = updates.loc[updates['ERR_XY'] > update_error_report_thresh]
         if len(selection):
-            logger.warn(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
-            logger.warn(f'FP_SETUP: update deatils: \n{selection}')
+            logger.warning(f'FP_SETUP: found {len(selection)} positioners with updates greater than {update_error_report_thresh}!')
+            logger.warning(f'FP_SETUP: update deatils: \n{selection}')
     disabled_during_1p2 = enabled_before_1p2 - enabled_after_1p2
     logger.info(f'FP_SETUP: {len(disabled_during_1p2)} disabled during initial 1p calib. Posids {disabled_during_1p2}')
     final_enabled = get_pos_set('enabled')
@@ -149,6 +150,8 @@ if err is None:
     if non_ambig_disabled:
         logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors or communication errors.')
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
+else:
+    logger.error('FP_SETUP: focalplane setup failed to complete. Please wait a moment to try again or contact an FP expert.')
 
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
