@@ -4,6 +4,7 @@ import time
 import Pyro4
 import sys
 from DOSlib.advertise import Seeker
+import posconstants as pc
 
 class PetalComm(object):
     """
@@ -11,7 +12,7 @@ class PetalComm(object):
     and petalbox software running on the petal.
     """
 
-    def __init__(self, petalbox_id, controller = None, user_interactions_enabled = False):
+    def __init__(self, petalbox_id, controller=None, user_interactions_enabled=False, printfunc=print):
         """
         Initialize the object and connect to the petal controller
 
@@ -34,6 +35,7 @@ class PetalComm(object):
         self.stype = '-dos-'
         self.service = 'PetalControl'
         self.device = {}
+        self.printfunc = printfunc
 
         # Make sure we have the correct information
         if isinstance(controller, dict):
@@ -52,7 +54,7 @@ class PetalComm(object):
             self.seeker_thread = threading.Thread(target=self._repeat_seeker)
             self.seeker_thread.setDaemon(True)
             self.seeker_thread.start()
-            print('Seeker thread is now running. Delay %s' % str(self.delay))
+            self.printfunc('Seeker thread is now running. Delay %s' % str(self.delay))
             # wait briefly for seeker to find all devices
             self.found_controller.wait(timeout = 2.0)
             self.delay = 4.0
@@ -69,14 +71,14 @@ class PetalComm(object):
             elif '2' in answer:
                 sys.exit(0)
             elif '3' in answer:
-                print('Ok, continuing along, even though petalcomm found nothing to talk to.')
+                self.printfunc('Ok, continuing along, even though petalcomm found nothing to talk to.')
                 break
             else:
-                print('Input ' + str(answer) + ' not understood.')
+                self.printfunc('Input ' + str(answer) + ' not understood.')
         else:
             if self.device:
                 self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-                print('Connected to Petal Controller %d' % self.petalbox_id)
+                self.printfunc('Connected to Petal Controller %d' % self.petalbox_id)
 
     def is_connected(self):
         """
@@ -99,11 +101,11 @@ class PetalComm(object):
                     if self.petalbox_id == int(m.group()):
                         # Found the matching petal controller
                         if 'name' not in self.device or self.device['name'] != key:
-                            print('_found_dev: Found new device %s' % str(key))
+                            self.printfunc('_found_dev: Found new device %s' % str(key))
                             self.device['name'] = key
                         # update proxy information?
                         if 'uid' in self.device and self.device['uid'] != dev[key]['uid']:
-                            print('_found_dev: Device %s rediscovered.' % key)
+                            self.printfunc('_found_dev: Device %s rediscovered.' % key)
                             if 'proxy' in self.device:     # remove potentially stale info
                                 del self.device['proxy']
                         self.device.update(dev[key])   # make a copy
@@ -113,25 +115,28 @@ class PetalComm(object):
         """
         Call remote function
         Input:  cmd   = function name
-                args, kwargs are passed to the remove function
+                args, kwargs are passed to the remote function
         Returns: return value received from remote function
         """
         timeout = kwargs.pop('pyrotimeout', 20.0)
+        handle = None
+        n_retries = 2
+        for n in range(1, n_retries + 1):
+            try:
+                self.device['proxy']._pyroTimeout = timeout
+                handle = getattr(self.device['proxy'], cmd)
+            except Exception as e1:
+                self.printfunc(f'Exception while connecting to petalcontroller: {e1}')
+                if n < n_retries and 'pyro_uri' in self.device:
+                    uri = self.device['pyro_uri']
+                    self.printfunc(f'Trying to re-establish connection to {uri}, attempt {n}')
+                    self.device['proxy'] = Pyro4.Proxy(uri)
+        if not handle:
+            raise RuntimeError(f'Failed to connect to {uri} and get handle for command {cmd}')
         try:
-            # kh: to prevent blocking calls if the connection is down
-            self.device['proxy']._pyroTimeout = timeout
-            return getattr(self.device['proxy'],cmd)(*args, **kwargs)
-        except:
-            if 'pyro_uri' in self.device:
-                try:
-                    self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-                    # kh: to prevent blocking calls if the connection is down
-                    self.device['proxy']._pyroTimeout = timeout
-                    return getattr(self.device['proxy'],cmd)(*args, **kwargs)
-                except Exception as e:
-                    raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
-            # Failed to get status from device
-            raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
+            return handle(*args, **kwargs)
+        except Exception as e2:
+            raise RuntimeError(f'Exception for command {cmd}. Message: {e2}')            
 
     def ready_for_tables(self, bus_ids=None, can_ids=None):
         """Checks if all the positioners identified by can_id are ready to receive
@@ -149,9 +154,8 @@ class PetalComm(object):
         can_ids = [] if can_ids is None else can_ids
         try:
             retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
-            if type(retcode) != bool:
-                print(retcode)
-            return retcode
+            assert pc.is_boolean(retcode), f'non-boolean return value {retcode}'
+            return pc.boolean(retcode)
         except Exception as e:
             print('FAILED: Can not execute ready_for_tables. Exception: %s' % str(e))
             print(bus_ids, can_ids)

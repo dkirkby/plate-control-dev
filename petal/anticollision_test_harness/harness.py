@@ -81,6 +81,7 @@ n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
+expand_keepouts = False
 
 # randomizer for correction moves
 randomizer_seed = 0
@@ -170,7 +171,10 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       phi_limit_on    = False,
                       save_debug      = True,
                       anneal_mode     = 'ramped',
+#                      auto_disabling_on = True,
                       )
+    if expand_keepouts:
+        ptl.set_keepouts(posids='all', radT=0.05, radP=0.05, angT=5, angP=10)
     for key, val in sim_fail_freq.items():
         ptl.sim_fail_freq[key] = val
     ptl.limit_radius = None
