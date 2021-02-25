@@ -10,7 +10,6 @@ from pecs import PECS
 
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 
-
 log_dir = pc.dirs['sequence_logs']
 log_timestamp = pc.filename_timestamp_str()
 log_name = 'FP_setup_' + log_timestamp + '.log'
@@ -46,6 +45,8 @@ initial_enabled = get_pos_set('enabled')
 
 err = None #no exception
 
+### Initial setup for proc: enable positioners then turn onf illumination and fiducials ###
+### Exit script if any fails, do not continue ###
 logger.info('FP_SETUP: enabling positioners...')
 ret = cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
 logger.info(f'FP_SETUP: enable_positioners returned: {ret}')
@@ -56,11 +57,24 @@ if not(ret == 'SUCCESS' or ret is None):
     import sys; sys.exit(1)
 
 logger.info('FP_SETUP: turning on back illumination...')
-cs.turn_on_illuminator()
+try:
+    cs.turn_off_illuminator()
+    #logger.info(f'FP_SETUP: turning on back illumination returned: {ret}')
+except Exception as e:
+    logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
+    logger.error('FP_SETUP: could not turn on back illumination! Please investigate before continuing!')
+    import sys; sys.exit(1)
 
 logger.info('FP_SETUP: turning on fiducials...')
-cs.turn_on_fids()
+try:
+    cs.turn_off_fids()
+    #logger.info(f'FP_SETUP: turning on fiducials returned: {ret}')
+except Exception as e:
+    logger.info(f'FP_SETUP: turning on fiducials failed with exception: {e}')
+    logger.error('FP_SETUP: could not turn on fiducials! Please investigate before continuing!')
+    import sys; sys.exit(1)
 
+### Here's the buld of the setup: 1p, disambiguate, 1p ###
 try:
     logger.info('FP_SETUP: running 1p calibration...')
     enabled_before_1p = get_pos_set('enabled')
@@ -133,13 +147,27 @@ except Exception as e:
         logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
         logger.critical('FP_SETUP: failed to return to initial state. DO NOT continue without consulting FP expert.')
 
+### Cleanup: turn off illuminator and fiducials, trigger fvc_collect ###
+### Allow turning off to fail, observers should investigate and resolve issue before going on-sky ###
 logger.info('FP_SETUP: turning off back illumination...')
-cs.turn_off_illuminator()
+try:
+    cs.turn_off_illuminator()
+    #logger.info(f'FP_SETUP: turning off back illumination returned: {ret}')
+except Exception as e:
+    logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
+    logger.error('FP_SETUP: Could not turn off back illumination! Please investigate before continuing!')
 
 logger.info('FP_SETUP: turning off fiducials...')
-cs.turn_off_fids()
+try:
+    cs.turn_off_fids()
+    #logger.info(f'FP_SETUP: turning off fiducials returned: {ret}')
+except Exception as e:
+    logger.info(f'FP_SETUP: turning off fiducials failed with exception: {e}')
+    logger.error('FP_SETUP: could not turn off fiducials! Please investigate before continuing!')
+
 cs.fvc_collect()
 
+### Print out summary for night log if successful ###
 if err is None:
     logger.info('FP_SETUP: Successfully completed! Please record any following notes in the night log in addition to any other observations:')
     newly_enabled = final_enabled - initial_enabled
@@ -154,6 +182,7 @@ if err is None:
 else:
     logger.error('FP_SETUP: focalplane setup failed to complete. Please wait a moment to try again or contact an FP expert.')
 
+### Clean up logger ###
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
 
