@@ -727,7 +727,7 @@ class Petal(object):
             self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
             
-    def set_motor_parameters(self):
+    def set_motor_parameters(self, wait_on=False):
         """Send the motor current and period settings to the positioners.
         
         INPUTS:  None
@@ -737,12 +737,18 @@ class Petal(object):
             if self.verbose:
                 self.printfunc('Simulator skips sending motor parameters to positioners.')
             return 'SUCCESS'
-        pospwr = self.get_pbdata_val('pospwr')
-        state = set(list(pospwr.values()))
-        if len(state) == 1:
-            state = state.pop()
-        else:
-            state = 'mixed'
+        n_tries = 5 if wait_on else 1 #To give PS1/2_FBK time to update after enabling
+        for i in range(n_tries):
+            pospwr = self.get_pbdata_val('pospwr')
+            state = set(list(pospwr.values()))
+            if len(state) == 1:
+                state = state.pop()
+            else:
+                state = 'mixed'
+            if state == 'on':
+                break
+            elif wait_on:
+                time.sleep(2)
         if state == 'on':
             parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
             currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
@@ -1088,7 +1094,7 @@ class Petal(object):
                         self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
                 else:
                     # Inform PC about motor parameters
-                    self.set_motor_parameters()
+                    self.set_motor_parameters(wait_on=True)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
