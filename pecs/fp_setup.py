@@ -58,7 +58,7 @@ if not(ret == 'SUCCESS' or ret is None):
 
 logger.info('FP_SETUP: turning on back illumination...')
 try:
-    cs.turn_off_illuminator()
+    cs.turn_on_illuminator()
     #logger.info(f'FP_SETUP: turning on back illumination returned: {ret}')
 except Exception as e:
     logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
@@ -67,7 +67,7 @@ except Exception as e:
 
 logger.info('FP_SETUP: turning on fiducials...')
 try:
-    cs.turn_off_fids()
+    cs.turn_on_fids()
     #logger.info(f'FP_SETUP: turning on fiducials returned: {ret}')
 except Exception as e:
     logger.info(f'FP_SETUP: turning on fiducials failed with exception: {e}')
