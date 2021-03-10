@@ -71,11 +71,16 @@ class PECS:
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
-                self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
-                               constants_version=self.constants_version,
-                               use_desimeter=self.use_desimeter,
-                               match_to_positioner_centers=self.match_to_positioner_centers,
-                               use_arcprep=self.use_arcprep, logger=self.logger)
+                from Pyro4.errors import NamingError
+                try:
+                    self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
+                                   constants_version=self.constants_version,
+                                   use_desimeter=self.use_desimeter,
+                                   match_to_positioner_centers=self.match_to_positioner_centers,
+                                   use_arcprep=self.use_arcprep, logger=self.logger)
+                except NamingError as e:
+                    self.print('Naming error! You did not join the instance or you joined the incorrect one! Try running join_instance desi_yyyymmdd.')
+                    raise e
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         elif not(fvc): # if FVC is False don't startup FVC stuff
@@ -111,6 +116,10 @@ class PECS:
         if self.interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs=device_locs, posids=posids)
         elif self.interactive is False:
+            # In non-interactive mode, check against obs_petals in petalman
+            obs_petals = self.ptlm.get('obs_petals')
+            obs_locs = [self._role2pcid(role) for role in obs_petals]
+            self.pcids = list(set(self.pcids) & set(obs_locs))
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         # Do this after interactive_ptl_setup
         if self.interactive:
@@ -490,7 +499,7 @@ class PECS:
         do_on = self._parse_yn(self.input('Turn on fiducials (y/n): ')) if self.interactive else True
         if do_on:
             responses = self.ptlm.set_fiducials(setting='on',
-                            participating_petals=list(self.ptlm.Petals.keys()))
+                            participating_petals=self.ptlm.get('fid_petals'))
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
@@ -513,7 +522,7 @@ class PECS:
         do_off = self._parse_yn(self.input('Turn off fiducials (y/n): ')) if self.interactive else True
         if do_off:
             responses = self.ptlm.set_fiducials(setting='off',
-                            participating_petals=list(self.ptlm.Petals.keys()))
+                            participating_petals=self.ptlm.get('fid_petals'))
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
