@@ -733,18 +733,27 @@ class Petal(object):
             retry_posids ... (internal use only) set of positioners that are being retried
                                                     
         OUTPUT:
-            set containing any posids for which sending the table failed
+            tuple with:
+                item 0 ... set containing any posids for which sending the table failed
+                item 1 ... dummy value (as of 2021-03-10) to accommodate legacy interface with PetalApp
+
         """
         self.schedule.plot_density()
         
+        # 2021-01-26 [JHS] dummy return value is for the sake of PetalApp's old print
+        # messages and alarms etc during the separated send/execute sequence. Once we
+        # transition to combined send_and_execute, this dummy return should be removed,
+        # and PetalApp updated to reflect the reality of what happened.
+        dummy_n_retries = 0        
+
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('no tables to send')
             self._cancel_move(reset_flags='all', reset_notes='all')
             if retry_posids:
-                return retry_posids  # in this context, the retry positioners are interpreted as having failed
-            return set()
+                return retry_posids, dummy_n_retries  # in this context, the retry positioners are interpreted as having failed
+            return set(), dummy_n_retries
         posids_to_try = {t['posid'] for t in hw_tables}
         s1 = pc.plural('table', hw_tables)
         s2 = pc.plural('retry', n_retries)
@@ -839,13 +848,7 @@ class Petal(object):
             self._wait_while_moving()
         self._clear_schedule()
         self.printfunc('Done')
-        
-        # 2021-01-26 [JHS] dummy return value is for the sake of PetalApp's old print
-        # messages and alarms etc during the separated send/execute sequence. Once we
-        # transition to combined send_and_execute, this dummy return should be removed,
-        # and PetalApp updated to reflect the reality of what happened.
-        dummy_n_retries = 0
-        
+
         return failures, dummy_n_retries
     
     def send_move_tables(self):
