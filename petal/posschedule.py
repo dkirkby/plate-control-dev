@@ -53,6 +53,22 @@ class PosSchedule(object):
     @property
     def expert_requests_accepted(self):
         return set(self.stages['expert'].move_tables.keys())
+
+    @property
+    def requested_posids(self):
+        return self._all_requested_posids['regular'] | self._all_requested_posids['expert']
+  
+    @property
+    def accepted_posids(self):
+        return self.regular_requests_accepted | self.expert_requests_accepted
+    
+    @property
+    def rejected_posids(self):
+        return self.requested_posids - self.accepted_posids
+    
+    @property
+    def scheduled_posids(self):
+        return set(self.move_tables)
     
     def has_regular_request_already(self, posid):
         if posid in self._requests and not self._requests[posid]['is_dummy']:
@@ -301,6 +317,11 @@ class PosSchedule(object):
             anim_tables = {}
         for table in self.move_tables.values():
             table.strip()
+        safe, risky = self._check_risk_if_hw_failure()
+        for posid in safe:
+            self.move_tables[posid].set_required(False)
+        for posid in risky:
+            self.move_tables[posid].set_required(True)
         self._schedule_moves_store_requests_info()
         self._schedule_moves_finish_logging(anim_tables)
 
@@ -347,11 +368,11 @@ class PosSchedule(object):
         """
         return self.stages['expert'].is_not_empty()
     
-    def get_requests(self, include_dummies=False):
-        """Returns a dict containing copies of all the current requests. Keys
-        are posids. Any dummy requests (auto-generated during anticollision
-        scheduling) by default are excluded. But can be included with the
-        include_dummies boolean.
+    def get_regular_requests(self, include_dummies=False):
+        """Returns a dict containing copies of all the current "regular" (non-expert)
+        requests. Keys are posids. Any dummy requests (auto-generated during anticollision
+        scheduling) by default are excluded. But can be included with the include_dummies
+        boolean.
         """
         requests = {}
         for posid, request in self._requests.items():
@@ -545,7 +566,7 @@ class PosSchedule(object):
         keys = posid and values = any adjusted starting POS_T, POS_P (so that later
         stages know where this debounce move puts the robots.)
         '''
-        user_requests = self.get_requests(include_dummies=False)
+        user_requests = self.get_regular_requests(include_dummies=False)
         requested_posids = user_requests.keys()
         overlaps_dict = self.get_overlaps(requested_posids)
         if len(overlaps_dict) == 0:
@@ -990,6 +1011,38 @@ class PosSchedule(object):
             return False
         return True
     
+    def _check_risk_if_hw_failure(self):
+        '''Scans through self.move_tables, making a boolean assessment for each positioner.
+        In the case of a hardware failure (presumably where the petalcontroller failed
+        to send the move table out to the positioner over the canbus) this boolean says
+        whether there is a significant risk of adverse effects (for example crashing
+        into neighbors).
+        
+        OUTPUT:  tuple[0] ... set of posids that are safe if fail to move
+                 tuple[1] ... set of posids that are risky if fail to move
+        '''
+        all_posids = set(self.move_tables)
+        min_phi = {}
+        max_excursion = {posid:{} for posid in all_posids}
+        for posid, table in self.move_tables.items():
+            angles = table.angles()
+            min_phi[posid] = min(tp[1] for tp in angles['poslocTP'])
+            max_excursion[posid] = {axis: max(abs(x) for x in angles[f'net_d{axis}']) for axis in ['T', 'P']}
+        for posid in self.petal.posids - set(min_phi):
+            min_phi[posid] = self.petal.posmodels[posid].expected_current_poslocTP[1]  # non-moving bots --> use current phi location
+        safe = {posid for posid in all_posids if
+                max_excursion[posid]['T'] < pc.low_risk_rotation and
+                max_excursion[posid]['P'] < pc.low_risk_rotation}
+        unknown = all_posids - safe
+        min_safe_phi = self.collider.Eo_phi
+        retracted = {posid for posid in unknown if min_phi[posid] > min_safe_phi}
+        for posid in retracted:
+            neighbors_min_phi = min(min_phi[n] for n in self.collider.pos_neighbors[posid])
+            if neighbors_min_phi > min_safe_phi:
+                safe.add(posid)
+        risky = all_posids - safe
+        return safe, risky
+
     def _denied_str(self, target_str, msg_str):
         return pc.join_notes('Target request denied', target_str, msg_str)
 

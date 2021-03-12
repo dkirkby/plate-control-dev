@@ -3,6 +3,7 @@ import re
 import time
 import Pyro4
 import sys
+from sendcases import sendex
 from DOSlib.advertise import Seeker
 import posconstants as pc
 
@@ -121,20 +122,23 @@ class PetalComm(object):
         timeout = kwargs.pop('pyrotimeout', 20.0)
         handle = None
         n_retries = 2
-        for n in range(1, n_retries + 1):
+        for i in range(1, n_retries + 1):
             try:
                 self.device['proxy']._pyroTimeout = timeout
                 handle = getattr(self.device['proxy'], cmd)
+                if handle:
+                    break
             except Exception as e1:
                 self.printfunc(f'Exception while connecting to petalcontroller: {e1}')
-                if n < n_retries and 'pyro_uri' in self.device:
+                if i < n_retries and 'pyro_uri' in self.device:
                     uri = self.device['pyro_uri']
-                    self.printfunc(f'Trying to re-establish connection to {uri}, attempt {n}')
+                    self.printfunc(f'Trying to re-establish connection to {uri}, attempt {i}')
                     self.device['proxy'] = Pyro4.Proxy(uri)
         if not handle:
             raise RuntimeError(f'Failed to connect to {uri} and get handle for command {cmd}')
         try:
-            return handle(*args, **kwargs)
+            output = handle(*args, **kwargs)
+            return output
         except Exception as e2:
             raise RuntimeError(f'Exception for command {cmd}. Message: {e2}')            
 
@@ -161,44 +165,38 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_tables(self, move_tables, pc_cmd='send_tables_ex'):
+    def send_and_execute_tables(self, move_tables, sync_mode):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
-
+        
+        In cases of SUCCESS or PARTIAL SUCCESS, petalcontroller shall immediately
+        send the synchronized start signal upon completion of loading all tables.
+ 
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
-            
-            pc_cmd ... optional override of the function name to use when sending
-                       to petalcontroller.py. After 2020-06-08 (tag v4.18 and up),
-                       use 'send_tables_ex'. For petalcontroller.py versions prior
-                       to that, use 'send_tables'.
-            
         OUTPUT:
-            tuple ... 1st element: string with first token being 'SUCCESS' or 'FAILED'
-                  ... 2nd element: dict with keys = busid and values = list of canids,
-                      for any failed cases. The dict will not necessarily contain
-                      entries for all possible busids.
+            tuple[0] ... string
+            tuple[1] ... None or list or dict, depending on case defined by tuple[0]
+        There are several valid output cases. Their identifying key strings and
+        value formats are explicitly defined in posconstants.py. These cases ARE
+        validated here, so higher level code does not need to double-check whether
+        they conform to the interface given in posconstants.
         """
-        valid_cmds = {'send_tables', 'send_tables_ex'}
         try:
-            assert pc_cmd in valid_cmds, f'pc_cmd {pc_cmd} invalid'
-            return self._call_device(pc_cmd, move_tables)
+            assert sync_mode in ['hard', 'soft']
+            output = self._call_device('send_and_execute_tables',
+                                       move_tables,
+                                       sync_mode,
+                                       pyrotimeout=100,  # [2021-02-12] JHS + CAD, time for possible canbus and powersupply resets
+                                      )
+            sendex.validate(output)
+            return output
         except Exception as e:
-            return 'FAILED: Can not send move tables. Exception: %s' % str(e)
-
-    def execute_sync(self, mode):
-        """
-        Send the command to synchronously begin move sequences to all positioners
-        on the petal simultaneously.
-        mode can be either hard or soft
-        """
-        if str(mode).lower() not in ['hard','soft']:
-            return 'FAILED: Invalid value for mode argument'
-        try:
-            return self._call_device('execute_sync', str(mode).lower())
-        except Exception as e:
-            return 'FAILED: Can not execute sync command. Exception: %s' % str(e)
+            msg = 'FAILED: Could not send_and_execute move tables, in an undefined way.'
+            msg += ' I.e. petalcomm did not receive an error value from petalcontroller'
+            msg += f' in a format it could understand. Exception: {e}'
+            return msg
 
     def move(self, bus_id, can_id, direction, mode, motor, angle):
         """

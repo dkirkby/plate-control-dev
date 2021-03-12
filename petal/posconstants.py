@@ -147,6 +147,9 @@ near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop c
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 theta_hardstop_ambig_tol = 8.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
+keepout_typ_angular_padding = 3.5 # deg, per DESI-0899-v14
+low_risk_rotation = keepout_typ_angular_padding - 0.1 # deg, delta theta or phi smaller than this threshold have low risk if hardware should fail to execute them as scheduled
+ 
 
 # Annealing spreads out motor power consumption in time, as well as naturally reducing
 # potential collision frequency. See posschedulestage.py for more info. Do *not* increase
@@ -455,6 +458,18 @@ def linspace(start,stop,num):
     List has num elements."""
     return [i*(stop-start)/(num-1)+start for i in range(num)]
 
+def plural(string, test_item):
+    '''Returns string appropriately pluralized according to length of test_item.
+    Alternately if test_item is an integer, uses that number. If string ends in
+    "y", replaces with "ies" to pluralize. Otherwise simply appends and "s".
+    '''
+    length = test_item if is_integer(test_item) else len(test_item)
+    if length == 1:
+        return string
+    if string[-1] == 'y':
+        return string[:-1] + 'ies'
+    return string + 's'
+
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):
     """Turn [u,v] into [[u],[v]], if it isn't already.
@@ -605,6 +620,9 @@ def is_integer(x):
 
 def is_float(x):
     return isinstance(x, (float, np.floating))
+
+def is_number(x):
+    return is_integer(x) or is_float(x)
 
 def is_string(x):
     return isinstance(x, (str, np.str))
