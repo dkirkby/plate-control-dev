@@ -839,10 +839,13 @@ class Petal(object):
         
         # add to prev_failed
         retry_posids = combined[sendex.CLEARED]
-        prev_failed |= (failures-set(retry_posids))
+        prev_failed |= failures
 
         # retry if applicable
         if errstr == sendex.FAIL_SEND:
+            retry_posids = combined[sendex.CLEARED]
+            # remove ones we will retry
+            prev_failed -= set(retry_posids)
             if any(retry_posids):
                 if n_retries >= 1:
                     self._reschedule(retry_posids)
