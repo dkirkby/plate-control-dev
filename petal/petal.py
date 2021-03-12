@@ -725,33 +725,15 @@ class Petal(object):
             self.printfunc(f'WARNING: {ret}')
             return f'FAILED: {ret}'
 
-    def execute_moves(self):
-        """Command the positioners to do the move tables that were sent out to them.
-        Then do clean-up and logging routines to keep track of the moves that were done.
-        
-        INPUTS:  None
-        """
-        self.printfunc('execute_moves called')
-        if self.simulator_on:
-            if self.verbose:
-                self.printfunc('Simulator skips sending execute moves command to positioners.')
-            self._postmove_cleanup()
-        else:
-            self.comm.execute_sync(self.sync_mode)
-            self._postmove_cleanup()
-            self._wait_while_moving()
-        self._remove_posid_from_sent_tables('all')
-        self.printfunc('execute_moves: Done')
-
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
         self.schedule_moves(anticollision, should_anneal)
-        failed_posids = self.send_and_execute_moves()
-        return failed_posids
+        failed_posids, errs = self.send_and_execute_moves()
+        return failed_posids, errs
 
-    def send_and_execute_moves(self, n_retries=1, retry_posids=None):
+    def send_and_execute_moves(self, n_retries=1, retry_posids=None, prev_failed=None, prev_err=None):
         """Send move tables that have been scheduled out to the positioners.
         When all tables are loaded on positioners, immediately commence the
         movements.
@@ -776,11 +758,11 @@ class Petal(object):
         """
         self.schedule.plot_density()
         
-        # 2021-01-26 [JHS] dummy return value is for the sake of PetalApp's old print
-        # messages and alarms etc during the separated send/execute sequence. Once we
-        # transition to combined send_and_execute, this dummy return should be removed,
-        # and PetalApp updated to reflect the reality of what happened.
-        dummy_n_retries = 0        
+        # To bubble up information from earlier retries
+        if prev_failed is None:
+            prev_failed = set()
+        if prev_err is None:
+            prev_err = []      
 
         # prepare tables for hardware
         hw_tables = self._hardware_ready_move_tables()
@@ -788,8 +770,8 @@ class Petal(object):
             self.printfunc('no tables to send')
             self._cancel_move(reset_flags='all', reset_notes='all')
             if retry_posids:
-                return retry_posids, dummy_n_retries  # in this context, the retry positioners are interpreted as having failed
-            return set(), dummy_n_retries
+                return prev_failed|retry_posids, prev_err  # in this context, the retry positioners are interpreted as having failed
+            return prev_failed, prev_err
         posids_to_try = {t['posid'] for t in hw_tables}
         s1 = pc.plural('table', hw_tables)
         s2 = pc.plural('retry', n_retries)
@@ -816,6 +798,7 @@ class Petal(object):
         if errstr == sendex.SUCCESS:
             failures = set()
         elif errstr in comm_fail_cases:
+            prev_err.append(errstr)
             combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
             for key, posids in combined.items():
                 s = pc.plural('positioner', posids)
@@ -828,6 +811,7 @@ class Petal(object):
             for key in extra_keys:
                 self.printfunc(f'petalcontroller also returned... {key}: {errdata[key]}')            
         else:
+            prev_err.append(errstr)
             failures = posids_to_try
             errdata2 = errdata 
             if errstr == sendex.FAIL_TEMPLIMIT:
@@ -853,13 +837,16 @@ class Petal(object):
             for posid in unknown_but_required:
                 self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
+        # add to prev_failed
+        retry_posids = combined[sendex.CLEARED]
+        prev_failed |= (failures-set(retry_posids))
+
         # retry if applicable
         if errstr == sendex.FAIL_SEND:
-            retry_posids = combined[sendex.CLEARED]
             if any(retry_posids):
                 if n_retries >= 1:
                     self._reschedule(retry_posids)
-                    return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids)
+                    return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids, prev_err=prev_err, prev_failed=prev_failed)
                 else:
                     self.printfunc('No more retries remaining.')        
         
@@ -885,7 +872,7 @@ class Petal(object):
         self._clear_schedule()
         self.printfunc('Done')
 
-        return failures, dummy_n_retries
+        return prev_failed, prev_err
     
     def send_move_tables(self):
         assert False, 'BUG!! This call to send_move_tables is deprecated! Use send_and_execute_moves() instead.'
