@@ -838,7 +838,6 @@ class Petal(object):
                 self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
         # add to prev_failed
-        retry_posids = combined[sendex.CLEARED]
         prev_failed |= failures
 
         # retry if applicable
