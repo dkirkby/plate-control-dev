@@ -196,7 +196,8 @@ class PetalComm(object):
             msg = 'FAILED: Could not send_and_execute move tables, in an undefined way.'
             msg += ' I.e. petalcomm did not receive an error value from petalcontroller'
             msg += f' in a format it could understand. Exception: {e}'
-            return msg
+            # Return None for error data, output will always be tuple
+            return msg, None
 
     def move(self, bus_id, can_id, direction, mode, motor, angle):
         """
