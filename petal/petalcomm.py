@@ -37,6 +37,8 @@ class PetalComm(object):
         self.service = 'PetalControl'
         self.device = {}
         self.printfunc = printfunc
+        # Lock timeout, don't let overlapping _call_device commands reset the timeout
+        self.lock_timeout = False
 
         # Make sure we have the correct information
         if isinstance(controller, dict):
@@ -120,11 +122,17 @@ class PetalComm(object):
         Returns: return value received from remote function
         """
         timeout = kwargs.pop('pyrotimeout', 20.0)
+        lockedtimeout = kwargs.pop('lockedtimeout', None)
+
         handle = None
         n_retries = 2
         for i in range(1, n_retries + 1):
             try:
-                self.device['proxy']._pyroTimeout = timeout
+                if lockedtimeout is not None:
+                    self.lock_timeout = True
+                    self.device['proxy']._pyroTimeout = lockedtimeout
+                elif not self.lock_timeout:
+                    self.device['proxy']._pyroTimeout = timeout
                 handle = getattr(self.device['proxy'], cmd)
                 if handle:
                     break
@@ -188,15 +196,18 @@ class PetalComm(object):
             output = self._call_device('send_and_execute_tables',
                                        move_tables,
                                        sync_mode,
-                                       pyrotimeout=100,  # [2021-02-12] JHS + CAD, time for possible canbus and powersupply resets
+                                       lockedtimeout=100,  # [2021-02-12] JHS + CAD, time for possible canbus and powersupply resets
                                       )
+            self.lock_timeout = False
             sendex.validate(output)
             return output
         except Exception as e:
+
             msg = 'FAILED: Could not send_and_execute move tables, in an undefined way.'
             msg += ' I.e. petalcomm did not receive an error value from petalcontroller'
             msg += f' in a format it could understand. Exception: {e}'
-            # Return None for error data, output will always be tuple
+            self.lock_timeout = False
+            # Return None for error data, output must always be tuple
             return msg, None
 
     def move(self, bus_id, can_id, direction, mode, motor, angle):
