@@ -828,14 +828,15 @@ class Petal(object):
         if should_cleanup_pos_data:
             self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
         
-        # disable robots with bad comm 
+        # disable robots with bad comm
+        all_disabled = set() 
         if self.auto_disabling_on and errstr in comm_fail_cases:
             for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
-                self._batch_disable(combined[key], comment=f'auto-disabled due to communication error "{key}"', commit=True)
+                all_disabled |= self._batch_disable(combined[key], comment=f'auto-disabled due to communication error "{key}"', commit=True)
             required = {t['posid'] for t in hw_tables if t['required']}
             unknown_but_required = required & combined[sendex.UNKNOWN]
             for posid in unknown_but_required:
-                self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
+                all_disabled |= self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
         
         # add to prev_failed
         prev_failed |= failures
@@ -843,8 +844,8 @@ class Petal(object):
         # retry if applicable
         if errstr == sendex.FAIL_SEND:
             retry_posids = combined[sendex.CLEARED]
-            # remove ones we will retry
-            prev_failed -= set(retry_posids)
+            # remove ones we will retry unless they have been disabled
+            prev_failed -= (set(retry_posids)-all_disabled)
             if any(retry_posids):
                 if n_retries >= 1:
                     self._reschedule(retry_posids)
