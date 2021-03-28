@@ -105,7 +105,9 @@ try:
     logger.info('FP_SETUP: shrinking keepouts for overlapping positioners')
     overlapping = cs.ptlm.get_overlaps(as_dict=True)
     for petal, overlaps in overlapping.items():
-        cs.ptlm.set_keepouts(posids=set(overlaps.keys()), angT=-7.0, radT=-0.5, angP=-10.0, radP=-0.5, participating_petals=petal)
+        posids = set(overlaps.keys())
+        if posids:
+            cs.ptlm.set_keepouts(posids=posids, angT=-7.0, radT=-0.5, angP=-10.0, radP=-0.5, participating_petals=petal)
 
     logger.info('FP_SETUP: running disambiguation loops...')
     enabled_before_disambig = get_pos_set('enabled')
