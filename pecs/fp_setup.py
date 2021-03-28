@@ -107,6 +107,8 @@ try:
     for petal, overlaps in overlapping.items():
         posids = set(overlaps.keys())
         if posids:
+            logger.info(f'FP_SETUP: {petal} has {len(posids)} overlapping positioners! List: {posids}')
+            logger.info(f'FP_SETUP: shrinking keepouts for above positioners...')
             cs.ptlm.set_keepouts(posids=posids, angT=-7.0, radT=-0.5, angP=-10.0, radP=-0.5, participating_petals=petal)
 
     logger.info('FP_SETUP: running disambiguation loops...')
@@ -164,6 +166,7 @@ except Exception as e:
 
 ### Cleanup: restore keepouts, turn off illuminator and fiducials, trigger fvc_collect ###
 restore_keepout_err = False
+logger.info('FP_SETUP: restoring positioner keepout zones...')
 try:
     for petal, path in keepouts.items():
         cs.ptlm.restore_keepouts(path=path, participating_petals=petal)
