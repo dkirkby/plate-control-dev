@@ -12,7 +12,6 @@ except:
 import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
-from sendcases import sendex
 import time
 import os
 import random
@@ -85,7 +84,6 @@ class Petal(object):
         phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius
         sync_mode       ... string, 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         anneal_mode     ... string, 'filled' --> more time-efficient, 'ramped' --> slower total power ramp-up
-        auto_disabling_on ... boolean, for experts only, controls whether to disable positioners if they fail to communicate over CAN
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -97,13 +95,11 @@ class Petal(object):
                  printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled',
-                 auto_disabling_on=True):
+                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled'):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
-        sendex.printfunc = printfunc
         # petal setup
         if None in [petalbox_id, petal_loc, fidids, posids, shape] or not hasattr(self, 'alignment'):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
@@ -138,6 +134,7 @@ class Petal(object):
         self.petal_loc = int(petal_loc)
         self.shape = shape
         self._last_state = None
+        self._posids_where_tables_were_just_sent = set()
         self._set_exposure_info(exposure_id=None, exposure_iter=None)
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
@@ -151,8 +148,7 @@ class Petal(object):
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.sync_mode = sync_mode.lower()
         assert sync_mode in ['hard', 'soft'], f'Invalid sync mode: {sync_mode}'
-        self.auto_disabling_on = auto_disabling_on
-
+        
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0} 
         
@@ -232,6 +228,7 @@ class Petal(object):
             self.dos_mask = 0
             self.missing_flag = 0
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
+        self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags(initialize=True, enabled_only=False)
         self._apply_all_state_enable_settings()
 
@@ -678,6 +675,57 @@ class Petal(object):
         self.__current_schedule_moves_should_anneal = should_anneal
         
         self.schedule.schedule_moves(anticollision, should_anneal)
+
+    def send_move_tables(self, n_retries=1, previous_failed=None):
+        """Send move tables that have been scheduled out to the positioners.
+        
+        The argument n_retries is for internal usage when handling error
+        cases, where move tables need to be rescheduled and resent.
+        
+        Returns a set containing any posids for which sending the table failed
+                and the number of retries remaining.
+        """
+        self.printfunc(f'send_move_tables called (n_retries={n_retries})')
+        hw_tables = self._hardware_ready_move_tables()
+        if not hw_tables:
+            self.printfunc('send_move_tables: no tables to send')
+            return set(), n_retries
+        for tbl in hw_tables:
+            self._posids_where_tables_were_just_sent.add(tbl['posid'])
+        if self.simulator_on:
+            sim_fail = random.random() <= self.sim_fail_freq['send_tables']
+            if sim_fail:
+                commanded_posids = [table['posid'] for table in hw_tables]
+                num_fail = random.randint(1, len(commanded_posids)) if commanded_posids else 0
+                sim_fail_posids = set(random.choices(commanded_posids, k=num_fail))
+                sim_fail_buscans = {}
+                for posid in sim_fail_posids:
+                    busid = self.busids[posid]
+                    if busid not in sim_fail_buscans:
+                        sim_fail_buscans[busid] = []
+                    sim_fail_buscans[busid].append(self.canids[posid])
+                response = 'FAILED', sim_fail_buscans
+            else:
+                response = 'SUCCESS'
+            if self.verbose:
+                self.printfunc('Simulator skips sending move tables to positioners.')
+        else:
+            self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
+            response = self.comm.send_tables(hw_tables)
+        failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
+        if n_retries == 0 or not failed_posids:
+            frozen = self.schedule.get_frozen_posids()
+            for posid in frozen:
+                self.pos_flags[posid] |= self.flags.get('FROZEN', self.missing_flag) # Mark as frozen by anticollision
+            if any(frozen):
+                self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
+            times = {tbl['total_time'] for tbl in hw_tables}
+            self.printfunc(f'max move table time = {max(times):.4f} sec')
+            self.printfunc(f'min move table time = {min(times):.4f} sec')
+            self.printfunc('send_move_tables: Done')
+        if self.save_debug:
+            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        return failed_posids, n_retries
             
     def set_motor_parameters(self, wait_on=False):
         """Send the motor current and period settings to the positioners.
@@ -725,163 +773,41 @@ class Petal(object):
             self.printfunc(f'WARNING: {ret}')
             return f'FAILED: {ret}'
 
+    def execute_moves(self):
+        """Command the positioners to do the move tables that were sent out to them.
+        Then do clean-up and logging routines to keep track of the moves that were done.
+        
+        INPUTS:  None
+        """
+        self.printfunc('execute_moves called')
+        if self.simulator_on:
+            if self.verbose:
+                self.printfunc('Simulator skips sending execute moves command to positioners.')
+            self._postmove_cleanup()
+        else:
+            self.comm.execute_sync(self.sync_mode)
+            self._postmove_cleanup()
+            self._wait_while_moving()
+        self._remove_posid_from_sent_tables('all')
+        self.printfunc('execute_moves: Done')
+
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
         self.schedule_moves(anticollision, should_anneal)
-        failed_posids, errs = self.send_and_execute_moves()
-        return failed_posids, errs
+        failed_posids, n_retries = self.send_and_execute_moves()
+        return failed_posids, n_retries
 
-    def send_and_execute_moves(self, n_retries=1, retry_posids=None, prev_failed=None, prev_err=None):
-        """Send move tables that have been scheduled out to the positioners.
-        When all tables are loaded on positioners, immediately commence the
-        movements.
-        
-        Upon return from petalcontroller, do clean-up and logging tasks, to keep
-        track of the moves that are being done. These tasks are performed in parallel
-        while the robots are physically moving, and we assume the positioners behave
-        deterministically, and true to what petalcontroller's return arguments claim
-        they will do.
-                
-        INPUTS:
-            n_retries ... number of retries when handling error cases, where move
-                          tables may need to be rescheduled and resent
-                          
-            retry_posids ... (internal use only) set of positioners that are being retried
-                                                    
-        OUTPUT:
-            tuple with:
-                item 0 ... set containing any posids for which sending the table failed
-                item 1 ... dummy value (as of 2021-03-10) to accommodate legacy interface with PetalApp
-
+    def send_and_execute_moves(self):
+        """Convenience wrapper to send and execute the pending moves (that have already
+        been scheduled).
+            
+        INPUTS:  None
         """
-        self.schedule.plot_density()
-        
-        # To bubble up information from earlier retries
-        if prev_failed is None:
-            prev_failed = set()
-        if prev_err is None:
-            prev_err = []      
-
-        # prepare tables for hardware
-        hw_tables = self._hardware_ready_move_tables()
-        if not hw_tables:
-            self.printfunc('no tables to send')
-            self._cancel_move(reset_flags='all', reset_notes='all')
-            if retry_posids:
-                return prev_failed|retry_posids, prev_err  # in this context, the retry positioners are interpreted as having failed
-            return prev_failed, prev_err
-        posids_to_try = {t['posid'] for t in hw_tables}
-        s1 = pc.plural('table', hw_tables)
-        s2 = pc.plural('retry', n_retries)
-        self.printfunc(f'{len(hw_tables)} move {s1} to send')
-        self.printfunc(f'{n_retries} {s2} remaining')
-        
-        # send to hardware (or simulator)
-        if self.simulator_on:
-            self.printfunc(f'simulator skips sending {len(hw_tables)} move {pc.plural("table", hw_tables)} to hardware')
-            sim_fail = random.random() <= self.sim_fail_freq['send_tables']
-            if sim_fail:
-                case = sendex.next_sim_case()
-            else:
-                case = sendex.SUCCESS
-            errstr, errdata = sendex.sim_send_and_execute_tables(hw_tables, case=case)
-        else:
-            self._wait_while_moving()
-            errstr, errdata = self.comm.send_and_execute_tables(hw_tables, self.sync_mode)
-        
-        # process petalcontroller's success/fail data
-        self.printfunc(f'petalcontroller returned "{errstr}"')
-        comm_fail_cases = {sendex.PARTIAL_SEND, sendex.FAIL_SEND}
-        should_cleanup_pos_data = True
-        if errstr == sendex.SUCCESS:
-            failures = set()
-        elif errstr in comm_fail_cases:
-            prev_err.append(errstr)
-            combined = {k: self._union_buscanids_to_posids(v) for k, v in errdata.items()}
-            for key, posids in combined.items():
-                s = pc.plural('positioner', posids)
-                response_msg = f'petalcontroller labeled {len(posids)} {s} as "{key}"'
-                if posids:
-                    response_msg += f': {posids}'
-                self.printfunc(response_msg)
-            failures = set().union(*combined.values())
-            extra_keys = {key for key in errdata if key not in sendex.send_fail_format}
-            for key in extra_keys:
-                self.printfunc(f'petalcontroller also returned... {key}: {errdata[key]}')            
-        else:
-            prev_err.append(errstr)
-            failures = posids_to_try
-            errdata2 = errdata 
-            if errstr == sendex.FAIL_TEMPLIMIT:
-                for key, temps_dict in errdata.items():
-                    if 'can' in key:
-                        errdata2[key] = {self.canids_to_posids[canid]: value for canid, value in temps_dict.items()}
-            self.printfunc(f'"{errstr}" data: {errdata2}')
-            self._cancel_move(reset_flags='all', reset_notes='all')
-            should_cleanup_pos_data = False  # cancel move already takes care of all cleanup
-        successes = posids_to_try - failures
-        for result, posids in {'SUCCESS': successes, 'FAILURE': failures}.items():
-            if any(posids):
-                self.printfunc(f'petalcontroller reports send/execute {result} for {len(posids)} total {pc.plural("positioner", posids)}')
-        if should_cleanup_pos_data:
-            self._postmove_cleanup(send_succeeded=successes, send_failed=failures)
-        
-        # disable robots with bad comm
-        all_disabled = set() 
-        if self.auto_disabling_on and errstr in comm_fail_cases:
-            for key in [sendex.NORESPONSE, sendex.UNKNOWN]:
-                all_disabled |= self._batch_disable(combined[key], comment=f'auto-disabled due to communication error "{key}"', commit=True)
-            required = {t['posid'] for t in hw_tables if t['required']}
-            unknown_but_required = required & combined[sendex.UNKNOWN]
-            for posid in unknown_but_required:
-                all_disabled |= self._disable_neighbors(posid, comment=f'auto-disabled neighbor of "required" positioner {posid}, which had communication error "{sendex.UNKNOWN}"')
-        
-        # add to prev_failed
-        prev_failed |= failures
-
-        # retry if applicable
-        if errstr == sendex.FAIL_SEND:
-            retry_posids = combined[sendex.CLEARED]
-            # remove ones we will retry unless they have been disabled
-            prev_failed -= (set(retry_posids)-all_disabled)
-            if any(retry_posids):
-                if n_retries >= 1:
-                    self._reschedule(retry_posids)
-                    return self.send_and_execute_moves(n_retries=n_retries-1, retry_posids=retry_posids, prev_err=prev_err, prev_failed=prev_failed)
-                else:
-                    self.printfunc('No more retries remaining.')        
-        
-        # other logging / reporting
-        if errstr == sendex.PARTIAL_SEND and not any(successes):
-            self.printfunc(f'Unexpected response "{sendex.PARTIAL_SEND}" from petalcontroller, despite it also reporting that no tables were sent.')    
-        if any(successes):
-            frozen = self.schedule.get_frozen_posids() & successes
-            for posid in frozen:
-                self.set_posfid_flag(posid, 'FROZEN')
-            if any(frozen):
-                self.printfunc(f'frozen (len={len(frozen)}): {frozen}')
-            sent_tables = [t for t in hw_tables if t['posid'] in successes]
-            times = {tbl['total_time'] for tbl in sent_tables}
-            self.printfunc(f'max move table time = {max(times):.4f} sec')
-            self.printfunc(f'min move table time = {min(times):.4f} sec')
-        if self.save_debug:
-            self._write_schedule_debug_data_to_disk(hw_tables, failures)
-
-        # final cleanup
-        if not self.simulator_on:
-            self._wait_while_moving()
-        self._clear_schedule()
-        self.printfunc('Done')
-
-        return prev_failed, prev_err
-    
-    def send_move_tables(self):
-        assert False, 'BUG!! This call to send_move_tables is deprecated! Use send_and_execute_moves() instead.'
-
-    def execute_moves(self):
-        assert False, 'BUG!! This call to execute_moves is deprecated! Use send_and_execute_moves() instead.'
+        failed_posids, n_retries = self.send_move_tables()
+        self.execute_moves()
+        return failed_posids, n_retries
 
     def quick_move(self, posids='', cmd='', target=[None, None],
                    log_note='', anticollision='default', should_anneal=True,
@@ -1335,19 +1261,6 @@ class Petal(object):
         unit_ids = {state.unit_id for state in states}
         posids = unit_ids & self.posids
         return posids
-
-    def set_posfid_flag(self, posid, key, val=True):
-        '''Set a positioner flag.
-        
-        INPUTS:  posids ... str, positioner id
-                 key ... str, flag name
-                 val ... boolean, set flag to this (default is True)
-        '''
-        mask = self.flags.get(key, self.missing_flag)
-        if val:
-            self.pos_flags[posid] |= mask
-        else:
-            self.pos_flags[posid] &= ~mask
     
     def _add_to_altered_states(self, state):
         '''Wrapper function so that another module (posstate) can add itself
@@ -1606,18 +1519,6 @@ class Petal(object):
         """Returns set of all posids of positioners with CTRL_ENABLED == False.
         """
         return set(self.posids) - set(self.all_enabled_posids())
-
-    @property
-    def disabled_devids(self):
-        '''List of all disabled positioner and fiducial ids.
-        2020-12-29 [JHS] This is historical --- I don't see anywhere it is actually
-        used. Historically it was static and stateful. Here I made it properly dynamic.
-        Perhaps can be removed entirely.
-        '''
-        key = 'CTRL_ENABLED'
-        ids = self.posids | self.fidids
-        has_key = [devid for devid in ids if key in self.states[devid]._val]
-        return [devid for devid in has_key if self.get_posfid_val(devid, key) == False]
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
@@ -2268,7 +2169,6 @@ class Petal(object):
                 speed_mode_P   ... list of strings           ... 'cruise' or 'creep' mode on phi axis
                 move_time      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
                 postpause      ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
-                required       ... boolean                   ... if True, petalcontroller must not proceed with move if this table failed to send to its positioner
         """
         hw_tables = []
         for m in self.schedule.move_tables.values():
@@ -2301,167 +2201,174 @@ class Petal(object):
         density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
         self.schedule.plot_density(density_path)
 
-    def _postmove_cleanup(self, send_succeeded, send_failed):
+    def _postmove_cleanup(self):
         """This always gets called after performing a set of moves, so that
         PosModel instances can be informed that the move was physically done on
-        the hardware. This function 
-        
-        INPUTS:  send_succeeded ... set of posids for which tables were successfully sent
-                 send_failed ... set of posids for which tables failed to send
-                 disable ... set of posids that should be disabled
-                 
-        Positioners with rejected requests are *different* from send_failed, and
-        will be automatically found within this function.
+        the hardware.
         """
-        conflict = send_succeeded & send_failed
-        assert not any(conflict), f'success/fail sets have overlapping posids: {conflict}'
-        mismatch = (send_succeeded | send_failed) ^ self.schedule.scheduled_posids
-        assert not any(mismatch), f'args/schedule mismatch, missing posids: {mismatch}'
         if self.schedule_stats.is_enabled():
             for posid in self.posids:
                 avoidance = self.schedule_stats.get_avoidances(posid)
                 if avoidance:
                     self.set_posfid_val(posid, 'LOG_NOTE', f'collision avoidance: {avoidance}')
-        for posid in send_succeeded:
-            table = self.schedule.move_tables[posid].for_cleanup()
-            self.posmodels[posid].postmove_cleanup(table)
-        for posid in send_failed:
-            self.set_posfid_flag(posid, 'COMERROR')
-        for posid in self.schedule.rejected_posids:
-            self.set_posfid_flag(posid, 'REJECTED')
-        self.commit(mode='both')
-        self._clear_log_move_cmds(posids='all')
-        
-    def _disable_neighbors(self, posids, comment='', commit=True):
-        '''Disable any neighbors of the argued posids. Returns set of posids
-        that were disabled.
-        '''
-        if not posids:
-            return set()
-        posids = self._validate_posids_arg(posids, skip_unknowns=True)
-        neighbors = set()
-        for posid in posids:
-            neighbors |= self.collider.pos_neighbors[posid]
-        disabled = self._batch_disable(neighbors, comment=comment, commit=commit)
-        for posid in disabled:
-            self.set_posfid_flag(posid, 'BADNEIGHBOR')
-        if any(disabled):
-            s1 = pc.plural('neighbor', disabled)
-            s2 = pc.plural('positioner', posids)
-            self.printfunc(f'WARNING: Disabled {len(disabled)} {s1} of {len(posids)} {s2}')
-        return disabled
-                
-    def _batch_disable(self, posids, comment='', commit=True):
-        '''Disable positioners. Returns set of posids that were disabled.
-        '''
-        if not posids:
-            return set()
-        posids = self._validate_posids_arg(posids, skip_unknowns=True)
-        disabled = set()
-        for posid in posids:
-            accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment=comment)
-            if accepted:
-                disabled.add(posid)
-                self.set_posfid_flag(posid, 'NOTCTLENABLED')
-        if any(disabled):
-            s = pc.plural('posid', disabled)
-            self.printfunc(f'WARNING: Disabled {len(disabled)} {s} with comment "{comment}": {sorted(disabled)}')
-        if commit:
-            self.commit(mode='move')
-        return disabled
-        
-    def _clear_schedule(self):
-        '''Wipes the current schedule.
-        '''
+        for m in self.schedule.move_tables.values():
+            if m.posmodel.posid in self._posids_where_tables_were_just_sent:
+                m.posmodel.postmove_cleanup(m.for_cleanup())
+                self.altered_states.add(m.posmodel.state)
+            else:
+                self.pos_flags[m.posid] |= self.flags.get('REJECTED', self.missing_flag)
+        self.commit(mode='both')  # commit() determines whether anything actually needs pushing to db
+        self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
         if self.animator_on:
             self.previous_animator_total_time = self.animator_total_time
             self.previous_animator_move_number = self.animator_move_number
         
-    def _cancel_move(self, reset_flags=True, reset_notes='all'):
+    def _cancel_move(self, reset_flags=True):
         '''Resets schedule and performs posmodel cleanup commands.
         
         INPUTS:            
             reset_flags ... True --> reset posflags (for enabled positioners only)
                             False --> do not reset any posflags
                             'all' --> reset posflags for both enabled and disabled
-            reset_notes ... similar values like reset_flags
         '''
-        self.printfunc('Canceling move. Tracking data in petal.py will be reset')
-        if self.animator_on:
-            self.animator.clear_after(time=self.previous_animator_total_time)
-        self._clear_log_move_cmds(posids='all')
-        self._clear_schedule()
+        self._clear_temporary_state_values()
+        self.schedule = self._new_schedule()
         if reset_flags:
             enabled_only = reset_flags != 'all'
             self._initialize_pos_flags(ids='all', enabled_only=enabled_only)
-        if reset_notes:
-            enabled_only = reset_notes != 'all'
-            posids = self.all_enabled_posids() if enabled_only else self.posids
-            for posid in posids:
-                self.states[posid].clear_log_notes()
-                self.states[posid].clear_calib_notes()
-
-    def _reschedule(self, posids):
-        '''Cancels existing move and reschedules. Intended for use when responding
-        to a failed-to-send-move-tables situation.
+        self._remove_posid_from_sent_tables('all')
+        if self.animator_on:
+            self.animator.clear_after(time=self.previous_animator_total_time)
+            self.animator_total_time = self.previous_animator_total_time
+            self.animator_move_number = self.previous_animator_move_number
+    
+    def _handle_any_failed_send_of_move_tables(self, response, n_retries, previous_failed=None):
+        '''Inspects response from petalcontroller after attempt to send move
+        tables to hardware.
         
-        INPUTS:  posids ... collection of positioner ids to retry scheduling
-                            (i.e. the ones presumed to still be good)
-        '''
-        posids = set(posids)
-        if self.schedule.expert_mode_is_on():
-            expert_mode = True
-            all_tables = self.schedule.get_orig_expert_tables_sequence()
-            expert_tables_to_retry = [t for t in all_tables if t.posid in posids]
-        else:
-            expert_mode = False
-            all_requests = self.schedule.get_regular_requests()
-            posids = {p for p in posids if p in all_requests}
-            requests_to_retry = {posid: all_requests[posid] for posid in posids}
-        self._cancel_move(reset_flags='all', reset_notes=False)
-        self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids)} positioner(s)')
-        if expert_mode:
-            for move_table in expert_tables_to_retry:
-                error = self.schedule.expert_add_table(move_table)
-                if error:
-                    self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
-        else:
-            cleaned = {}
-            for posid, req in requests_to_retry.items():
-                cleaned[posid] = {'command': req['command'],
-                                  'target': [req['cmd_val1'], req['cmd_val2']],
-                                  'log_note': req['log_note']}
-            self.request_targets(cleaned, _is_retry=True) # 2020-04-30 [JHS] anything useful to be done with return value?
-        anticollision = self.__current_schedule_moves_anticollision
-        should_anneal = self.__current_schedule_moves_should_anneal
-        self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
-        rescheduled_str = 'rescheduled'
-        for table in self.schedule.move_tables.values():
-            if rescheduled_str not in table.log_note:
-                table.append_log_note(rescheduled_str)
+        Based on that response, may trigger recursive recalculation of move
+        schedule (limited by integer arg n_retries). This is necessary, when
+        tables fail to be sent to positioners, for two reasons:
+            
+          1. Keep track of correct expected position of each robot.
+          2. Ensure neighbors don't collide with those now effectively disabled.
+          
+        Returns set of posids that failed to send (empty if all succeeded).
         
-    def _union_buscanids_to_posids(self, buscanids):
-        '''For input dict buscanids, with keys = busids and values = collections
-        of canids, this function returns the set of all posids represented therein.
+        As of this writing (2020-04-28) this handler will NOT automatically set
+        any CTRL_ENABLED flags to False. Doing so would save some time for the
+        flag), by avoiding recalculation of the anticollision move schedules
+        upon each retargeting. Consensus with the larger team would be wanted
+        prior to including any such auto-disabling feature here.
         '''
-        keys = set()
-        for busid, canids in buscanids.items():
-            these_keys = {(busid, canid) for canid in canids}
-            keys |= these_keys
-        posids = {self.buscan_to_posids[key] for key in keys}
-        return posids
+        if previous_failed is None:
+            previous_failed = set()
+        failed_send_posids = set()
+        if isinstance(response, tuple):  # conditional here is to support earlier implementations of petalcontroller (pre v4.18)
+            response_str = response[0]
+            failed_send_buscanids = response[1]
+            for busid, canids in failed_send_buscanids.items():
+                buscan_combo_keys = {(busid, canid) for canid in canids}
+                failed_send_posids |= {self.buscan_to_posids[key] for key in buscan_combo_keys}            
+        else:
+            response_str = response
+        failed = response_str.upper().find('FAILED') == 0  # petalcomm.py interface specifies that this keyword would be found as first token of response string, in failure case
+        failed |= len(failed_send_posids) > 0  # backup check, in case some formatting inconsistency in response string
+        if failed:
+            if len(failed_send_posids) > 0:
+                buses_with_fails = {self.busids[posid] for posid in failed_send_posids}
+                self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_posids)} ' +
+                               f'move tables to petalcontroller. Failed posids: {failed_send_posids}. ' +
+                               f'CAN busids with failures: {buses_with_fails}.')
+                posids_to_retry = self._posids_where_tables_were_just_sent - failed_send_posids
+            else:
+                self.printfunc(f'ERROR: {response_str}. Could not send move tables to some unknown number ' +
+                               'of positioners. Most likely due petalcontroller not sending back information ' +
+                               'about which positioners failed to communicate. Further downstream errors are ' +
+                               'likely.')
+                posids_to_retry = {}
+                failed_send_posids = self._posids_where_tables_were_just_sent
+            all_failed_send = failed_send_posids | previous_failed
+                
+            # 2020-11-30 [JHS] This code block below could be used (need to add method to turn on that boolean
+            # in the if statement) to let failures still proceed in limited cases.
+            # 
+            # if n_retries == 0 and self.limit_angle >= self.collider.Eo_phi and self.accept_comm_failures_if_restricted_patrol:
+            #     msg = f'WARNING: Despite failures of CAN communication, with n_retries remaining == {n_retries}, ' + \
+            #           'this move will simply be allowed to proceed, because collision risk has been mitigated by ' + \
+            #           f'restricted target patrol zones (phi limit angle = {self.limit_angle}). Failures of spotmatching ' + \
+            #           'may result, if this incurs significant loss of tracking accuracy.'
+            #     return all_failed_send
+            
+            if self.schedule.expert_mode_is_on():
+                expert_mode = True
+                all_tables = self.schedule.get_orig_expert_tables_sequence()
+                expert_tables_to_retry = [t for t in all_tables if t.posid in posids_to_retry]
+            else:
+                expert_mode = False
+                all_requests = self.schedule.get_requests()
+                posids_to_retry = {p for p in posids_to_retry if p in all_requests}
+                requests_to_retry = {posid:all_requests[posid] for posid in posids_to_retry}
+            self.printfunc('Canceling move. Tracking data in petal.py will be reset')
+            self._cancel_move(reset_flags='all')
+            # set flags and disable nonresponsiives after canceling to so that the moves will not be committed.
+            self._handle_nonresponsive_positioners(failed_send_posids, auto_disabling_on=True)
+            if n_retries > 0 and posids_to_retry:
+                self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids_to_retry)} ' +
+                               f'positioners (num tries remaining = {n_retries})')
+                if expert_mode:
+                    for move_table in expert_tables_to_retry:
+                        error = self.schedule.expert_add_table(move_table)
+                        if error:
+                            self._print_and_store_note(move_table.posid, f'expert table retry: {error}')
+                else:
+                    cleaned = {}
+                    for posid, req in requests_to_retry.items():
+                        cleaned[posid] = {'command': req['command'],
+                                          'target': [req['cmd_val1'], req['cmd_val2']],
+                                          'log_note': req['log_note']}
+                    self.request_targets(cleaned, _is_retry=True) # 2020-04-30 [JHS] anything useful to be done with return value?
+                anticollision = self.__current_schedule_moves_anticollision
+                should_anneal = self.__current_schedule_moves_should_anneal
+                self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
+                return self.send_move_tables(n_retries - 1, previous_failed=all_failed_send)
+            else:
+                msg = 'WARNING: Due to failures when sending move tables to positioners, the entire move is canceled.'
+                if n_retries <= 0:
+                    msg += ' No scheduling retries remaining.'
+                if len(posids_to_retry) == 0:
+                    msg += ' No communicable positioners remaining to reschedule.'
+                self.printfunc(msg)
+        all_failed_send = failed_send_posids | previous_failed
+        return all_failed_send, n_retries
 
-    def _clear_log_move_cmds(self, posids='all'):
-        '''Clear out any move command log data in the positoner state objects, which
-        are only temporarily held until we can get the state committed to the log / db.
+    def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
+        """Receives a list of positioners that the petalcontroller reports it
+        could not send move tables to. Sets communication error flag.
+
+        Optionally automatically disables positioners to remove them from
+        future send_move_tables attempts.
+        """
+        disabled = set()
+        for posid in posids:
+            self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
+                if accepted:
+                    disabled.add(posid)
+        if disabled:
+            self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
+
+    def _clear_temporary_state_values(self):
+        '''Clear out any existing values in the state objects that were only temporarily
+        held until we could get the state committed to the log / db.
         '''
         resets = {'MOVE_CMD'  : '',
                   'MOVE_VAL1' : '',
                   'MOVE_VAL2' : '',
                   }
-        posids = self._validate_posids_arg(posids, skip_unknowns=True)
-        for posid in posids:
+        for posid in self.posids:
             for key in resets:
                 # Set directly with state.store + special arg, to avoid triggering another commit
                 self.states[posid].store(key, resets[key], register_if_altered=False)
@@ -2551,21 +2458,19 @@ class Petal(object):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
            KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
         """
-        update = False
         if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-            comment = 'auto-disabled to comply with DEVICE_CLASSIFIED_NONFUNCTIONAL'
-            flags = {'NOTCTLENABLED', 'NONFUNCTIONAL'}
-            update = True
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with DEVICE_CLASSIFIED_NONFUNCTIONAL')
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('NONFUNCTIONAL', self.missing_flag)
+            self.disabled_devids.append(devid)
         if not self.get_posfid_val(devid, 'FIBER_INTACT'):
-            comment = 'auto-disabled to comply with FIBER_INTACT == False'
-            flags = {'NOTCTLENABLED', 'BROKENFIBER', 'BADPOSFID'}
-            update = True
+            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with FIBER_INTACT == False')
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('BROKENFIBER', self.missing_flag)
+            self.pos_flags[devid] |= self.flags.get('BADPOSFID', self.missing_flag)
+            self.disabled_devids.append(devid)
         if not self.get_posfid_val(devid, 'CTRL_ENABLED'):
-            self.set_posfid_flag(devid, 'NOTCTLENABLED')
-        if update:
-            self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment=comment)
-            for flag in flags:
-                self.set_posfid_flag(devid, flag)
+            self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
 
     def _apply_all_state_enable_settings(self):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
@@ -2608,13 +2513,24 @@ class Petal(object):
                 for fid in self.fidids:
                     self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
         #Reset values
-        self._cancel_move(reset_flags=False, reset_notes='all') 
+        self._cancel_move(reset_flags=False) 
         # Reset posflags, leave disabled flags alone for record
         self._initialize_pos_flags(enabled_only=True)
         self._apply_all_state_enable_settings()
         self._clear_exposure_info() #Get rid of lingering exposure details
         self.commit(mode='both', log_note='auto-committed during petal configure') # commit uncommitted changes to DB
         return 'SUCCESS'
+
+    def _remove_posid_from_sent_tables(self, posid):
+        """There is an internal list in petal.py of which positioners have had
+        move tables actually sent out to hardware. This function removes a
+        positioner (identified by posid) from the list. You can also argue
+        posid='all', in which case the whole list will get cleared.
+        """
+        if posid == 'all':
+            self._posids_where_tables_were_just_sent = set()         
+        elif posid in self._posids_where_tables_were_just_sent:
+            self._posids_where_tables_were_just_sent.remove(posid)
 
     def _print_and_store_note(self, posid, msg):
         '''Print out a message for one posid and also store the message to its
