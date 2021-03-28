@@ -534,7 +534,7 @@ class PECS:
             if do_off:
                 try:
                     specman = SimpleProxy('SPECMAN')
-                    self.print('Turning on illuminator')
+                    self.print('Turning off illuminator')
                     specs = [f'SP{p}' for p in self.illuminated_pcids]
                     retcode = specman._send_command('illuminate', action='off', participating_spectrographs=specs)
                     self.print(f'SPECMAN.illuminate returned code: {retcode}')
