@@ -74,7 +74,15 @@ except Exception as e:
     logger.error('FP_SETUP: could not turn on fiducials! Please investigate before continuing!')
     import sys; sys.exit(1)
 
-### Here's the buld of the setup: 1p, disambiguate, 1p ###
+logger.info('FP_SETUP: caching keepouts...')
+try:
+    keepouts = cs.ptlm.cache_keepouts()
+except Exception as e:
+    logger.info(f'FP_SETUP: caching keepouts failed with exception: {e}')
+    logger.error('FP_SETUP: could not cache keepouts! Please investigate before continuing!')
+    import sys; sys.exit(1)
+
+### Here's the bulk of the setup: 1p, disambiguate, 1p ###
 try:
     logger.info('FP_SETUP: running 1p calibration...')
     enabled_before_1p = get_pos_set('enabled')
@@ -93,6 +101,11 @@ try:
             logger.warning(f'FP_SETUP: update deatils: \n{selection}')
     disabled_during_1p = enabled_before_1p - enabled_after_1p
     logger.info(f'FP_SETUP: {len(disabled_during_1p)} disabled during initial 1p calib. Posids {disabled_during_1p}')
+
+    logger.info('FP_SETUP: shrinking keepouts for overlapping positioners')
+    overlapping = cs.ptlm.get_overlaps(as_dict=True)
+    for petal, overlaps in overlapping.items():
+        cs.ptlm.set_keepouts(posids=set(overlaps.keys()), angT=-7.0, radT=-0.5, angP=-10.0, radP=-0.5, participating_petals=petal)
 
     logger.info('FP_SETUP: running disambiguation loops...')
     enabled_before_disambig = get_pos_set('enabled')
@@ -147,7 +160,14 @@ except Exception as e:
         logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
         logger.critical('FP_SETUP: failed to return to initial state. DO NOT continue without consulting FP expert.')
 
-### Cleanup: turn off illuminator and fiducials, trigger fvc_collect ###
+### Cleanup: restore keepouts, turn off illuminator and fiducials, trigger fvc_collect ###
+restore_keepout_err = False
+try:
+    for petal, path in keepouts.items():
+        cs.ptlm.restore_keepouts(path=path, participating_petals=petal)
+except Exception as e:
+    logger.info(f'FP_SETUP: keepouts cache to restore by hand {keepouts}')
+    logger.error(f'FP_SETUP: failed to restore keepouts, exception: {e}')
 ### Allow turning off to fail, observers should investigate and resolve issue before going on-sky ###
 logger.info('FP_SETUP: turning off back illumination...')
 try:
@@ -181,7 +201,8 @@ if err is None:
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
 else:
     logger.error('FP_SETUP: focalplane setup failed to complete. Please wait a moment to try again or contact an FP expert.')
-
+if restore_keepout_err:
+    logger.error('FP_SETUP: could not restore keepouts!!!! DO NOT continue until this is resolved. Contact an expert.')
 ### Clean up logger ###
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
