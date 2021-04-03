@@ -20,7 +20,7 @@ commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
 boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED'}
 float_keys = (valid_keys | fit_err_keys) - boolean_keys
-no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
