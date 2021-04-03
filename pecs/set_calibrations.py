@@ -12,7 +12,7 @@ format_info = 'For data model and procedures to generate these values, see DESI-
 valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
               'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P',
-              'DEVICE_CLASSIFIED_NONFUNCTIONAL'}
+              'DEVICE_CLASSIFIED_NONFUNCTIONAL','CLASSIFIED_AS_RETRACTED'}
 fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR',
                 'NUM_POINTS_IN_FIT_STATIC', 'NUM_POINTS_IN_FIT_DYNAMIC',
                 'NUM_OUTLIERS_EXCLUDED_STATIC', 'NUM_OUTLIERS_EXCLUDED_DYNAMIC'}
@@ -186,6 +186,8 @@ for row in table:
                     kwargs2['value'] = new_ctrl_enabled
                     kwargs2['comment'] = f'auto-{"enabled" if new_ctrl_enabled else "disabled"} by set_calibrations.py upon setting {key}={value}'
                     updates = [kwargs, kwargs2]
+            elif key == 'CLASSIFIED_AS_RETRACTED':
+                kwargs['comment'] = row['ENABLE_DISABLE_RATIONALE']
             for kwargs in updates:
                 val_accepted = True if args.simulate else pecs.ptlm.set_posfid_val(**kwargs)
                 if val_accepted:
