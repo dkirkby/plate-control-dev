@@ -56,6 +56,9 @@ if not(ret == 'SUCCESS' or ret is None):
     logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
     import sys; sys.exit(1)
 
+# Re-setup petal/posids in pecs to reflect newly enabled positioners
+cs.ptl_setup(cs.pcids)
+
 logger.info('FP_SETUP: turning on back illumination...')
 try:
     cs.turn_on_illuminator()
