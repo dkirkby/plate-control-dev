@@ -424,9 +424,8 @@ class Petal(object):
                                     allow_initial_interference=allow_initial_interference)
             if error:
                 marked_for_delete.add(posid)
-                if self.verbose:
-                    error_str = f'{"move request retry: " if _is_retry else ""}{error}'
-                    self._print_and_store_note(posid, error_str)
+                error_str = f'{"move request retry: " if _is_retry else ""}{error}'
+                self._print_and_store_note(posid, error_str)
         for posid in marked_for_delete:
             del requests[posid]
         self._stop_request_timer()
@@ -2536,7 +2535,8 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        self.printfunc(f'{posid}: {msg}')
+        if self.verbose:
+            self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
         
     def _start_request_timer(self):
