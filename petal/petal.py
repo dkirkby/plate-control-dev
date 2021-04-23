@@ -2589,7 +2589,53 @@ class Petal(object):
             func = trans.construct(coord_in=cs1, coord_out=cs2)
             d['uv2'] = func(d['uv1'])
         return coord
+    
+    def set_anneal_params(self, density=None, mode='filled'):
+        '''Set annealing parameters.
         
+        Note that these settings are in memory only. They will revert to the
+        default values upon re-initialization.
+        
+        If no input arguments are provided, the defaults will be restored
+        immediately. If you argue just a mode, you will get the default density
+        for that mode. If you argue just a density, the mode will be 'filled'.
+        
+        INPUTS:  density ... float, maximum value 1.0 means minimal possible move time
+                                    minimum value 0.1 means ~10x minimal possible time
+                
+                 mode ... str, 'filled' --> try to most efficiently fill time with moves
+                               'ramped' --> try to ramp up/down the power (takes more time)
+                               
+        OUTPUTS:  reply string, stating what was done
+                               
+        Please note!
+        ------------
+        Annealing spreads out motor power consumption in time, as well as naturally
+        reducing potential collision frequency. See posschedulestage.py for more info.
+        Do *not* increase the density values on a whim. These values were chosen to
+        broadly ensure not too many motors spinning simultaneously.
+        '''
+        def return2(reply):
+            self.printfunc(reply)
+            return reply
+        min_density = 0.1
+        max_density = 1.0
+        valid_modes = list(pc.anneal_density.keys())
+        if mode not in valid_modes:
+            return return2(f'FAILED: Invalid mode argument "{mode}", must be one of {valid_modes}')
+        if density == None:
+            density = pc.anneal_density[mode]
+        if not(pc.is_float(density) or pc.is_integer(density)) or density < min_density or density > max_density:
+            return return2(f'FAILED: Invalid density argument "{density}", must be a number between {min_density} and {max_density}')
+        self.anneal_mode = mode
+        pc.anneal_density[mode] = density
+        return return2(f'SUCCESS: Set annealing parameters to {self.get_anneal_params()}')
+    
+    def get_anneal_params(self):
+        '''Returns a dict stating the current annealing parameters.
+        '''
+        return {self.anneal_mode: pc.anneal_density[self.anneal_mode]}
+    
 if __name__ == '__main__':
     '''
     python -m cProfile -s cumtime petal.py
