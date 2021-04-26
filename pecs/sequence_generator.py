@@ -320,29 +320,47 @@ options = {'FINAL_CREEP_ON': False,
            'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
           }
 prefix = 'scale'
-long_suffix = 'cruise-only, forward and back'
-for axis in {'THETA', 'PHI'}:
-    seq = sequence.Sequence(short_name=f'motortest {prefix} {axis[0]}',
+for suffix, long_suffix in {'': 'cruise-only, forward and back',
+                            'multi': 'cruise-only, multiple step sizes',
+                           }.items():
+    for axis in {'THETA', 'PHI'}:
+        spaced_suffix = ' ' + suffix if suffix else ''
+        seq = sequence.Sequence(short_name=f'motortest {prefix} {axis[0]}{spaced_suffix}',
                                 long_name=f'output {prefix} motor test, {long_suffix}',
                                 details=details,
                                 pos_settings=options,
                                 )
-    if axis == 'THETA':
-        forward_deltas = [10 for i in range(4)]
-        reverse_deltas = [-x for x in forward_deltas]
-        deltas = forward_deltas + reverse_deltas + reverse_deltas + forward_deltas
-        i = 0
-    else:
-        forward_deltas = [-8 for i in range(5)]
-        reverse_deltas = [-x for x in forward_deltas]
-        deltas = forward_deltas + reverse_deltas
-        i = 1
-    for j in range(len(deltas)):
-        target = [0,0]
-        target[i] = deltas[j]
-        move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note='', allow_corr=False)
-        seq.append(move)
-    seqs.append(seq)
+        if axis == 'THETA':
+            if suffix == '':
+                forward_deltas = [10 for i in range(4)]
+                reverse_deltas = [-x for x in forward_deltas]
+                deltas = forward_deltas + reverse_deltas + reverse_deltas + forward_deltas
+            elif suffix == 'multi':
+                forward_deltas = [5, 10, 15, -20, 30, -80, 40]
+                reverse_deltas = [-x for x in forward_deltas]
+                deltas = forward_deltas + reverse_deltas + reverse_deltas + forward_deltas
+            else:
+                assert False, f'unrecognized suffix identifier {suffix}'
+            i = 0
+        else:
+            if suffix == '':
+                forward_deltas = [-8 for i in range(5)]
+                reverse_deltas = [-x for x in forward_deltas]
+                deltas = forward_deltas + reverse_deltas
+            elif suffix == 'multi':
+                forward_deltas = [5, 8, 15, -20, 32]
+                reverse_deltas = [-x for x in forward_deltas]
+                deltas = forward_deltas + [-40, 40] + reverse_deltas
+                deltas += deltas
+            else:
+                assert False, f'unrecognized suffix identifier {suffix}'
+            i = 1
+        for j in range(len(deltas)):
+            target = [0,0]
+            target[i] = deltas[j]
+            move = sequence.Move(command='dTdP', target0=target[0], target1=target[1], log_note='', allow_corr=False)
+            seq.append(move)
+        seqs.append(seq)
 
 # simple positioning tests for robots with calibrated scale errors
 for axis, targets in {'THETA': [[x, 130] for x in [0, +60, -60, +120, -120]],
