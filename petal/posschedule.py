@@ -139,15 +139,32 @@ class PosSchedule(object):
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
             return self._denied_str(cmd_target_str, 'Bad uv_type')
+
+        # handle locked axes
+        # 2021-04-29 [JHS] There may be more sophisiticated things one could do with the coord transformations,
+        # to optimize closeness of single-DOF approach to requested target. Here I am currently opting for the
+        # simplest approach: zero the target rotation angle for the locked axis.
+        lock_msg = ''
+        locks = posmodel.axis_locks
+        if any(locks) and not all(locks): # all case is handled below in validations section
+            locked_axis = 0 if locks[0] else 1
+            locked_angle = start_posintTP[locked_axis]
+            orig_targt_posintTP_str = self._make_coord_str('posintTP', targt_posintTP, prefix='user')
+            lock_msg = pc.join_notes(orig_targt_posintTP_str, f'posint{"T" if locked_axis == 0 else "P"} locked at {locked_angle:.3f}')
+            targt_posintTP_mutable = list(targt_posintTP)
+            targt_posintTP_mutable[locked_axis] = start_posintTP[locked_axis]
+            targt_posintTP = tuple(targt_posintTP_mutable)
         
         # other standard coordinates for validations and logging
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         targt_ptlXYZ = trans.poslocTP_to_ptlXYZ(targt_poslocTP)
         target_str_posintTP = self._make_coord_str('posintTP', targt_posintTP, prefix='req')
         target_str_ptlXYZ = self._make_coord_str('ptlXYZ', targt_ptlXYZ, prefix='req')
-        target_str = pc.join_notes(target_str_posintTP, target_str_ptlXYZ)
+        target_str = pc.join_notes(lock_msg, target_str_posintTP, target_str_ptlXYZ)
         
         # validations
+        if all(locks):
+            return self._denied_str(target_str, 'Both theta and phi axes have been locked.')
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
             target_str = target_str.replace('req', 'nearest')
