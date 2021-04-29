@@ -130,7 +130,7 @@ offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' fo
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
 range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
-range_desc2 = lambda func, c: f'{func} full internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
+range_desc2 = lambda func, c: f'{func} full range internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys2 = {f'FULL_{func.upper()}_{c}': range_desc2(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
 range_keys_map2 = {key: f'{key[5:-1].lower()}full_range_posint{key[-1]}' for key in range_keys2}
 query_keys.update(range_keys)
