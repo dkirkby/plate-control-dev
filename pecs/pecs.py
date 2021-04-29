@@ -37,9 +37,15 @@ class PECS:
         For different hardware setups, you need to intialize including the
         correct config file for that local setup. This will be stored in
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
+
+        KF - 20210201: A Note on PCIDs, PCID means Petal Controller ID, mistakenly
+                       used as an alternate name for petal loc which it actually refers to.
+                       pcid is only used internal to the code (to be purged later), all
+                       printouts now properly refer to it as petal loc.
     '''
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
-                 test_name='PECS', device_locs=None, no_expid=False, posids=None):
+                 test_name='PECS', device_locs=None, no_expid=False, posids=None,
+                logger=None, inputfunc=input):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -52,6 +58,8 @@ class PECS:
         self.start_time = pc.now()
         self.test_name = test_name
         self.interactive = interactive
+        self.logger = logger
+        self.input = inputfunc
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
@@ -63,11 +71,16 @@ class PECS:
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
-                self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
-                               constants_version=self.constants_version,
-                               use_desimeter=self.use_desimeter,
-                               match_to_positioner_centers=self.match_to_positioner_centers,
-                               use_arcprep=self.use_arcprep)
+                from Pyro4.errors import NamingError
+                try:
+                    self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
+                                   constants_version=self.constants_version,
+                                   use_desimeter=self.use_desimeter,
+                                   match_to_positioner_centers=self.match_to_positioner_centers,
+                                   use_arcprep=self.use_arcprep, logger=self.logger)
+                except NamingError as e:
+                    self.print('Naming error! You did not join the instance or you joined the incorrect one! Try running join_instance desi_yyyymmdd.')
+                    raise e
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         elif not(fvc): # if FVC is False don't startup FVC stuff
@@ -78,13 +91,14 @@ class PECS:
             self.print(f"Reusing existing FVC proxy: "
                        f"{self.fvc.get('instrument')}")
         if ptlm is None:
-            self.ptlm = PetalMan()
+            self.ptlm = PetalMan(logger=self.logger)
             pcids = [self._role2pcid(role)
                      for role in self.ptlm.participating_petals]
             # Only use petals that are availible in Petalman
             self.pcids = list(set(self.pcids) & set(pcids))
-            self.print(f'PetalMan proxy initialised with active petal '
-                       f'role numbers (PCIDs): {pcids}')
+            self.ptlm.participating_petals = [self._pcid2role(p) for p in self.pcids]
+            self.print(f'PetalMan proxy initialized with active petal '
+                       f'role numbers (locs): {pcids}')
         else:
             self.ptlm = ptlm
             self.print(f'Reusing existing PetalMan proxy with active petals: '
@@ -102,28 +116,19 @@ class PECS:
         if self.interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs=device_locs, posids=posids)
         elif self.interactive is False:
+            # In non-interactive mode, check against obs_petals in petalman
+            obs_petals = self.ptlm.get('obs_petals')
+            obs_locs = [self._role2pcid(role) for role in obs_petals]
+            self.pcids = list(set(self.pcids) & set(obs_locs))
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
         # Do this after interactive_ptl_setup
         if self.interactive:
             self.home_adc() #asks to home, not automatic
             self.turn_on_fids()
+            self.turn_on_illuminator()
         #Setup exposure ID last incase aborted doing the above
         if not(no_expid):
             self._get_expid()
-
-    def exp_setup(self):
-        '''
-        Temp function to setup fptestdata while PECS still has some integration with it
-        '''
-        assert hasattr(self, 'data'), (
-            'FPTestData must be initialised before calling exposure setup.')
-        self.test_name = self.data.test_name
-        self.exp.program = self.test_name
-        self.data.set_dirs(self.exp.id)
-        self.start_time = self.data.t_i
-        self.fvc.save_centers = True
-        # fvc centre jsons are written by non-msdos account, note access
-        self.fvc.save_centers_path = self.data.dir
 
     def _get_expid(self):
         '''
@@ -137,7 +142,7 @@ class PECS:
         self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
     def print(self, msg):
-        if hasattr(self, 'logger'):
+        if self.logger is not None:
             self.logger.info(msg)  # use broadcast logger to log to all pcids
         else:
             self.printfunc(msg)
@@ -150,16 +155,16 @@ class PECS:
             return False
         else:
             return self._parse_yn(
-                input(f'Invalid input: {yn_str}, must be y/n:'))
+                self.input(f'Invalid input: {yn_str}, must be y/n:'))
 
     def ptl_setup(self, pcids, posids=None, illumination_check=False, device_locs=None):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
-                   f'selected petals, PCIDs: {pcids}')
+                   f'selected petals, locs: {pcids}')
         if illumination_check:
             for pcid in pcids:  # illumination check
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
-                    f'PC{pcid:02} must be illuminated.')
+                    f'PETAL{pcid} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
         all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
         self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
@@ -210,21 +215,21 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = input('Please enter integer PCIDs seperated by spaces. '
-                      'Leave blank to select petal specified in cfg: ')
+        pcids = self.input('Please enter integer petal locs seperated by spaces. '
+                           'Leave blank to select petals specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
             assert f'PETAL{pcid}' in self.ptlm.Petals.keys(), (
-                f'PC{pcid:02} unavailable, all available ICS petal roles: '
+                f'PETAL{pcid} unavailable, all available ICS petal roles: '
                 f'{self.ptlm.Petals.keys()}')
-        self.print(f'Selected {len(self.pcids)} petals, PCIDs: {self.pcids}')
+        self.print(f'Selected {len(self.pcids)} petals, Petal Locs: {self.pcids}')
         self.ptlm.participating_petals = [self._pcid2role(p) for p in pcids]
         return pcids
 
     def _interactively_get_posids(self):
-        user_text = input('Please list canids (can??) or posids, seperated by '
-                          'spaces. Leave blank to select all positioners: ')
+        user_text = self.input('Please list canids (can??) or posids, seperated by '
+                               'spaces. Leave blank to select all positioners: ')
         enabled_only, kwarg = True, {}
         if user_text == '':
             self.print('Defaulting to all enabled positioners...')
@@ -480,25 +485,61 @@ class PECS:
 
     def home_adc(self):
         if self.adc_available:
-            try:
-                adc = SimpleProxy('ADC')
-                if self._parse_yn(input('Home ADC? (y/n): ')):
+            do_home = self._parse_yn(self.input('Home ADC? (y/n): ')) if self.interactive else True
+            if do_home:
+                try:
+                    adc = SimpleProxy('ADC')
                     self.print('Homing ADC...')
                     retcode = adc._send_command('home', controllers=[1, 2])
                     self.print(f'ADC.home returned code: {retcode}')
-            except Exception as e:
-                print(f'Exception homing ADC, {e}')
-        else:
-            return
+                except Exception as e:
+                    print(f'Exception homing ADC, {e}')
 
     def turn_on_fids(self):
-        if self._parse_yn(input('Turn on fiducials (y/n): ')):
+        do_on = self._parse_yn(self.input('Turn on fiducials (y/n): ')) if self.interactive else True
+        if do_on:
             responses = self.ptlm.set_fiducials(setting='on',
-                            participating_petals=list(self.ptlm.Petals.keys()))
+                            participating_petals=self.ptlm.get('fid_petals'))
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
         self.print(f'Petals report fiducials in the following states: {responses}')
+
+    def turn_on_illuminator(self):
+        if self.specman_available:
+            do_on = self._parse_yn(self.input('Turn on illuminator? (y/n): ')) if self.interactive else True
+            if do_on:
+                try:
+                    specman = SimpleProxy('SPECMAN')
+                    self.print('Turning on illuminator')
+                    specs = [f'SP{p}' for p in self.illuminated_pcids]
+                    retcode = specman._send_command('illuminate', action='on', participating_spectrographs=specs)
+                    self.print(f'SPECMAN.illuminate returned code: {retcode}')
+                except Exception as e:
+                    print(f'Exception when trying to turn on illumination, {e}') 
+
+    def turn_off_fids(self):
+        do_off = self._parse_yn(self.input('Turn off fiducials (y/n): ')) if self.interactive else True
+        if do_off:
+            responses = self.ptlm.set_fiducials(setting='off',
+                            participating_petals=self.ptlm.get('fid_petals'))
+            # Set fiducials for all availible petals
+        else:
+            responses = self.ptlm.get_fiducials()
+        self.print(f'Petals report fiducials in the following states: {responses}')
+
+    def turn_off_illuminator(self):
+        if self.specman_available:
+            do_off = self._parse_yn(self.input('Turn off illuminator? (y/n): ')) if self.interactive else True
+            if do_off:
+                try:
+                    specman = SimpleProxy('SPECMAN')
+                    self.print('Turning off illuminator')
+                    specs = [f'SP{p}' for p in self.illuminated_pcids]
+                    retcode = specman._send_command('illuminate', action='off', participating_spectrographs=specs)
+                    self.print(f'SPECMAN.illuminate returned code: {retcode}')
+                except Exception as e:
+                    print(f'Exception when trying to turn off illumination, {e}') 
 
 
     def fvc_collect(self):
@@ -537,8 +578,8 @@ class PECS:
     def pause(self, press_enter=False):
         '''pause operation between positioner moves for heat monitoring'''
         if self.pause_interval is None or press_enter:
-            input('Paused for heat load monitoring for unspecified interval. '
-                  'Press enter to continue: ')
+            self.input('Paused for heat load monitoring for unspecified interval. '
+                       'Press enter to continue: ')
         elif self.pause_interval == 0:  # no puase needed, just continue
             self.print('pause_interval = 0, continuing without pause...')
         elif self.pause_interval > 0:

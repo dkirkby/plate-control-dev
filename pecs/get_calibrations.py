@@ -130,8 +130,13 @@ offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' fo
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
 range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
+range_desc2 = lambda func, c: f'{func} full range internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
+range_keys2 = {f'FULL_{func.upper()}_{c}': range_desc2(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
+range_keys_map2 = {key: f'{key[5:-1].lower()}full_range_posint{key[-1]}' for key in range_keys2}
 query_keys.update(range_keys)
 query_keys_map.update(range_keys_map)
+query_keys.update(range_keys2)
+query_keys_map.update(range_keys_map2)
 
 # summarize all keys and units (where applicable)
 all_pos_keys = {}
@@ -141,9 +146,10 @@ all_pos_keys.update(collider_query_keys)
 all_pos_keys.update(collider_pos_poly_keys)
 all_pos_keys.update(offset_variant_keys)
 all_pos_keys.update(range_keys)
+all_pos_keys.update(range_keys2)
 angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
                 'KEEPOUT_EXPANSION_PHI_ANGULAR', 'KEEPOUT_EXPANSION_THETA_ANGULAR'}
-angular_keys |= set(range_keys)
+angular_keys |= set(range_keys) | set(range_keys2)
 mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'OBS_X', 'OBS_Y', 'PTL_X', 'PTL_Y',
            'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_THETA_RADIAL'}
 mm_keys |= set(offset_variant_keys)
@@ -259,7 +265,7 @@ try:
         mapped_query_keys = {query_keys_map[key] if key in query_keys_map else key for key in query_keys}
         missing = set(mapped_query_keys) - set(valid_keys)
         assert2(not(any(missing)), f'some keys are not available for petal {ptl.petal_id}: {missing}')
-        posids_ordered = sorted(ptl.posids)
+        posids_ordered = sorted(ptl.app_get('posids'))
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
         
         # queryable values
@@ -375,3 +381,7 @@ if online:
 # re-raise exception from above if we have one
 if exception_during_run:
     raise(exception_during_run)
+
+#Sometimes hangs? Should fix but no time now.
+time.sleep(60)
+sys.exit(0)

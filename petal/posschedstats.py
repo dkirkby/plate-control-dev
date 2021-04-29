@@ -471,7 +471,10 @@ class PosSchedStats(object):
             parent_dir = os.path.dirname(dir_name)
             parent_dir_exists = os.path.isdir(parent_dir)
             if parent_dir_exists:
-                os.mkdir(dir_name)
+                try:
+                    os.mkdir(dir_name)
+                except FileExistsError: #multiple petals could be trying to do this at the same time
+                    pass
                 dir_exists = os.path.isdir(dir_name)
         if path is None or not dir_exists:
             suffix = str(self.filename_suffix)

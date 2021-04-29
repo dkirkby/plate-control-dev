@@ -726,7 +726,7 @@ class Petal(object):
             self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
             
-    def set_motor_parameters(self):
+    def set_motor_parameters(self, wait_on=False):
         """Send the motor current and period settings to the positioners.
         
         INPUTS:  None
@@ -736,12 +736,18 @@ class Petal(object):
             if self.verbose:
                 self.printfunc('Simulator skips sending motor parameters to positioners.')
             return 'SUCCESS'
-        pospwr = self.get_pbdata_val('pospwr')
-        state = set(list(pospwr.values()))
-        if len(state) == 1:
-            state = state.pop()
-        else:
-            state = 'mixed'
+        n_tries = 5 if wait_on else 1 #To give PS1/2_FBK time to update after enabling
+        for i in range(n_tries):
+            pospwr = self.get_pbdata_val('pospwr')
+            state = set(list(pospwr.values()))
+            if len(state) == 1:
+                state = state.pop()
+            else:
+                state = 'mixed'
+            if state == 'on':
+                break
+            elif wait_on:
+                time.sleep(2)
         if state == 'on':
             parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
             currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
@@ -961,6 +967,8 @@ class Petal(object):
             ret = self.comm.pbget('FIDUCIALS')
 
         settings_done = {}
+        n_missing = 0
+        n_failed = 0
         for i in range(len(enabled)):
             set_duty = duties[i]
             # protect against missing fiducials in ret
@@ -969,18 +977,25 @@ class Petal(object):
                     self.printfunc('WARNING: set_fiducials: disagreement in fiducial set duty and returned duty, ID: %s' % enabled[i])
                     set_duty = ret[busids[i]][canids[i]]
                     error = True
+                    n_failed += 1
             elif not save_as_default:
                 # Use remembered state, fid not responding but only if not saving defaults
                 self.printfunc('WARNING: set_fiducials: fiducials %s not returned by petalcontroller, state not set.' % enabled[i])
                 set_duty = self.get_posfid_val(enabled[i], 'DUTY_STATE')
                 error = True
+                n_missing += 1
             self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty, check_existing=True)
             settings_done[enabled[i]] = set_duty
             if save_as_default:
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty, check_existing=True)
         self.commit(mode='both', log_note='set fiducial parameters')
         if error:
-            return 'FAILED: not all fiducials set. Try moving to READY if trying to turn them off.'
+            failed_str = 'FAILED: not all fiducials set.'
+            if n_missing != 0:
+                failed_str += f' {n_missing} fiducials were not responsive.'
+            if n_failed != 0:
+                failed_str += f' {n_failed} fiducials were not set to desired duty cycle.'
+            return failed_str
         else:
             return settings_done
 
@@ -1078,7 +1093,7 @@ class Petal(object):
                         self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
                 else:
                     # Inform PC about motor parameters
-                    self.set_motor_parameters()
+                    self.set_motor_parameters(wait_on=True)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -2003,7 +2018,7 @@ class Petal(object):
         plt.ylim(ylim)
         plt.xlabel('flat x (mm)')
         plt.ylabel('flat y (mm)')
-        basename = f'posplot_{pc.compact_timestamp()}.{fmt}'
+        basename = f'posplot_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.{fmt}'
         plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
         handles, labels = plt.gca().get_legend_handles_labels()
         handles = [handles[labels.index(L)] for L in label_order if L in labels]
@@ -2520,7 +2535,8 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        self.printfunc(f'{posid}: {msg}')
+        if self.verbose:
+            self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
         
     def _start_request_timer(self):
@@ -2573,7 +2589,53 @@ class Petal(object):
             func = trans.construct(coord_in=cs1, coord_out=cs2)
             d['uv2'] = func(d['uv1'])
         return coord
+    
+    def set_anneal_params(self, density=None, mode='filled'):
+        '''Set annealing parameters.
         
+        Note that these settings are in memory only. They will revert to the
+        default values upon re-initialization.
+        
+        If no input arguments are provided, the defaults will be restored
+        immediately. If you argue just a mode, you will get the default density
+        for that mode. If you argue just a density, the mode will be 'filled'.
+        
+        INPUTS:  density ... float, maximum value 1.0 means minimal possible move time
+                                    minimum value 0.1 means ~10x minimal possible time
+                
+                 mode ... str, 'filled' --> try to most efficiently fill time with moves
+                               'ramped' --> try to ramp up/down the power (takes more time)
+                               
+        OUTPUTS:  reply string, stating what was done
+                               
+        Please note!
+        ------------
+        Annealing spreads out motor power consumption in time, as well as naturally
+        reducing potential collision frequency. See posschedulestage.py for more info.
+        Do *not* increase the density values on a whim. These values were chosen to
+        broadly ensure not too many motors spinning simultaneously.
+        '''
+        def return2(reply):
+            self.printfunc(reply)
+            return reply
+        min_density = 0.1
+        max_density = 1.0
+        valid_modes = list(pc.anneal_density.keys())
+        if mode not in valid_modes:
+            return return2(f'FAILED: Invalid mode argument "{mode}", must be one of {valid_modes}')
+        if density == None:
+            density = pc.anneal_density[mode]
+        if not(pc.is_float(density) or pc.is_integer(density)) or density < min_density or density > max_density:
+            return return2(f'FAILED: Invalid density argument "{density}", must be a number between {min_density} and {max_density}')
+        self.anneal_mode = mode
+        pc.anneal_density[mode] = density
+        return return2(f'SUCCESS: Set annealing parameters to {self.get_anneal_params()}')
+    
+    def get_anneal_params(self):
+        '''Returns a dict stating the current annealing parameters.
+        '''
+        return {self.anneal_mode: pc.anneal_density[self.anneal_mode]}
+    
 if __name__ == '__main__':
     '''
     python -m cProfile -s cumtime petal.py
