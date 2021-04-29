@@ -2018,7 +2018,7 @@ class Petal(object):
         plt.ylim(ylim)
         plt.xlabel('flat x (mm)')
         plt.ylabel('flat y (mm)')
-        basename = f'posplot_{pc.compact_timestamp()}.{fmt}'
+        basename = f'posplot_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.{fmt}'
         plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
         handles, labels = plt.gca().get_legend_handles_labels()
         handles = [handles[labels.index(L)] for L in label_order if L in labels]
