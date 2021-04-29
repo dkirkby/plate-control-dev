@@ -63,7 +63,7 @@ logger.info('FP_SETUP: turning on back illumination...')
 try:
     cs.turn_on_illuminator()
     #logger.info(f'FP_SETUP: turning on back illumination returned: {ret}')
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
     logger.error('FP_SETUP: could not turn on back illumination! Please investigate before continuing!')
     import sys; sys.exit(1)
@@ -72,7 +72,7 @@ logger.info('FP_SETUP: turning on fiducials...')
 try:
     cs.turn_on_fids()
     #logger.info(f'FP_SETUP: turning on fiducials returned: {ret}')
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: turning on fiducials failed with exception: {e}')
     logger.error('FP_SETUP: could not turn on fiducials! Please investigate before continuing!')
     import sys; sys.exit(1)
@@ -80,7 +80,7 @@ except Exception as e:
 logger.info('FP_SETUP: caching keepouts...')
 try:
     keepouts = cs.ptlm.cache_keepouts()
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: caching keepouts failed with exception: {e}')
     logger.error('FP_SETUP: could not cache keepouts! Please investigate before continuing!')
     import sys; sys.exit(1)
@@ -154,7 +154,7 @@ try:
     disabled_during_1p2 = enabled_before_1p2 - enabled_after_1p2
     logger.info(f'FP_SETUP: {len(disabled_during_1p2)} disabled during initial 1p calib. Posids {disabled_during_1p2}')
     final_enabled = get_pos_set('enabled')
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     err = e
     logger.error('FP_SETUP crashed! See traceback below:')
     logger.critical(traceback.format_exc())
@@ -173,7 +173,7 @@ logger.info('FP_SETUP: restoring positioner keepout zones...')
 try:
     for petal, path in keepouts.items():
         cs.ptlm.restore_keepouts(path=path, participating_petals=petal)
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: keepouts cache to restore by hand {keepouts}')
     logger.error(f'FP_SETUP: failed to restore keepouts, exception: {e}')
 ### Allow turning off to fail, observers should investigate and resolve issue before going on-sky ###
@@ -181,7 +181,7 @@ logger.info('FP_SETUP: turning off back illumination...')
 try:
     cs.turn_off_illuminator()
     #logger.info(f'FP_SETUP: turning off back illumination returned: {ret}')
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
     logger.error('FP_SETUP: Could not turn off back illumination! Please investigate before continuing!')
 
@@ -189,7 +189,7 @@ logger.info('FP_SETUP: turning off fiducials...')
 try:
     cs.turn_off_fids()
     #logger.info(f'FP_SETUP: turning off fiducials returned: {ret}')
-except Exception as e:
+except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: turning off fiducials failed with exception: {e}')
     logger.error('FP_SETUP: could not turn off fiducials! Please investigate before continuing!')
 
@@ -202,7 +202,7 @@ if err is None:
     if newly_enabled:
         logger.info(f'FP_SETUP NOTE: recovered {len(newly_enabled)} positioner robots.')
     if ambig:
-        logger.info(f'FP_SETUP NOTE: {len(ambig)} positioners remaing in ambiguous theta range and are not used tonight: posids {ambig}')
+        logger.info(f'FP_SETUP NOTE: {len(ambig)} positioners remaining in ambiguous theta range and are not used tonight: posids {ambig}')
     non_ambig_disabled = disabled_during_1p | disabled_during_1p2 | (disabled_during_disambig-ambig)
     if non_ambig_disabled:
         logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors or communication errors.')
