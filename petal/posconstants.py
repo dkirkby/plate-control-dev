@@ -166,8 +166,8 @@ nominals['OFFSET_X']         = {'value':   0.0, 'tol': 1000.0}
 nominals['OFFSET_Y']         = {'value':   0.0, 'tol': 1000.0}
 nominals['PHYSICAL_RANGE_T'] = {'value': 370.0, 'tol':   50.0}
 nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
-nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.99}
-nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.99}
+nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    1.0}
+nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    1.0}
 
 # Tolerance for theta guesses when performing xy2tp transform
 default_t_guess_tol = 30.0  # deg
