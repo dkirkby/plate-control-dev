@@ -132,7 +132,7 @@ range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for
 range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
 range_desc2 = lambda func, c: f'{func} full internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys2 = {f'FULL_{func.upper()}_{c}': range_desc2(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
-range_keys_map2 = {key: f'{key[:-1].lower()}full_range_posint{key[-1]}' for key in range_keys2}
+range_keys_map2 = {key: f'{key[5:-1].lower()}full_range_posint{key[-1]}' for key in range_keys2}
 query_keys.update(range_keys)
 query_keys_map.update(range_keys_map)
 query_keys.update(range_keys2)
@@ -381,3 +381,7 @@ if online:
 # re-raise exception from above if we have one
 if exception_during_run:
     raise(exception_during_run)
+
+#Sometimes hangs? Should fix but no time now.
+time.sleep(60)
+sys.exit(0)
