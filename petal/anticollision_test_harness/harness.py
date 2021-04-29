@@ -30,7 +30,13 @@ subset7b = {21, 22, 26, 27, 28, 33, 34}
 device_loc_to_command = subset7b # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
-retract_and_disable = set() #{87,88} # enter device locations to simulate those positioners as retracted and disabled
+retract_and_disable_sets = {0: {},
+                            10: {231, 201, 170, 425, 396, 45, 272, 179, 84, 220},
+                            25: {258, 387, 520, 137, 269, 24, 28, 286, 288, 165, 170, 305, 307, 57, 443, 319, 193, 322, 67, 228, 240, 113, 243, 116, 123},
+                            50: {6, 263, 520, 266, 523, 524, 142, 271, 16, 145, 18, 400, 149, 157, 288, 416, 165, 297, 425, 45, 431, 176, 304, 59, 446, 64, 450, 69, 72, 202, 81, 83, 339, 213, 86, 354, 228, 104, 365, 494, 372, 380, 250, 124, 126},
+                            100: {2, 8, 520, 15, 18, 26, 29, 31, 42, 44, 50, 74, 81, 87, 90, 91, 92, 95, 98, 104, 108, 111, 113, 119, 122, 127, 130, 137, 139, 152, 165, 168, 175, 190, 192, 196, 203, 207, 210, 215, 218, 223, 225, 226, 235, 238, 258, 262, 269, 273, 284, 292, 293, 298, 301, 307, 314, 315, 322, 324, 326, 334, 337, 342, 347, 348, 349, 354, 357, 360, 371, 372, 378, 381, 382, 386, 392, 428, 431, 437, 452, 457, 461, 462, 464, 465, 467, 469, 475, 483, 486, 487, 493, 495, 508},
+                            }
+retract_and_disable = retract_and_disable_sets[0] #{87,88} # enter device locations to simulate those positioners as retracted and disabled
 retracted_TP = [0, 110]
 
 # Set any non 1.0 output ratio scales
@@ -54,7 +60,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_triple' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_dix' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
