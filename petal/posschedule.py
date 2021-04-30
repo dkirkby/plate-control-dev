@@ -163,8 +163,8 @@ class PosSchedule(object):
         target_str = pc.join_notes(lock_msg, target_str_posintTP, target_str_ptlXYZ)
         
         # validations
-        if all(locks):
-            return self._denied_str(target_str, 'Both theta and phi axes have been locked.')
+        if self._deny_request_because_both_locked(posmodel):
+            return self._denied_str(target_str, BOTH_AXES_LOCKED_MSG)
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
             target_str = target_str.replace('req', 'nearest')
@@ -345,11 +345,14 @@ class PosSchedule(object):
         if stats_enabled:
             timer_start = time.perf_counter()
         self._all_requested_posids['expert'].add(move_table.posid)
-        if self._deny_request_because_disabled(move_table.posmodel):
+        disabled = self._deny_request_because_disabled(move_table.posmodel)
+        both_locked = self._deny_request_because_both_locked(move_table.posmodel)
+        if disabled or both_locked:
             sched_table = move_table.for_schedule()
             net_dtdp = [sched_table[key][-1] for key in ['net_dT', 'net_dP']]
             target_str = self._make_coord_str('expert_net_dtdp', net_dtdp, prefix='')
-            return self._denied_str(target_str, POS_DISABLED_MSG)
+            msg = POS_DISABLED_MSG if disabled else BOTH_AXES_LOCKED_MSG
+            return self._denied_str(target_str, msg)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
@@ -739,14 +742,19 @@ class PosSchedule(object):
             self._requests[posid] = new_request
 
     def _deny_request_because_disabled(self, posmodel):
-        """This is a special function specifically because there is a bit of care we need to
-        consistently take with regard to post-move cleanup, if a request is going to be denied.
+        """Checks enabled status and includes setting flag.
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('NOTCTLENABLED', self.petal.missing_flag)
             return True
         return False
+    
+    def _deny_request_because_both_locked(self, posmodel):
+        '''Checks for case where both axes are locked.
+        '''
+        both_locked = all(posmodel.axis_locks)
+        return both_locked
     
     def _check_init_or_final_neighbor_interference(self, posmodel, final_poslocTP=None):
         """Checks for interference of posmodel with any neighbor positioner or fixed
@@ -1021,3 +1029,4 @@ class PosSchedule(object):
         return s
 
 POS_DISABLED_MSG = 'Positioner is disabled.'
+BOTH_AXES_LOCKED_MSG = 'Both theta and phi axes have been locked.'
