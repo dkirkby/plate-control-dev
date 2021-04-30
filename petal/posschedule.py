@@ -1029,4 +1029,4 @@ class PosSchedule(object):
         return s
 
 POS_DISABLED_MSG = 'Positioner is disabled.'
-BOTH_AXES_LOCKED_MSG = 'Both theta and phi axes have been locked.'
+BOTH_AXES_LOCKED_MSG = 'Both theta and phi axes are locked.'
