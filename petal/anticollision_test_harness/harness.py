@@ -41,9 +41,10 @@ retracted_TP = [0, 110]
 
 # Set any non 1.0 output ratio scales
 # format of dict: keys = posids, values = subdicts like {'T': 0.7} or {'P': 0.2, 'T': 0.4} etc
-scale_changes = {'M02182': {'T': 0.5},
-                 'M01981': {'P': 0.3},
-                 'M06389': {'T': 0.2, 'P': 0.4},
+# scale == 0 --> disable that axis entirely
+scale_changes = {'M02182': {'T': 0}, #0.5},
+                 'M01981': {'P': 0.0}, #0.3},
+                 'M06389': {'T': 0.0, 'P': 0}, #{'T': 0.2, 'P': 0.4},
                  }
 set_scale_changes_as_retracted = True
 
@@ -60,7 +61,7 @@ sim_fail_freq = {'send_tables': 0.0}
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'ptl01_sept2020_nominal' # 'cmds_unit_test'
-move_request_sequence_id = 'ptl01_set00_dix' # 'cmds_unit_test'
+move_request_sequence_id = 'ptl01_set00_double' # 'cmds_unit_test'
 ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 new_stats_per_loop = True # save a new stats file for each loop of this script
 
@@ -173,7 +174,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       collider_file   = None,
                       sched_stats_on  = True, # minor speed-up if turn off
                       anticollision   = 'adjust',
-                      verbose         = False,
+                      verbose         = True,
                       phi_limit_on    = False,
                       save_debug      = True,
                       anneal_mode     = 'ramped',
