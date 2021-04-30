@@ -245,7 +245,9 @@ class PosModel(object):
         specific meanings.
         """
         start = self.expected_current_posintTP if not init_posintTP else init_posintTP
-        if limits:
+        if self.axis[axisid].is_locked:
+            distance = 0.0
+        elif limits:
             use_near_full_range = (limits == 'near_full')
             distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
         motor_dist = self.axis[axisid].shaft_to_motor(distance)

@@ -419,10 +419,9 @@ class PosMoveTable(object):
         has_moved = [False, False]
         normal_row_limits = None if self.allow_exceed_limits else 'debounced'
         extra_row_limits = None if self.allow_exceed_limits else 'near_full'
-        locked = self.posmodel.axis_locks
+        axis_idxs = [pc.T, pc.P]
         for row in self.rows:
-            ideal_dist = [row.data['dT_ideal'] if not locked[0] else 0.0,
-                          row.data['dP_ideal'] if not locked[1] else 0.0]
+            ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
                 move = self.posmodel.true_move(axisid=i,
                                                distance=ideal_dist[i],
@@ -437,7 +436,7 @@ class PosMoveTable(object):
             backlash_dir = [self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T'],
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
-            for i in [pc.T,pc.P]:
+            for i in axis_idxs:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
                 move = self.posmodel.true_move(axisid=i,
                                                distance=backlash[i],
@@ -448,14 +447,15 @@ class PosMoveTable(object):
                 new_moves[i][-1]['auto_cmd'] = '(auto backlash backup)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
-            ideal_total = [0,0]
+            ideal_total = [0, 0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
             ideal_total[pc.P] = sum([row.data['dP_ideal'] for row in self.rows])
-            actual_total = [0,0]
-            err_dist = [0,0]
-            for i in [pc.T,pc.P]:
+            actual_total = [0, 0]
+            err_dist = [0, 0]
+            for i in axis_idxs:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
-                err_dist[i] = ideal_total[i] - actual_total[i]
+                if not self.posmodel.axis[i].is_locked:
+                    err_dist[i] = ideal_total[i] - actual_total[i]
                 if abs(err_dist[i]) > pc.max_auto_creep_distance:
                     auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
                                        f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
