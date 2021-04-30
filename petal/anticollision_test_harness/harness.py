@@ -42,9 +42,9 @@ retracted_TP = [0, 110]
 # Set any non 1.0 output ratio scales
 # format of dict: keys = posids, values = subdicts like {'T': 0.7} or {'P': 0.2, 'T': 0.4} etc
 # scale == 0 --> disable that axis entirely
-scale_changes = {'M02182': {'T': 0}, #0.5},
-                 'M01981': {'P': 0.0}, #0.3},
-                 'M06389': {'T': 0.0, 'P': 0}, #{'T': 0.2, 'P': 0.4},
+scale_changes = {'M02182': {'T': 0.5},
+                 'M01981': {'P': 0.3},
+                 'M06389': {'T': 0.0, 'P': 0.4},
                  }
 set_scale_changes_as_retracted = True
 
@@ -52,8 +52,8 @@ set_scale_changes_as_retracted = True
 include_neighbors = True
 
 # Whether to test some "expert" mode commands
-test_direct_dTdP = True
-test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_direct_dTdP = False
+test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
