@@ -501,7 +501,7 @@ class PosSchedule(object):
         should_freeze = not(not(anticollision))
         if should_freeze:
             if anticollision != 'freeze':
-                self.printfunc(f'anticollision method {anticollision} overriden with \'freeze\', due to presence of expert move tables')
+                self.printfunc(f'anticollision method \'{anticollision}\' overriden with \'freeze\', due to presence of expert move tables')
             if self.stats.is_enabled():
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')

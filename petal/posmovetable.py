@@ -517,21 +517,20 @@ class PosMoveTable(object):
                                       true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type in {'full', 'cleanup', 'hardware'}:
             lock_note = ''
-            for axis, is_locked in enumerate(self.posmodel.axis_locks):
-                if is_locked:
-                    key = 'T' if axis == 0 else 'P'
-                    dkey = f'motor_steps_{key}' if output_type == 'hardware' else f'd{key}'
-                    if any(table[dkey]):
-                        pc.printfunc(f'ERROR: {self.posid}: lock calculation failed on axis {axis}, non-zero {dkey} detected in' + \
-                                       ' posmovetable.py. Move command to positioner will be altered to prevent any motion, though' + \
-                                       ' could still result in timing errors or collisions.')
-                        table[dkey] = [0 for i in row_range]
-                        lock_note = pc.join_notes(lock_note, f'lock error on axis {key}')
-                    if output_type in {'full', 'cleanup'}:
-                        ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
-                        zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
-                        if any(zeroed_deltas):
-                            lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')            
+            locked_axes = [name for num, name in {pc.T: 'T', pc.P: 'P'}.items() if self.posmodel.axis[num].is_locked]
+            for axis in locked_axes:
+                dkey = f'motor_steps_{axis}' if output_type == 'hardware' else f'd{axis}'
+                if any(table[dkey]):
+                    pc.printfunc(f'ERROR: {self.posid}: lock calculation failed on axis {axis}, non-zero {dkey} detected in' + \
+                                   ' posmovetable.py. Move command to positioner will be altered to prevent any motion, though' + \
+                                   ' could still result in timing errors or collisions.')
+                    table[dkey] = [0 for i in row_range]
+                    lock_note = pc.join_notes(lock_note, f'lock error on axis {axis}')
+                if output_type in {'full', 'cleanup'}:
+                    ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
+                    zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
+                    if any(zeroed_deltas):
+                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')            
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
