@@ -135,6 +135,10 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
+# common print function
+# note the implementation may be replaced at runtime by petal.py, for logging
+printfunc = print
+
 # handle_fvc_feedback defaults
 err_thresh = False # tracing error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates

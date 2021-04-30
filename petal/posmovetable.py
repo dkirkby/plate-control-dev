@@ -522,7 +522,7 @@ class PosMoveTable(object):
                     key = 'T' if axis == 0 else 'P'
                     dkey = f'motor_steps_{key}' if output_type == 'hardware' else f'd{key}'
                     if any(table[dkey]):
-                        self.printfunc(f'ERROR: {self.posid}: lock calculation failed on axis {axis}, non-zero {dkey} detected in' + \
+                        pc.printfunc(f'ERROR: {self.posid}: lock calculation failed on axis {axis}, non-zero {dkey} detected in' + \
                                        ' posmovetable.py. Move command to positioner will be altered to prevent any motion, though' + \
                                        ' could still result in timing errors or collisions.')
                         table[dkey] = [0 for i in row_range]

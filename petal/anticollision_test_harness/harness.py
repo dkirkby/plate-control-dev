@@ -52,8 +52,8 @@ set_scale_changes_as_retracted = True
 include_neighbors = True
 
 # Whether to test some "expert" mode commands
-test_direct_dTdP = False
-test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_direct_dTdP = True
+test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
@@ -72,7 +72,7 @@ note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -174,7 +174,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       collider_file   = None,
                       sched_stats_on  = True, # minor speed-up if turn off
                       anticollision   = 'adjust',
-                      verbose         = True,
+                      verbose         = False,
                       phi_limit_on    = False,
                       save_debug      = True,
                       anneal_mode     = 'ramped',
@@ -323,7 +323,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             expected_results.add_row(row)
         if test_direct_dTdP:
             posids_to_test = list(requests.keys())
-            for dtdp in [[30,0], [-30,0], [0,-30], [0,30], [30,-30], [-30,30]]:
+            for dtdp in [[30,0], [0,-30], [-30,30]]:
                 print(f'direct_dTdP {dtdp}')
                 direct_requests = {posid: {'target': dtdp, 'log_note':''} for posid in posids_to_test}
                 ptl.request_direct_dtdp(direct_requests)
