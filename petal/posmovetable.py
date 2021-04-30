@@ -530,7 +530,7 @@ class PosMoveTable(object):
                     ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
                     zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
                     if any(zeroed_deltas):
-                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')            
+                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables        
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
