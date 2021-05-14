@@ -39,6 +39,7 @@ class PosSchedule(object):
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
+        self.extra_log_notes = {} # keys = posid, values = strs --- special collection of extra log notes that should be stored, outside of the usual move_tables data tracking (e.g. for empty or motionless positioner special cases)
         self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
         self._all_requested_posids = {'regular': set(), 'expert': set()}  # every posid that received a request, whether accepted or not
 
@@ -255,6 +256,7 @@ class PosSchedule(object):
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
+        all_accepted = set()
         for kind in ['regular', 'expert']:
             received = self._all_requested_posids[kind]
             accepted = self.regular_requests_accepted if kind == 'regular' else self.get_posids_with_expert_tables()
@@ -266,6 +268,7 @@ class PosSchedule(object):
                 self.printfunc(f'{prefix} rejected = {len(rejected)}')
                 if rejected:
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
+            all_accepted |= accepted
         scheduling_timer_start = time.perf_counter()
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
@@ -305,12 +308,15 @@ class PosSchedule(object):
                 colliding_sweeps, collision_pairs = c, p # for readability
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
-        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
+            if posid in all_accepted:
+                req = self._requests[posid]
+                note = pc.join_notes(req['log_note'], req['target_str']) # because the move tables for these are about to be deleted
+                self.extra_log_notes[posid] = note
             del self.move_tables[posid]
         if self.petal.animator_on:
             anim_tables = {posid: table.copy() for posid, table in self.move_tables.items()}
@@ -919,7 +925,7 @@ class PosSchedule(object):
         and pushing it into the tables. (This is for logging purposes.)
         """
         stats_enabled = self.stats.is_enabled()
-        for posid,table in self.move_tables.items():
+        for posid, table in self.move_tables.items():
             if stats_enabled:
                 # for_hardware time is the true time to execute the move, including automatic antibacklash and creep moves (unknown to posschedule)
                 self.__max_net_time = max(table.for_hardware()['total_time'], self.__max_net_time)

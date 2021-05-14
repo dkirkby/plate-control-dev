@@ -2219,6 +2219,8 @@ class Petal(object):
                 self.altered_states.add(m.posmodel.state)
             else:
                 self.pos_flags[m.posid] |= self.flags.get('REJECTED', self.missing_flag)
+        for posid, note in self.schedule.extra_log_notes.items():
+            self.set_posfid_val(posid, 'LOG_NOTE', note)
         self.commit(mode='both')  # commit() determines whether anything actually needs pushing to db
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
