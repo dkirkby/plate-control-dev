@@ -399,9 +399,11 @@ class PosSchedule(object):
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
-        posids = set(self._requests) & set(self.move_tables)
+        user_requested = set(self.get_requests(include_dummies=False))
+        has_table = set(self.move_tables)
+        frozen |= user_requested - has_table
         err = {}
-        for posid in posids:
+        for posid in has_table:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
@@ -949,9 +951,20 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
-            if freeze_collisions:
-                self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
+            resolved_by_freeze = self.stats.get_collisions_resolved_by(method='freeze')
+            if resolved_by_freeze:
+                self.printfunc(f'{len(resolved_by_freeze)} collision(s) prevented by "freeze" method: {resolved_by_freeze}')
+                
+            # Patch for occasional corner corner case where two neighbor positioners both must freeze,
+            # but during path adjustment, only one of them got the avoidance event registered.
+            frozen = self.get_frozen_posids()
+            for posid in frozen:
+                avoidances = self.stats.get_avoidances(posid)
+                if 'freeze' not in str(avoidances):
+                    resolved_this_posid_by_freeze = {collision for collision in resolved_by_freeze if posid in collision}
+                    for collision_pair_id in resolved_this_posid_by_freeze:
+                        self.stats.add_avoidance(posid, 'freeze', collision_pair_id)
+            
         self.printfunc(f'Num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
