@@ -39,6 +39,7 @@ class PosSchedule(object):
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
+        self.extra_log_notes = {} # keys = posid, values = strs --- special collection of extra log notes that should be stored, outside of the usual move_tables data tracking (e.g. for empty or motionless positioner special cases)
         self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
         self._all_requested_posids = {'regular': set(), 'expert': set()}  # every posid that received a request, whether accepted or not
 
@@ -139,15 +140,32 @@ class PosSchedule(object):
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
             return self._denied_str(cmd_target_str, 'Bad uv_type')
+
+        # handle locked axes
+        # 2021-04-29 [JHS] There may be more sophisiticated things one could do with the coord transformations,
+        # to optimize closeness of single-DOF approach to requested target. Here I am currently opting for the
+        # simplest approach: zero the target rotation angle for the locked axis.
+        lock_msg = ''
+        locks = posmodel.axis_locks
+        if any(locks) and not all(locks): # all case is handled below in validations section
+            locked_axis = 0 if locks[0] else 1
+            locked_angle = start_posintTP[locked_axis]
+            orig_targt_posintTP_str = self._make_coord_str('posintTP', targt_posintTP, prefix='user')
+            lock_msg = pc.join_notes(orig_targt_posintTP_str, f'posint{"T" if locked_axis == 0 else "P"} locked at {locked_angle:.3f}')
+            targt_posintTP_mutable = list(targt_posintTP)
+            targt_posintTP_mutable[locked_axis] = start_posintTP[locked_axis]
+            targt_posintTP = tuple(targt_posintTP_mutable)
         
         # other standard coordinates for validations and logging
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         targt_ptlXYZ = trans.poslocTP_to_ptlXYZ(targt_poslocTP)
         target_str_posintTP = self._make_coord_str('posintTP', targt_posintTP, prefix='req')
         target_str_ptlXYZ = self._make_coord_str('ptlXYZ', targt_ptlXYZ, prefix='req')
-        target_str = pc.join_notes(target_str_posintTP, target_str_ptlXYZ)
+        target_str = pc.join_notes(lock_msg, target_str_posintTP, target_str_ptlXYZ)
         
         # validations
+        if self._deny_request_because_both_locked(posmodel):
+            return self._denied_str(target_str, BOTH_AXES_LOCKED_MSG)
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.flags.get('UNREACHABLE', self.petal.missing_flag)
             target_str = target_str.replace('req', 'nearest')
@@ -238,6 +256,7 @@ class PosSchedule(object):
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
+        all_accepted = set()
         for kind in ['regular', 'expert']:
             received = self._all_requested_posids[kind]
             accepted = self.regular_requests_accepted if kind == 'regular' else self.get_posids_with_expert_tables()
@@ -249,6 +268,7 @@ class PosSchedule(object):
                 self.printfunc(f'{prefix} rejected = {len(rejected)}')
                 if rejected:
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
+            all_accepted |= accepted
         scheduling_timer_start = time.perf_counter()
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
@@ -288,12 +308,15 @@ class PosSchedule(object):
                 colliding_sweeps, collision_pairs = c, p # for readability
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
-        
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
+            if posid in all_accepted:
+                req = self._requests[posid]
+                note = pc.join_notes(req['log_note'], req['target_str']) # because the move tables for these are about to be deleted
+                self.extra_log_notes[posid] = note
             del self.move_tables[posid]
         if self.petal.animator_on:
             anim_tables = {posid: table.copy() for posid, table in self.move_tables.items()}
@@ -328,11 +351,14 @@ class PosSchedule(object):
         if stats_enabled:
             timer_start = time.perf_counter()
         self._all_requested_posids['expert'].add(move_table.posid)
-        if self._deny_request_because_disabled(move_table.posmodel):
+        disabled = self._deny_request_because_disabled(move_table.posmodel)
+        both_locked = self._deny_request_because_both_locked(move_table.posmodel)
+        if disabled or both_locked:
             sched_table = move_table.for_schedule()
             net_dtdp = [sched_table[key][-1] for key in ['net_dT', 'net_dP']]
             target_str = self._make_coord_str('expert_net_dtdp', net_dtdp, prefix='')
-            return self._denied_str(target_str, POS_DISABLED_MSG)
+            msg = POS_DISABLED_MSG if disabled else BOTH_AXES_LOCKED_MSG
+            return self._denied_str(target_str, msg)
         self.stages['expert'].add_table(move_table)
         self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
@@ -373,9 +399,11 @@ class PosSchedule(object):
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
-        posids = set(self._requests) & set(self.move_tables)
+        user_requested = set(self.get_requests(include_dummies=False))
+        has_table = set(self.move_tables)
+        frozen |= user_requested - has_table
         err = {}
-        for posid in posids:
+        for posid in has_table:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
@@ -481,7 +509,7 @@ class PosSchedule(object):
         should_freeze = not(not(anticollision))
         if should_freeze:
             if anticollision != 'freeze':
-                self.printfunc('anticollision method {anticollision} overriden with \'freeze\', due to presence of expert move tables')
+                self.printfunc(f'anticollision method \'{anticollision}\' overriden with \'freeze\', due to presence of expert move tables')
             if self.stats.is_enabled():
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')
@@ -722,14 +750,19 @@ class PosSchedule(object):
             self._requests[posid] = new_request
 
     def _deny_request_because_disabled(self, posmodel):
-        """This is a special function specifically because there is a bit of care we need to
-        consistently take with regard to post-move cleanup, if a request is going to be denied.
+        """Checks enabled status and includes setting flag.
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             self.petal.pos_flags[posmodel.posid] |= self.petal.flags.get('NOTCTLENABLED', self.petal.missing_flag)
             return True
         return False
+    
+    def _deny_request_because_both_locked(self, posmodel):
+        '''Checks for case where both axes are locked.
+        '''
+        both_locked = all(posmodel.axis_locks)
+        return both_locked
     
     def _check_init_or_final_neighbor_interference(self, posmodel, final_poslocTP=None):
         """Checks for interference of posmodel with any neighbor positioner or fixed
@@ -894,7 +927,7 @@ class PosSchedule(object):
         and pushing it into the tables. (This is for logging purposes.)
         """
         stats_enabled = self.stats.is_enabled()
-        for posid,table in self.move_tables.items():
+        for posid, table in self.move_tables.items():
             if stats_enabled:
                 # for_hardware time is the true time to execute the move, including automatic antibacklash and creep moves (unknown to posschedule)
                 self.__max_net_time = max(table.for_hardware()['total_time'], self.__max_net_time)
@@ -918,9 +951,20 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
-            freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
-            if freeze_collisions:
-                self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
+            resolved_by_freeze = self.stats.get_collisions_resolved_by(method='freeze')
+            if resolved_by_freeze:
+                self.printfunc(f'{len(resolved_by_freeze)} collision(s) prevented by "freeze" method: {resolved_by_freeze}')
+                
+            # Patch for occasional corner corner case where two neighbor positioners both must freeze,
+            # but during path adjustment, only one of them got the avoidance event registered.
+            frozen = self.get_frozen_posids()
+            for posid in frozen:
+                avoidances = self.stats.get_avoidances(posid)
+                if 'freeze' not in str(avoidances):
+                    resolved_this_posid_by_freeze = {collision for collision in resolved_by_freeze if posid in collision}
+                    for collision_pair_id in resolved_this_posid_by_freeze:
+                        self.stats.add_avoidance(posid, 'freeze', collision_pair_id)
+            
         self.printfunc(f'Num move tables in final schedule = {len(self.move_tables)}')
         if self.verbose:
             self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
@@ -1004,3 +1048,4 @@ class PosSchedule(object):
         return s
 
 POS_DISABLED_MSG = 'Positioner is disabled.'
+BOTH_AXES_LOCKED_MSG = 'Both theta and phi axes are locked.'
