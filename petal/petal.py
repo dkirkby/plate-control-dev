@@ -95,7 +95,7 @@ class Petal(object):
                  printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled'):
+                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled', n_strikes=2):
         
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
@@ -234,6 +234,13 @@ class Petal(object):
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags(initialize=True, enabled_only=False)
         self._apply_all_state_enable_settings()
+
+        # '2-strike' rule for comm errors
+        self.n_strikes = 2 #should be able to operate at different values, but not changed on the fly
+        self.strikes = {}
+        for i in range(self.n_strikes, 0, -1):
+            self.strikes[f'strike_{i}'] = set()
+
 
 
     def is_pc_connected(self):
@@ -2355,9 +2362,14 @@ class Petal(object):
         future send_move_tables attempts.
         """
         disabled = set()
+        for i in range(self.n_strikes):
+            if i == 0:
+                self.strikes[f'strike_{i+1}'] |= posids
+            else:
+                self.strikes[f'strike_{i+1}'] |= (self.strikes[f'strike_{i}'] & posids)
         for posid in posids:
             self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
-            if auto_disabling_on and self.posmodels[posid].is_enabled:
+            if auto_disabling_on and self.posmodels[posid].is_enabled and (posid in self.strikes[f'strike_{self.n_strikes}']):
                 accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
                 if accepted:
                     disabled.add(posid)
@@ -2452,10 +2464,14 @@ class Petal(object):
                     self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
+                mask = self.reset_mask
                 # Unsets flags in reset_mask
                 if posfidid not in self.posids.union(self.fidids): 
                     continue
-                self.pos_flags[posfidid] = (self.pos_flags[posfidid] | self.reset_mask) ^ self.reset_mask
+                if posfidid not in self.strikes[f'strike_{self.n_strikes}']:
+                    # reset comm error bit as well unless it has failed all strikes.
+                    mask |= self.flags.get('COMERROR', self.missing_flag)
+                self.pos_flags[posfidid] = (self.pos_flags[posfidid] | mask) ^ mask
         return
 
     def _apply_state_enable_settings(self, devid):

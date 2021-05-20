@@ -47,17 +47,6 @@ err = None #no exception
 
 ### Initial setup for proc: enable positioners then turn onf illumination and fiducials ###
 ### Exit script if any fails, do not continue ###
-logger.info('FP_SETUP: enabling positioners...')
-ret = cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
-logger.info(f'FP_SETUP: enable_positioners returned: {ret}')
-if not(ret == 'SUCCESS' or ret is None):
-    logger.error('FP_SETUP: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
-    ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
-    logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
-    import sys; sys.exit(1)
-
-# Re-setup petal/posids in pecs to reflect newly enabled positioners
-cs.ptl_setup(cs.pcids)
 
 logger.info('FP_SETUP: turning on back illumination...')
 try:
@@ -84,6 +73,19 @@ except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: caching keepouts failed with exception: {e}')
     logger.error('FP_SETUP: could not cache keepouts! Please investigate before continuing!')
     import sys; sys.exit(1)
+
+# Do enable last since we want to re-disable if we fail
+logger.info('FP_SETUP: enabling positioners...')
+ret = cs.ptlm.enable_positioners(ids='all', comment='FP setup script initial enable')
+logger.info(f'FP_SETUP: enable_positioners returned: {ret}')
+if not(ret == 'SUCCESS' or ret is None):
+    logger.error('FP_SETUP: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
+    ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
+    logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
+    import sys; sys.exit(1)
+
+# Re-setup petal/posids in pecs to reflect newly enabled positioners
+cs.ptl_setup(cs.pcids)
 
 ### Here's the bulk of the setup: 1p, disambiguate, 1p ###
 try:
