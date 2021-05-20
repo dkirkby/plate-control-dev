@@ -7,6 +7,7 @@ import traceback
 import os
 import posconstants as pc
 from pecs import PECS
+import DOSlib.flags as flags 
 
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 
@@ -130,7 +131,8 @@ try:
             for petal_id, table_str in details.items():
                 details_str += f'\n{petal_id}\n{table_str}\n'
         logger.warning(f'{len(ambig)} positioners remain *unresolved* and will be disabled. Details:\n{details_str}')
-        ret = cs.ptlm.disable_positioners(ids=ambig, comment='FP setup - disabling positioners that remain in ambiguous theta range.')
+        ret = cs.ptlm.disable_positioners(ids=ambig, comment='FP setup - disabling positioners that remain in ambiguous theta range.',
+                                          set_flag=flags.POSITIONER_FLAGS_MASKS['BADPERFORMANCE'])
         logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
     else:
         logger.info('FP_SETUP: All selected ambiguous cases were resolved!')

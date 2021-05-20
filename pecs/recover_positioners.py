@@ -99,7 +99,7 @@ try:
             logger.warning(f'{name}: update deatils: \n{selection}')
     disabled_during_1p = enabled_before_1p - enabled_after_1p
     logger.info(f'{name}: {len(disabled_during_1p)} disabled during initial 1p calib. Posids {disabled_during_1p}')
-
+    final_enabled = get_pos_set('enabled')
 except (Exception, KeyboardInterrupt) as e:
     err = e
     logger.error(f'{name} crashed! See traceback below:')
