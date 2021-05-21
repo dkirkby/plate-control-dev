@@ -313,7 +313,8 @@ class PosSchedule(object):
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
-            if posid in all_accepted:
+            # Ignore expert tables because they don't have requests
+            if posid in (all_accepted-self.get_posids_with_expert_tables()):
                 req = self._requests[posid]
                 note = pc.join_notes(req['log_note'], req['target_str']) # because the move tables for these are about to be deleted
                 self.extra_log_notes[posid] = note
