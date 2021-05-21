@@ -402,9 +402,11 @@ class PosSchedule(object):
         frozen = set()
         user_requested = set(self.get_requests(include_dummies=False))
         has_table = set(self.move_tables)
+        has_request = set(self._requests.keys())
+        check = has_table & has_request # ignores expert tables
         frozen |= user_requested - has_table
         err = {}
-        for posid in has_table:
+        for posid in check:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
