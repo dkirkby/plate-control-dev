@@ -71,11 +71,12 @@ except (Exception, KeyboardInterrupt) as e:
 logger.info(f'{name}: enabling positioners...')
 ret = cs.ptlm.careful_enable_positioners('all', 'COMM', comment=f'{name}: script initial enable')
 logger.info(f'{name}: careful_enable_positioners returned: {ret}')
-if not(ret == 'SUCCESS' or ret is None):
-    logger.error(f'{name}: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
-    ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment=f'{name}: crashed in execution, resetting disabled devices')
-    logger.info(f'{name}: disable_positioners returned: {ret}')
-    import sys; sys.exit(1)
+for i in ret.values():
+    if not(isinstance(i, set)):
+        logger.error(f'{name}: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
+        ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment=f'{name}: crashed in execution, resetting disabled devices')
+        logger.info(f'{name}: disable_positioners returned: {ret}')
+        import sys; sys.exit(1)
 
 # Re-setup petal/posids in pecs to reflect newly enabled positioners
 cs.ptl_setup(cs.pcids)
