@@ -2362,11 +2362,12 @@ class Petal(object):
         future send_move_tables attempts.
         """
         disabled = set()
-        for i in range(self.n_strikes):
-            if i == 0:
-                self.strikes[f'strike_{i+1}'] |= posids
+        # Iterate backwards to update later strikes first
+        for i in range(self.n_strikes, 0, -1):
+            if i == 1:
+                self.strikes[f'strike_{i}'] |= posids
             else:
-                self.strikes[f'strike_{i+1}'] |= (self.strikes[f'strike_{i}'] & posids)
+                self.strikes[f'strike_{i}'] |= (self.strikes[f'strike_{i-1}'] & posids)
         for posid in posids:
             self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
             if auto_disabling_on and self.posmodels[posid].is_enabled and (posid in self.strikes[f'strike_{self.n_strikes}']):

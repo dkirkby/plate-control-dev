@@ -140,9 +140,10 @@ axis_labels = ('theta', 'phi')
 printfunc = print
 
 # handle_fvc_feedback defaults
-err_thresh = False # tracing error over which to disable, False means none
+err_thresh = 0.5 # tracking error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
 up_frac = 1.0 # amount of update to apply to posTP
+err_disable = False # automatically disable positioners above error threshhold
 unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
 
 # some numeric tolerances for scheduling moves

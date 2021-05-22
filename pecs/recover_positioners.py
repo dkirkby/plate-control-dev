@@ -19,7 +19,7 @@ logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
 logger_fh.setLevel(logging.DEBUG)
 logger_sh.setLevel(logging.INFO)
 logger.info(f'{name}: script is starting. The logging is rather verbose, but please try to follow along. A summary of important notes are provided at the end.')
-simple_logger.input2(f'Alert: you are about to run the focalplane setup script to recover positioners or prepare the focalplane. This takes *up to half an hour* to execute. Hit enter to continue. ')
+simple_logger.input2(f'Alert: you are about to run the recover_positioners script to enable positioners disabled by communication issues. This takes about 2 minutes to execute. Hit enter to continue. ')
 
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 
