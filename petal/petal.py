@@ -2374,6 +2374,8 @@ class Petal(object):
                 accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
                 if accepted:
                     disabled.add(posid)
+            elif self.posmodels[posid].is_enabled:
+                self.set_posfid_val(posid, 'LOG_NOTE', 'move canceled due to communication error.')
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
 
