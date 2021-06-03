@@ -37,7 +37,9 @@ code_version = petal_directory.split(os.path.sep)[-2]
 
 # Directory locations
 dirs = {}
-if 'DESI_HOME' in os.environ:
+if 'FOCALPLANE_HOME' in os.environ:
+    home = os.environ.get('FOCALPLANE_HOME')
+elif 'DESI_HOME' in os.environ:
     home = os.environ.get('DESI_HOME')
 elif 'HOME' in os.environ:
     home = os.environ.get('HOME')
