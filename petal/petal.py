@@ -95,7 +95,7 @@ class Petal(object):
                  printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
-                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled'):
+                 phi_limit_on=True, sync_mode='hard', anneal_mode='filled', n_strikes=2):
         
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
@@ -234,6 +234,13 @@ class Petal(object):
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags(initialize=True, enabled_only=False)
         self._apply_all_state_enable_settings()
+
+        # '2-strike' rule for comm errors
+        self.n_strikes = 2 #should be able to operate at different values, but not changed on the fly
+        self.strikes = {}
+        for i in range(self.n_strikes, 0, -1):
+            self.strikes[f'strike_{i}'] = set()
+
 
 
     def is_pc_connected(self):
@@ -2355,12 +2362,20 @@ class Petal(object):
         future send_move_tables attempts.
         """
         disabled = set()
+        # Iterate backwards to update later strikes first
+        for i in range(self.n_strikes, 0, -1):
+            if i == 1:
+                self.strikes[f'strike_{i}'] |= posids
+            else:
+                self.strikes[f'strike_{i}'] |= (self.strikes[f'strike_{i-1}'] & posids)
         for posid in posids:
             self.pos_flags[posid] |= self.flags.get('COMERROR', self.missing_flag)
-            if auto_disabling_on and self.posmodels[posid].is_enabled:
+            if auto_disabling_on and self.posmodels[posid].is_enabled and (posid in self.strikes[f'strike_{self.n_strikes}']):
                 accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to communication error')
                 if accepted:
                     disabled.add(posid)
+            elif self.posmodels[posid].is_enabled:
+                self.set_posfid_val(posid, 'LOG_NOTE', 'move canceled due to communication error.')
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
 
@@ -2452,10 +2467,14 @@ class Petal(object):
                     self.pos_flags[etc] |= self.flags.get('ETC', self.missing_flag)
         else:
             for posfidid in ids:
+                mask = self.reset_mask
                 # Unsets flags in reset_mask
                 if posfidid not in self.posids.union(self.fidids): 
                     continue
-                self.pos_flags[posfidid] = (self.pos_flags[posfidid] | self.reset_mask) ^ self.reset_mask
+                if posfidid not in self.strikes[f'strike_{self.n_strikes}']:
+                    # reset comm error bit as well unless it has failed all strikes.
+                    mask |= self.flags.get('COMERROR', self.missing_flag)
+                self.pos_flags[posfidid] = (self.pos_flags[posfidid] | mask) ^ mask
         return
 
     def _apply_state_enable_settings(self, devid):
@@ -2640,6 +2659,31 @@ class Petal(object):
         '''Returns a dict stating the current annealing parameters.
         '''
         return {self.anneal_mode: pc.anneal_density[self.anneal_mode]}
+    
+    def get_clear_phi(self):
+        '''Returns a list of posids on this petal for which the phi axes currently
+        have clear paths for full extension. In other words, any combination of positioners
+        in this set can be freely extended in phi, without risk of collision, so long as all
+        theta values---throughout the petal---remain constant during that move.
+        '''
+        tables = {}
+        for posid in self.posids:
+            # model = self.posmodels[posid]
+            # current_posintTP = model.expected_current_posintTP
+            # T = current_posintTP[0]
+            # rangeP = model.targetable_range_posintP
+            # P0 = max(rangeP)
+            # P1 = min(rangeP)
+            # table = posmovetable.PosMoveTable(this_posmodel=posmodel, init_posintTP=[T, P0])
+
+            # tables[posid] = 
+            # # maybe this is the wrong method, and really need to assert geometry truths...
+            # # because it ignores timing issues, dependent on annealing specifics. gets complex
+            # #
+            # # maybe i just want a phi path polygon, tailored per pos, that can be rotated with theta and checked for collisions
+            # # so could do the atomic work in poscollider, wrap up the function to check a pos-pos or pos-fix in there
+            # # here, just organize the unique checks between various neighbor combos, and dumping results in one dict
+
     
 if __name__ == '__main__':
     '''

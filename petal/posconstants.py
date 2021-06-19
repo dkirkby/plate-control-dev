@@ -37,7 +37,9 @@ code_version = petal_directory.split(os.path.sep)[-2]
 
 # Directory locations
 dirs = {}
-if 'DESI_HOME' in os.environ:
+if 'FOCALPLANE_HOME' in os.environ:
+    home = os.environ.get('FOCALPLANE_HOME')
+elif 'DESI_HOME' in os.environ:
     home = os.environ.get('DESI_HOME')
 elif 'HOME' in os.environ:
     home = os.environ.get('HOME')
@@ -140,9 +142,10 @@ axis_labels = ('theta', 'phi')
 printfunc = print
 
 # handle_fvc_feedback defaults
-err_thresh = False # tracing error over which to disable, False means none
+err_thresh = 0.5 # tracking error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
 up_frac = 1.0 # amount of update to apply to posTP
+err_disable = False # automatically disable positioners above error threshhold
 unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
 
 # some numeric tolerances for scheduling moves
@@ -187,7 +190,7 @@ phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / _min_leng
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Hardware (operations) States
-PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                  'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                                  'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
                                                  'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
@@ -198,7 +201,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                                  #PetalBox Power ON - controlled by physical raritan switch
                                                  'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                                  'PS2_EN':('off', 1.0)}),
-                    'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'STANDBY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                              'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
                                              'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                              'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
@@ -209,7 +212,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                              #PetalBox Power ON - controlled by physical raritan switch
                                              'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                              'PS2_EN':('off', 1.0)}),
-                    'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'READY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                            'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                            'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                            'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
@@ -220,7 +223,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                            #PetalBox Power ON - controlled by physical raritan switch
                                            'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
                                            'PS2_EN': ('off', 1.0)}),
-                    'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'OBSERVING' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                                'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                                'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now

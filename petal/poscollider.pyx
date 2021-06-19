@@ -52,6 +52,7 @@ class PosCollider(object):
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
+        self.keepouts_arcP = {} # key: posid, value: phi arm keepout swept through its full range, of type PosPoly
         self.classified_as_retracted = set() # posids of robots classified as retracted. overrides polygonal keepout calcs
 
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
@@ -288,12 +289,13 @@ class PosCollider(object):
             else:
                 return pc.case.I
 
-    def spatial_collision_with_fixed(self, posid, poslocTP):
+    def spatial_collision_with_fixed(self, posid, poslocTP, use_phi_arc=False):
         """Searches for collisions in space between a fiber positioner and all
         fixed keepout envelopes.
 
-            posid    ...  positioner to check
-            poslocTP    ...  (theta,phi) position of the axes of the positioner
+            posid ... positioner to check
+            poslocTP ... (theta,phi) position of the axes of the positioner
+            use_phi_arc ... boolean, uses phi full-range arc instead of typical arm keepout
 
         poslocTP is in the (poslocT,poslocP) coordinate system, as defined in
         PosTransforms.
@@ -304,12 +306,58 @@ class PosCollider(object):
         cdef PosPoly poly1
         cdef PosPoly poly2
         if self.fixed_neighbor_cases[posid]:
-            poly1 = self.place_phi_arm(posid,poslocTP)
+            if use_phi_arc:
+                poly1 = self.place_phi_arc(posid, poslocTP[0])
+            else:
+                poly1 = self.place_phi_arm(posid, poslocTP)
             for fixed_case in self.fixed_neighbor_cases[posid]:
                 poly2 = self.fixed_neighbor_keepouts[fixed_case]
                 if poly1.collides_with(poly2):
                     return fixed_case
         return pc.case.I
+    
+    def phi_range_collision(self, posid_A, poslocT_A, posid_B, poslocTP_B=None):
+        """Special case, function, to search for collisions in space between a
+        positioner and its neighbors for all possible positions of phi. Depending
+        on the arguments, this function can also check the full-range phi against
+        neighbors' full-range phi, or against the fixed boundaries.
+        
+        The intended use case is for identifying when it is safe to move an
+        unpredictable phi arm outside the Eo retracted envelope.
+        
+            posid_A ... positioner with fixed full-range phi arc
+            poslocT_A ... theta position of A
+            posid_B ... neighbor of A, which may be either a posid or 'fixed'
+                        (in which case check against any fixed boundaries)
+            poslocTP_B ... position of B, where:
+                           ... (theta, phi) pair --> use neighbor's normal phi arm keepout
+                           ... scalar value --> treat this scalar as the neighbor's theta, and
+                                                use full-range phi arc for neighbor's phi keepout
+                           ... arg is ignored if posid_B == 'fixed'
+                           
+        The return is an enumeration of type "case", indicating what kind of collision
+        was first detected, if any.
+        """
+        cdef PosPoly poly1
+        cdef PosPoly poly2
+        if posid_B == 'fixed':
+            dummyP = 0.0
+            return self.spatial_collision_with_fixed(posid_A, [poslocT_A, dummyP], use_phi_arc=True)
+        poly1 = self.place_phi_arc(posid_A, poslocT_A)
+        if posid_B in self.classified_as_retracted:
+            return poly1.collides_with_circle(self.x0[posid_B], self.y0[posid_B], self.Eo_radius_with_margin)
+        use_neighbor_arc = not isinstance(poslocTP_B, (list, tuple))
+        neighbor_place_phi = self.place_phi_arc if use_neighbor_arc else self.place_phi_arm
+        poly2 = neighbor_place_phi(posid_B, poslocTP_B)
+        if poly1.collides_with(poly2):
+            return pc.case.II
+        poslocT_B = poslocTP_B if use_neighbor_arc else poslocTP_B[0]
+        poly2 = self.place_central_body(posid_B, poslocT_B)
+        if poly1.collides_with(poly2):
+            return pc.case.III
+        # implementation not yet complete
+        
+        
 
     def place_phi_arm(self, posid, poslocTP):
         """Rotates and translates the phi arm to position defined by the positioner's
@@ -320,6 +368,21 @@ class PosCollider(object):
                                                        x0=self.x0[posid],
                                                        y0=self.y0[posid],
                                                        r1=self.R1[posid])
+
+    def place_phi_arc(self, posid, poslocT):
+        """Rotates and translates the full-range phi arc to position defined by the
+        positioner's (x0,y0) and the argued poslocT (theta) angle.
+        
+        This function is like place_phi_arm(), but rather than the typical phi arm
+        keepout, it uses a larger swept-arc polygon. That polygon represents the
+        total area the phi arm can possibly inhabit, in its full range of motion,
+        when theta is held constant at the argued value. 
+        """
+        return self.keepouts_arcP[posid].place_as_phi_arm(theta=poslocT,
+                                                          phi=0,
+                                                          x0=self.x0[posid],
+                                                          y0=self.y0[posid],
+                                                          r1=self.R1[posid])
 
     def place_central_body(self, posid, poslocT):
         """Rotates and translates the central body of positioner
@@ -814,7 +877,8 @@ cdef class PosPoly:
     cpdef PosPoly expanded_radially(self, dR):
         """Returns a copy of the polygon object, with points expanded radially by distance dR.
         The linear expansion is made along lines from the polygon's [0,0] center.
-        A value dR < 0 is allowed, causing contraction of the polygon."""
+        A value dR < 0 is allowed, causing contraction of the polygon.
+        """
         cdef PosPoly new = self.copy()
         cdef unsigned int i
         cdef double delta_r = dR
@@ -830,7 +894,8 @@ cdef class PosPoly:
         Points leftward of the line x=0 are shifted further left by an amount left_shift > 0.
         Points rightward of the line x=0 are shifted further right by an amount right_shift > 0.
         Points upon the line x=0 are not shifted.
-        Negative values for left_dx and right_dx are allowed. They contract the polygon rightward and leftward, respectively."""
+        Negative values for left_dx and right_dx are allowed. They contract the polygon rightward and leftward, respectively.
+        """
         cdef PosPoly new = self.copy()
         cdef unsigned int i
         cdef double L = left_shift
@@ -846,7 +911,8 @@ cdef class PosPoly:
         """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
         The rotational expansion is made about the polygon's [0,0] center.
         Expansion is made in both the clockwise and counter-clockwise directions from the line y=0.
-        A value dA < 0 is allowed, causing contraction of the polygon."""
+        A value dA < 0 is allowed, causing contraction of the polygon.
+        """
         cdef PosPoly new = self.copy()
         cdef unsigned int i
         cdef double delta_angle = dA
