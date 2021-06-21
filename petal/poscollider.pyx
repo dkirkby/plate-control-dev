@@ -535,6 +535,8 @@ class PosCollider(object):
 
     def _load_keepouts_arcP(self):
         '''Generate latest full-range phi arc keepouts.'''
+        # [JHS, 2021-06-20] Incorrect implementation below. Need more polygon points,
+        # defining the arc. Probably default to 25 such points.
         dummy_T = 0
         for posid, posmodel in self.posmodels.items():
             translated_keepoutP = self.keepouts_P[posid].translated(self.R1[posid], 0)
