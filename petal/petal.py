@@ -2075,17 +2075,17 @@ class Petal(object):
             c = self.collider
             for posid in sorted(posids):
                 poslocT = self.posmodels[posid].expected_current_poslocTP[0]
-                fixed_collision = c.phi_range_collision(posid, poslocT, posid_B='fixed', poslocTP_B=None)
-                if fixed_collision != pc.case.I:
-                    overlaps[posid].add(pc.case.fixed_case_names[fixed_collision])
+                case = c.phi_range_collision(posid, poslocT, posid_B='fixed', poslocTP_B=None)
+                if case != pc.case.I:
+                    overlaps[posid].add(pc.case.fixed_case_names[case])
                 neighbors = c.pos_neighbors[posid]
                 for n in neighbors:
-                    # check phi
-                    phi_range_collision(posid_A, poslocT_A, posid_B, poslocTP_B=None)
-                    
-                    # check theta
-                    phi_range_collision(posid_A, poslocT_A, posid_B, poslocTP_B=None)
-
+                    use_neighbor_arc = n in posids
+                    n_poslocTP = self.posmodels[n].expected_current_poslocTP
+                    n_posloc = n_poslocTP[0] if use_neighbor_arc else n_poslocPT
+                    case = c.phi_range_collision(posid, poslocT, n, n_posloc)
+                    if case != pc.case.I:
+                        overlaps[posid].add(n) 
             overlaps = {p:s for p, s in overlaps.items() if s}
         if as_dict:
             return overlaps
