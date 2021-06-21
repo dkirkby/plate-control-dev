@@ -317,10 +317,10 @@ class PosCollider(object):
         return pc.case.I
     
     def phi_range_collision(self, posid_A, poslocT_A, posid_B, poslocTP_B=None):
-        """Special case, function, to search for collisions in space between a
-        positioner and its neighbors for all possible positions of phi. Depending
-        on the arguments, this function can also check the full-range phi against
-        neighbors' full-range phi, or against the fixed boundaries.
+        """Special function to search for collisions in space between a positioner
+        and its neighbors for all possible positions of phi. Depending on the arguments,
+        this function can also check the full-range phi against neighbors' full-range
+        phi, or against fixed boundaries.
         
         The intended use case is for identifying when it is safe to move an
         unpredictable phi arm outside the Eo retracted envelope.
@@ -345,7 +345,8 @@ class PosCollider(object):
             return self.spatial_collision_with_fixed(posid_A, [poslocT_A, dummyP], use_phi_arc=True)
         poly1 = self.place_phi_arc(posid_A, poslocT_A)
         if posid_B in self.classified_as_retracted:
-            return poly1.collides_with_circle(self.x0[posid_B], self.y0[posid_B], self.Eo_radius_with_margin)
+            if poly1.collides_with_circle(self.x0[posid_B], self.y0[posid_B], self.Eo_radius_with_margin):
+                return pc.case.IV
         use_neighbor_arc = not isinstance(poslocTP_B, (list, tuple))
         neighbor_place_phi = self.place_phi_arc if use_neighbor_arc else self.place_phi_arm
         poly2 = neighbor_place_phi(posid_B, poslocTP_B)
@@ -355,9 +356,7 @@ class PosCollider(object):
         poly2 = self.place_central_body(posid_B, poslocT_B)
         if poly1.collides_with(poly2):
             return pc.case.III
-        # implementation not yet complete
-        
-        
+        return pc.case.I
 
     def place_phi_arm(self, posid, poslocTP):
         """Rotates and translates the phi arm to position defined by the positioner's
@@ -378,11 +377,7 @@ class PosCollider(object):
         total area the phi arm can possibly inhabit, in its full range of motion,
         when theta is held constant at the argued value. 
         """
-        return self.keepouts_arcP[posid].place_as_phi_arm(theta=poslocT,
-                                                          phi=0,
-                                                          x0=self.x0[posid],
-                                                          y0=self.y0[posid],
-                                                          r1=self.R1[posid])
+        return self.keepouts_arcP[posid].rotated(poslocT).translated(self.x0[posid], self.y0[posid])
 
     def place_central_body(self, posid, poslocT):
         """Rotates and translates the central body of positioner
@@ -457,6 +452,7 @@ class PosCollider(object):
         self._load_keepouts()
         self._adjust_keepouts()
         self._load_circle_envelopes()
+        self._load_keepouts_arcP()
 
     def _load_positioner_params(self, verbose=True):
         """Read latest versions of all positioner parameters."""
@@ -536,6 +532,19 @@ class PosCollider(object):
             self.line_t0_polys[posid] = self.line_t0_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
+
+    def _load_keepouts_arcP(self):
+        '''Generate latest full-range phi arc keepouts.'''
+        dummy_T = 0
+        for posid, posmodel in self.posmodels.items():
+            translated_keepoutP = self.keepouts_P[posid].translated(self.R1[posid], 0)
+            range_posintP = posmodel.full_range_posintP
+            half_range_magnitude = (max(range_posintP) - min(range_posintP))/2
+            offset_arcP = translated_keepoutP.expanded_angularly(half_range_magnitude)
+            center_posintP = sum(range_posintP)/2
+            center_poslocP = posmodel.trans.posintTP_to_poslocTP([dummy_T, center_posintP])[1]
+            arcP = offset_arcP.rotated(center_poslocP)
+            self.keepouts_arcP[posid] = arcP
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
