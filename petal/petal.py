@@ -1939,7 +1939,7 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
     
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', phi_range='normal'):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', arcP=False):
         '''Graphical view of the current expected positions of one or many positioners.
         
         INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
@@ -1947,7 +1947,7 @@ class Petal(object):
                  path ... string, directory where to save the plot file to disk (defaults to dir defined in posconstants)
                  viewer ... string, the program with which to immediately view the file (see comments below)
                  fmt ... string, image file format like png, jpg, pdf, etc (default 'png')
-                 phi_range ... string, 'normal' for the usual phi keepout of 'full' for the full-range arc
+                 arcP ... boolean, argue True to use full-range phi arcs
                  
                  Regarding the image viewer, None or '' will suppress immediate display.
                  When running in Windows or Mac, defaults to whatever image viewer programs they have set as default.
@@ -2000,11 +2000,15 @@ class Petal(object):
                      'phi arm': c.place_phi_arm(posid, locTP),
                      'ferrule': c.place_ferrule(posid, locTP),
                      }
+            pos_parts = {'central body'}
+            if arcP:
+                polys['phi arc'] = c.place_phi_arc(posid, locTP[0])
+                pos_parts |= {'phi arc'}
+            else:
+                pos_parts |= {'phi arm', 'ferrule'}            
             styles = {key: pc.plot_styles[key].copy() for key in polys}
-            overlaps = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
-            self.get_clear_phi(p
+            overlaps = self.get_overlaps(posids=posid, as_dict=True, arcP=arcP) 
             enabled = self.posmodels[posid].is_enabled
-            pos_parts = {'central body', 'phi arm', 'ferrule'}
             if self.posmodels[posid].classified_as_retracted:
                 styles['Eo'] = pc.plot_styles['Eo bold'].copy()
                 for key in pos_parts:
@@ -2051,24 +2055,23 @@ class Petal(object):
             os.system(f'{viewer} {path} &')
         return path
     
-    def get_overlaps(self, posids='all', as_dict=False, phi_range=None):
+    def get_overlaps(self, posids='all', as_dict=False, arcP=False):
         '''Returns a string describing all cases where positioners' current expected
         positoner of their polygonal keepout envelope overlaps with their neighbors.
         
-        INPUTS:  posids ... single or collection of positioners to check for overlaps, default is 'all'
+        INPUTS:  posids ... optional single posid or collection of positioners to check for overlaps, defaults to 'all'
                  as_dict ... optional boolean, argue True to eturn a python dict rather than
                              string. Dict will have keys = posids and values = set of overlapping
                              neighbors for that posid
-                 phi_range ... optional string, 'targetable' or 'full', in which case 
+                 arcP ... optional boolean to use full-range phi polygons for the argued posids 
         
         (Hint: also try "quick_plot posids=all" for graphical view.)
         '''
         posids = self._validate_posids_arg(posids, skip_unknowns=True)
-        if not phi_range:
+        if not arcP:
             overlaps = self.schedule.get_overlaps(posids)
         else:
             overlaps = {}
-            assert phi_range in {'targetable', 'full'}, f'get_overlaps(): invalid phi_range arg {phi_range}'
             for posid in sorted(posids):
                 fixed_cases 
                 neighbors = self.collider.pos_neighbors[posid]
