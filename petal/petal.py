@@ -2060,7 +2060,7 @@ class Petal(object):
         positoner of their polygonal keepout envelope overlaps with their neighbors.
         
         INPUTS:  posids ... optional single posid or collection of positioners to check for overlaps, defaults to 'all'
-                 as_dict ... optional boolean, argue True to eturn a python dict rather than
+                 as_dict ... optional boolean, argue True to return a python dict rather than
                              string. Dict will have keys = posids and values = set of overlapping
                              neighbors for that posid
                  arcP ... optional boolean to use full-range phi polygons for the argued posids 
@@ -2684,28 +2684,13 @@ class Petal(object):
     def get_clear_phi(self):
         '''Returns a list of posids on this petal for which the phi axes currently
         have clear paths for full extension. In other words, any combination of positioners
-        in this set can be freely extended in phi, without risk of collision, so long as all
-        theta values---throughout the petal---remain constant during that move.
+        in this list can be freely extended in phi, without risk of collision, so long as all
+        theta values---throughout the petal---remain constant during that move. Also see
+        get_overlaps and quick_plot functions (with their arcP arguments set to True).
         '''
-        tables = {}
-        for posid in self.posids:
-            pass
-            # model = self.posmodels[posid]
-            # current_posintTP = model.expected_current_posintTP
-            # T = current_posintTP[0]
-            # rangeP = model.targetable_range_posintP
-            # P0 = max(rangeP)
-            # P1 = min(rangeP)
-            # table = posmovetable.PosMoveTable(this_posmodel=posmodel, init_posintTP=[T, P0])
-
-            # tables[posid] = 
-            # # maybe this is the wrong method, and really need to assert geometry truths...
-            # # because it ignores timing issues, dependent on annealing specifics. gets complex
-            # #
-            # # maybe i just want a phi path polygon, tailored per pos, that can be rotated with theta and checked for collisions
-            # # so could do the atomic work in poscollider, wrap up the function to check a pos-pos or pos-fix in there
-            # # here, just organize the unique checks between various neighbor combos, and dumping results in one dict
-
+        overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
+        clear = self.posids - set(overlaps)
+        return sorted(clear)
     
 if __name__ == '__main__':
     '''
