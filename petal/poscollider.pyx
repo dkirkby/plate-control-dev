@@ -327,8 +327,8 @@ class PosCollider(object):
         
             posid_A ... positioner with fixed full-range phi arc
             poslocT_A ... theta position of A
-            posid_B ... neighbor of A, which may be either a posid or 'fixed'
-                        (in which case check against any fixed boundaries)
+            posid_B ... neighbor of A, which may be either a posid or the string
+                        'fixed' (in which case check against any fixed boundaries)
             poslocTP_B ... position of B, where:
                            ... (theta, phi) pair --> use neighbor's normal phi arm keepout
                            ... scalar value --> treat this scalar as the neighbor's theta, and
