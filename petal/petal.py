@@ -2688,11 +2688,12 @@ class Petal(object):
         return {self.anneal_mode: pc.anneal_density[self.anneal_mode]}
     
     def get_clear_phi(self):
-        '''Returns a list of posids on this petal for which the phi axes currently
-        have clear paths for full extension. In other words, any combination of positioners
-        in this list can be freely extended in phi, without risk of collision, so long as all
-        theta values---throughout the petal---remain constant during that move. Also see
-        get_overlaps and quick_plot functions (with their arcP arguments set to True).
+        '''Returns list of posids on this petal for which the phi axes currently have
+        clear paths for full extension. In other words, any combination of these positioners
+        can be freely extended in phi, without risk of collision, so long as all theta
+        values---throughout the petal---remain constant during that move.
+                
+        Also see get_overlaps and quick_plot functions (with their arcP arguments set to True).
         '''
         overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
         clear = self.posids - set(overlaps)
