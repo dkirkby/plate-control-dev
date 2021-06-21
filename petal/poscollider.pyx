@@ -53,6 +53,7 @@ class PosCollider(object):
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
         self.keepouts_arcP = {} # key: posid, value: phi arm keepout swept through its full range, of type PosPoly
+        self.keepouts_arcP_resolution = 25 # number of points to add when generating polygonal full-range phi arc
         self.classified_as_retracted = set() # posids of robots classified as retracted. overrides polygonal keepout calcs
 
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
@@ -535,18 +536,29 @@ class PosCollider(object):
 
     def _load_keepouts_arcP(self):
         '''Generate latest full-range phi arc keepouts.'''
-        # [JHS, 2021-06-20] Incorrect implementation below. Need more polygon points,
-        # defining the arc. Probably default to 25 such points.
         dummy_T = 0
+        gpts = self.general_keepout_P.points
+        gpts = [gpts[0][:-1], gpts[1][:-1]] # take off the last polygon closure point
+        idx0 = gpts[1].index(0.0) # specific to the phi polygon definition as of 2021-06-21
+        remaining_idxs = list(range(idx0 + 1, len(gpts[0]))) + list(range(idx0))
         for posid, posmodel in self.posmodels.items():
-            translated_keepoutP = self.keepouts_P[posid].translated(self.R1[posid], 0)
             range_posintP = posmodel.full_range_posintP
-            half_range_magnitude = (max(range_posintP) - min(range_posintP))/2
-            offset_arcP = translated_keepoutP.expanded_angularly(half_range_magnitude)
+            angular_range = max(range_posintP) - min(range_posintP)
+            expanded = self.keepouts_P[posid].expanded_angularly(angular_range/2)
+            pts = expanded.points
+            arc_radius = math.hypot(pts[0][idx0], pts[1][idx0])
+            n = self.keepouts_arcP_resolution
+            dA = angular_range / n
+            arc_angles = [i*dA - angular_range/2 for i in range(n+1)]
+            arc_x = [arc_radius*math.cos(math.radians(a)) for a in arc_angles]
+            arc_y = [arc_radius*math.sin(math.radians(a)) for a in arc_angles]
+            old_x = [pts[0][i] for i in remaining_idxs]
+            old_y = [pts[1][i] for i in remaining_idxs]
+            new = PosPoly([arc_x + old_x, arc_y + old_y])
             center_posintP = sum(range_posintP)/2
             center_poslocP = posmodel.trans.posintTP_to_poslocTP([dummy_T, center_posintP])[1]
-            arcP = offset_arcP.rotated(center_poslocP)
-            self.keepouts_arcP[posid] = arcP
+            rotated = new.rotated(center_poslocP)
+            self.keepouts_arcP[posid] = rotated.translated(self.R1[posid], 0)
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
