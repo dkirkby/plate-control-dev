@@ -2077,12 +2077,12 @@ class Petal(object):
                 poslocT = self.posmodels[posid].expected_current_poslocTP[0]
                 case = c.phi_range_collision(posid, poslocT, posid_B='fixed', poslocTP_B=None)
                 if case != pc.case.I:
-                    overlaps[posid].add(pc.case.fixed_case_names[case])
+                    overlaps[posid].add(pc.case.names[case])
                 neighbors = c.pos_neighbors[posid]
                 for n in neighbors:
                     use_neighbor_arc = n in posids
                     n_poslocTP = self.posmodels[n].expected_current_poslocTP
-                    n_posloc = n_poslocTP[0] if use_neighbor_arc else n_poslocPT
+                    n_posloc = n_poslocTP[0] if use_neighbor_arc else n_poslocTP
                     case = c.phi_range_collision(posid, poslocT, n, n_posloc)
                     if case != pc.case.I:
                         overlaps[posid].add(n) 
