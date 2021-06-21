@@ -1991,6 +1991,7 @@ class Petal(object):
             else:
                 label = None
             plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'], label=label)
+        overlaps = set(self.get_overlaps(posids=posids, as_dict=True, arcP=arcP))
         for posid in posids:
             locTP = self.posmodels[posid].expected_current_poslocTP        
             polys = {'Eo': c.Eo_polys[posid],
@@ -2007,7 +2008,6 @@ class Petal(object):
             else:
                 pos_parts |= {'phi arm', 'ferrule'}            
             styles = {key: pc.plot_styles[key].copy() for key in polys}
-            overlaps = self.get_overlaps(posids=posid, as_dict=True, arcP=arcP) 
             enabled = self.posmodels[posid].is_enabled
             if self.posmodels[posid].classified_as_retracted:
                 styles['Eo'] = pc.plot_styles['Eo bold'].copy()
@@ -2017,7 +2017,7 @@ class Petal(object):
             for key, poly in polys.items():
                 style = styles[key]
                 if key in pos_parts:
-                    if overlaps:
+                    if posid in overlaps:
                         style['edgecolor'] = 'red'
                     if not enabled:  # intentionally overrides overlaps
                         style['edgecolor'] = 'orange'
