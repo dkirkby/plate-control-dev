@@ -2071,16 +2071,22 @@ class Petal(object):
         if not arcP:
             overlaps = self.schedule.get_overlaps(posids)
         else:
-            overlaps = {}
+            overlaps = {p:set() for p in posids}
+            c = self.collider
             for posid in sorted(posids):
-                fixed_cases 
-                neighbors = self.collider.pos_neighbors[posid]
-                
-                phi_range_collision(posid_A, poslocT_A, posid_B, poslocTP_B=None)
+                poslocT = self.posmodels[posid].expected_current_poslocTP[0]
+                fixed_collision = c.phi_range_collision(posid, poslocT, posid_B='fixed', poslocTP_B=None)
+                if fixed_collision != pc.case.I:
+                    overlaps[posid].add(pc.case.fixed_case_names[fixed_collision])
+                neighbors = c.pos_neighbors[posid]
+                for n in neighbors:
+                    # check phi
+                    phi_range_collision(posid_A, poslocT_A, posid_B, poslocTP_B=None)
+                    
+                    # check theta
+                    phi_range_collision(posid_A, poslocT_A, posid_B, poslocTP_B=None)
 
-                these = self._check_init_or_final_neighbor_interference(model, final_poslocTP=None)
-                if these:
-                    overlaps[posid] = these
+            overlaps = {p:s for p, s in overlaps.items() if s}
         if as_dict:
             return overlaps
         listified = sorted(set(overlaps))
