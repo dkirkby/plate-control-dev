@@ -15,6 +15,7 @@ pecs/park_positioners.py -text
 pecs/pecs.py -text
 pecs/poscalibplot_from_df.py -text
 pecs/recover_positioners.py -text
+pecs/reset_pos_operation_state.py -text
 pecs/run_sequence.py -text
 pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
