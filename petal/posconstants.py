@@ -655,6 +655,12 @@ plot_styles = {
          'edgecolor' : 'green',
          'facecolor' : 'none'},
 
+    'phi arc':
+        {'linestyle' : '--',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
     'central body':
         {'linestyle' : '-',
          'linewidth' : 1,

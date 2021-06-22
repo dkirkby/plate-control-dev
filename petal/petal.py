@@ -1939,7 +1939,7 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
     
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png'):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', arcP=False):
         '''Graphical view of the current expected positions of one or many positioners.
         
         INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
@@ -1947,6 +1947,7 @@ class Petal(object):
                  path ... string, directory where to save the plot file to disk (defaults to dir defined in posconstants)
                  viewer ... string, the program with which to immediately view the file (see comments below)
                  fmt ... string, image file format like png, jpg, pdf, etc (default 'png')
+                 arcP ... boolean, argue True to use full-range phi arcs
                  
                  Regarding the image viewer, None or '' will suppress immediate display.
                  When running in Windows or Mac, defaults to whatever image viewer programs they have set as default.
@@ -1990,6 +1991,7 @@ class Petal(object):
             else:
                 label = None
             plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'], label=label)
+        overlaps = set(self.get_overlaps(posids=posids, as_dict=True, arcP=arcP))
         for posid in posids:
             locTP = self.posmodels[posid].expected_current_poslocTP        
             polys = {'Eo': c.Eo_polys[posid],
@@ -1999,10 +2001,14 @@ class Petal(object):
                      'phi arm': c.place_phi_arm(posid, locTP),
                      'ferrule': c.place_ferrule(posid, locTP),
                      }
+            pos_parts = {'central body'}
+            if arcP:
+                polys['phi arc'] = c.place_phi_arc(posid, locTP[0])
+                pos_parts |= {'phi arc'}
+            else:
+                pos_parts |= {'phi arm', 'ferrule'}            
             styles = {key: pc.plot_styles[key].copy() for key in polys}
-            overlaps = self.schedule._check_init_or_final_neighbor_interference(self.posmodels[posid])
             enabled = self.posmodels[posid].is_enabled
-            pos_parts = {'central body', 'phi arm', 'ferrule'}
             if self.posmodels[posid].classified_as_retracted:
                 styles['Eo'] = pc.plot_styles['Eo bold'].copy()
                 for key in pos_parts:
@@ -2011,7 +2017,7 @@ class Petal(object):
             for key, poly in polys.items():
                 style = styles[key]
                 if key in pos_parts:
-                    if overlaps:
+                    if posid in overlaps:
                         style['edgecolor'] = 'red'
                     if not enabled:  # intentionally overrides overlaps
                         style['edgecolor'] = 'orange'
@@ -2049,17 +2055,38 @@ class Petal(object):
             os.system(f'{viewer} {path} &')
         return path
     
-    def get_overlaps(self, as_dict=False):
+    def get_overlaps(self, posids='all', as_dict=False, arcP=False):
         '''Returns a string describing all cases where positioners' current expected
         positoner of their polygonal keepout envelope overlaps with their neighbors.
         
-        INPUTS:  as_dict ... optional boolean, argue True to eturn a python dict rather than
+        INPUTS:  posids ... optional single posid or collection of positioners to check for overlaps, defaults to 'all'
+                 as_dict ... optional boolean, argue True to return a python dict rather than
                              string. Dict will have keys = posids and values = set of overlapping
                              neighbors for that posid
+                 arcP ... optional boolean to use full-range phi polygons for the argued posids 
         
         (Hint: also try "quick_plot posids=all" for graphical view.)
         '''
-        overlaps = self.schedule.get_overlaps(self.posids)
+        posids = self._validate_posids_arg(posids, skip_unknowns=True)
+        if not arcP:
+            overlaps = self.schedule.get_overlaps(posids)
+        else:
+            overlaps = {p:set() for p in posids}
+            c = self.collider
+            for posid in sorted(posids):
+                poslocT = self.posmodels[posid].expected_current_poslocTP[0]
+                case = c.phi_range_collision(posid, poslocT, posid_B='fixed', poslocTP_B=None)
+                if case != pc.case.I:
+                    overlaps[posid].add(pc.case.names[case])
+                neighbors = c.pos_neighbors[posid]
+                for n in neighbors:
+                    use_neighbor_arc = n in posids
+                    n_poslocTP = self.posmodels[n].expected_current_poslocTP
+                    n_posloc = n_poslocTP[0] if use_neighbor_arc else n_poslocTP
+                    case = c.phi_range_collision(posid, poslocT, n, n_posloc)
+                    if case != pc.case.I:
+                        overlaps[posid].add(n) 
+            overlaps = {p:s for p, s in overlaps.items() if s}
         if as_dict:
             return overlaps
         listified = sorted(set(overlaps))
@@ -2659,6 +2686,18 @@ class Petal(object):
         '''Returns a dict stating the current annealing parameters.
         '''
         return {self.anneal_mode: pc.anneal_density[self.anneal_mode]}
+    
+    def get_clear_phi(self):
+        '''Returns list of posids on this petal for which the phi axes currently have
+        clear paths for full extension. In other words, any combination of these positioners
+        can be freely extended in phi, without risk of collision, so long as all theta
+        values---throughout the petal---remain constant during that move.
+                
+        Also see get_overlaps and quick_plot functions (with their arcP arguments set to True).
+        '''
+        overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
+        clear = self.posids - set(overlaps)
+        return sorted(clear)
     
 if __name__ == '__main__':
     '''
