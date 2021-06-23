@@ -6,7 +6,7 @@ import glob
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-i','--infile', required=True, type=str, help='Input calibration file to determine what to enable/disable. Defaults to latest file.', default='')
+parser.add_argument('-i','--infile', type=str, help='Input calibration file to determine what to enable/disable. Defaults to latest file.', default='')
 parser.add_argument('-dir', '--directory', type=str, help='Directory where calibration files are located. Default /data/focalplane/calibration/', default='/data/focalplane/calibration/')
 parser.add_argument('-c', '--comment', required=True, type=str, help='Comment to go with commit')
 
@@ -19,8 +19,8 @@ uargs = parser.parse_args()
 
 infile = uargs.infile
 if infile == '':
-    files = glob.glob(f'{uargs.dir}/*.ecsv')
-    infile = max(files, key=os.path.getctime)
+    files = glob.glob(f'{uargs.directory}/*.ecsv')
+    infile = max(files, key=os.path.getctime).split('/')[-1]
 
 df = Table.read(uargs.directory + infile)
 
@@ -38,7 +38,7 @@ if uargs.ctrl_enable | uargs.nonfunctional | uargs.brokenfiber | uargs.retracted
         change_flags += 'fiber_intact '
     if uargs.retracted:
         change_flags += 'classified_as_retracted '
-    input(f'WARNING: this script will set the following flags ({change_flags}) to match those found in the file ({infiile}). Are you sure this is what you want to do? (enter to continue)')
+    input(f'WARNING: this script will set the following flags ({change_flags}) to match those found in the file ({infile}). Are you sure this is what you want to do? (enter to continue)')
 
 
 
