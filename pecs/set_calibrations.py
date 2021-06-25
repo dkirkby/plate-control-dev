@@ -13,15 +13,19 @@ valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
               'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P',
               'DEVICE_CLASSIFIED_NONFUNCTIONAL','CLASSIFIED_AS_RETRACTED',
-              'POS_T', 'POS_P', 'LOC_T', 'LOC_P'}
+              'POS_T', 'POS_P', 'LOC_T', 'LOC_P',
+              'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_PHI_RADIAL',
+              'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR',}
 fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR',
                 'NUM_POINTS_IN_FIT_STATIC', 'NUM_POINTS_IN_FIT_DYNAMIC',
                 'NUM_OUTLIERS_EXCLUDED_STATIC', 'NUM_OUTLIERS_EXCLUDED_DYNAMIC'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
-boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED'}
+boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED',}
 float_keys = (valid_keys | fit_err_keys) - boolean_keys
-no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED', 'POS_P', 'POS_T'}
+no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED', 'POS_P', 'POS_T',
+                  'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_PHI_RADIAL',
+                  'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
