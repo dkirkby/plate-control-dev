@@ -439,7 +439,7 @@ class PECS:
                                                 test_tp=test_tp, anticollision=anticollision)
     
     def park_and_measure(self, posids, mode='normal', coords='poslocTP', log_note='',
-                         match_radius=None, check_unmatched=False, test_tp=False):
+                         match_radius=None, check_unmatched=False, test_tp=False, theta=0):
         '''Wrapper for sending park_positioners command and then measuring result.
         Returns whatever fvc_measure returns.
         '''
@@ -451,7 +451,7 @@ class PECS:
                                                 coords=coords, log_note=log_note,
                                                 match_radius=match_radius, 
                                                 check_unmatched=check_unmatched,
-                                                test_tp=test_tp)
+                                                test_tp=test_tp, theta=0)
         
     def _rehome_or_park_and_measure(self, move='rehome', **kwargs):
         '''Common operations for both "rehome_and_measure" and "park_and_measure".
@@ -459,7 +459,7 @@ class PECS:
         funcs = {'rehome': self.ptlm.rehome_pos,
                  'park': self.ptlm.park_positioners}
         move_args = {'rehome': {'ids', 'axis', 'anticollision', 'debounce', 'log_note'},
-                     'park': {'ids', 'mode', 'coords', 'log_note'}}
+                     'park': {'ids', 'mode', 'coords', 'log_note', 'theta'}}
         meas_args = {'match_radius', 'check_unmatched', 'test_tp'}
         missing_args = (move_args[move] | meas_args) - set(kwargs)
         assert move in funcs, f'unrecognized move type {move}'
