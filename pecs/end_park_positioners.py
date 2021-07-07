@@ -81,6 +81,9 @@ try:
             logger.info(f'{name}: Parking positioners...')
             res = cs.park_and_measure(violating_pos, mode='normal', coords=parktype, log_note='end of night park_positioners observer script',
                                       match_radius=None, check_unmatched=True, test_tp=True, theta=t_angle)
+            if res.empty:
+                logger.info(f'{name}: No matches in FVC image. Mirror covers may be closed. Continuing...')
+                break
         else:
             break
     out_of_limits = check_if_out_of_limits()

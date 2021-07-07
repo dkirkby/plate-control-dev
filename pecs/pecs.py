@@ -293,68 +293,77 @@ class PECS:
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
+        ok = True
         for i in range(num_meas):
             self.print(f'Calling FVC.measure with exptime = {self.exptime} s, '
                    f'expecting {len(exppos)} backlit positioners. Image {i+1} of {num_meas}.')
-            positions =self.fvc.measure(expected_positions=exppos, seqid=seqid,
-                                        exptime=self.exptime, match_radius=match_radius,
-                                        matched_only=matched_only,
-                                        all_fiducials=self.all_fiducials,centers=centers)
-            self.print('Finished FVC.measure')
-            
-            # Positions is either a pandas dataframe or else a dictionary (from np.rec_array).
-            # Is may empty when no posiitoners are present. Sometimes I've also seen a list...                
-            assert len(positions) > 0, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
-            
-            this_meapos = pd.DataFrame(positions).rename(columns=
-                            {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
-            if np.any(['P' in device_id for device_id in this_meapos.index]):
-                self.print('Measured positions of positioners by FVC '
-                           'are contaminated by fiducials.')
-            this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
-            this_meapos = self._batch_transform(this_meapos, 'QS', 'obsXY')
-            if i == 0:
-                meapos = this_meapos
-            for column in ['obsX', 'obsY', 'Q', 'S']:
-                meapos[f'{column}{i}'] = this_meapos[column]
-            self.iteration += 1
-        median_columns = ['obsX', 'obsY']
-        for column in median_columns:
-            these_columns = [f'{column}{i}' for i in range(num_meas)]
-            medians = meapos[these_columns].median(axis=1)
-            meapos[column] = medians
-        meapos = self._batch_transform(meapos, 'obsXY', 'QS')
-        exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
-                  .set_index('DEVICE_ID').sort_index())
-        exppos.columns = exppos.columns.str.upper()
-        # recover flags
-        meapos['FLAGS'] |= exppos.loc[list(meapos.index)]['FLAGS']
-        # find the posids that are unmatched, missing from FVC return
-        matched = set(exppos.index) & set(meapos.index)
-        unmatched = set(exppos.index) - matched
-        if len(unmatched) == 0:
-            self.print(f'All {len(exppos.index)} back-illuminated '
-                       f'positioners measured by FVC')
+            try:
+                positions =self.fvc.measure(expected_positions=exppos, seqid=seqid,
+                                            exptime=self.exptime, match_radius=match_radius,
+                                            matched_only=matched_only,
+                                            all_fiducials=self.all_fiducials,centers=centers)
+                self.print('Finished FVC.measure')
+                
+                # Positions is either a pandas dataframe or else a dictionary (from np.rec_array).
+                # Is may empty when no posiitoners are present. Sometimes I've also seen a list...                
+                assert len(positions) > 0, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
+            except:
+                self.print('FVC measure failed! Check if fibers are visable in the image!')
+                ok = False
+                break
+            else:
+                this_meapos = pd.DataFrame(positions).rename(columns=
+                                {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
+                if np.any(['P' in device_id for device_id in this_meapos.index]):
+                    self.print('Measured positions of positioners by FVC '
+                               'are contaminated by fiducials.')
+                this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
+                this_meapos = self._batch_transform(this_meapos, 'QS', 'obsXY')
+                if i == 0:
+                    meapos = this_meapos
+                for column in ['obsX', 'obsY', 'Q', 'S']:
+                    meapos[f'{column}{i}'] = this_meapos[column]
+                self.iteration += 1
+        if ok:
+            median_columns = ['obsX', 'obsY']
+            for column in median_columns:
+                these_columns = [f'{column}{i}' for i in range(num_meas)]
+                medians = meapos[these_columns].median(axis=1)
+                meapos[column] = medians
+            meapos = self._batch_transform(meapos, 'obsXY', 'QS')
+            exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
+                      .set_index('DEVICE_ID').sort_index())
+            exppos.columns = exppos.columns.str.upper()
+            # recover flags
+            meapos['FLAGS'] |= exppos.loc[list(meapos.index)]['FLAGS']
+            # find the posids that are unmatched, missing from FVC return
+            matched = set(exppos.index) & set(meapos.index)
+            unmatched = set(exppos.index) - matched
+            if len(unmatched) == 0:
+                self.print(f'All {len(exppos.index)} back-illuminated '
+                           f'positioners measured by FVC')
+            else:
+                self.print(f'Missing {len(unmatched)} of expected backlit fibers:'
+                           f'\n{sorted(unmatched)}')
+            fvc_data = pd.concat([meapos,
+                        exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
+                        axis=1)
+            submeas = {}
+            if num_meas > 1:
+                submeas = self.summarize_submeasurements(meapos)
+
+            # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
+            posids = exppos.index.tolist()
+            for key in ['posintT', 'posintP']:
+                this_data = self.quick_query_df(key=key, posids=posids)
+                exppos = exppos.join(this_data, on='DEVICE_ID')
+
+            self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
+                                          test_tp=test_tp, auto_update=True,
+                                          err_thresh=self.max_err, up_tol=self.tp_tol,
+                                          up_frac=self.tp_frac, postscript=submeas)
         else:
-            self.print(f'Missing {len(unmatched)} of expected backlit fibres:'
-                       f'\n{sorted(unmatched)}')
-        fvc_data = pd.concat([meapos,
-                    exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
-                    axis=1)
-        submeas = {}
-        if num_meas > 1:
-            submeas = self.summarize_submeasurements(meapos)
-
-        # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
-        posids = exppos.index.tolist()
-        for key in ['posintT', 'posintP']:
-            this_data = self.quick_query_df(key=key, posids=posids)
-            exppos = exppos.join(this_data, on='DEVICE_ID')
-
-        self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
-                                      test_tp=test_tp, auto_update=True,
-                                      err_thresh=self.max_err, up_tol=self.tp_tol,
-                                      up_frac=self.tp_frac, postscript=submeas)
+            exppos, meapos, matched, unmatched = pd.DataFrame(), pd.DataFrame(), set(), set()
 
         return exppos, meapos, matched, unmatched
 
