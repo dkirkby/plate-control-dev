@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 
 # set up a log file
+import argparse
+import sys
+parser = argparse.ArgumentParser()
+def_mirror = "open"
+def_ops = "observing"
+parser.add_argument('-m', '--mirrorcovers', type=str, default=def_mirror, help=f'Status of mirror covers; "open" or "closed" (defaults to {def_mirror})')
+parser.add_argument('-o', '--opsstate', type=str, default=def_ops, help=f'Operation state of DESI. Default is {def_ops}.')
+uargs = parser.parse_args()
+mirrors = uargs.mirrorcovers.lower()
+opsstate = uargs.opsstate.lower()
+
 import logging
 import simple_logger
 import traceback
@@ -8,6 +19,7 @@ import os
 import posconstants as pc
 from pecs import PECS
 
+status = 0
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 name = 'END_PARK_POSITIONERS'
 parktype = 'poslocTP'
@@ -40,6 +52,10 @@ logger_sh.setLevel(logging.INFO)
 logger.info(f'{name}: script is starting. The logging is rather verbose, but please try to follow along. A summary of important notes are provided at the end.')
 simple_logger.input2(f'Alert: you are about to run the park positioners script to park positioners at the end of the night. This takes about 2 minutes to execute. Keep power on while executing. Hit enter to continue. ')
 
+if opsstate != 'observing':
+    logger.info('DESI not in OBSERVING. Nothing to do. Script exiting.')
+    sys.exit(0)
+
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 
 logger.info(f'{name}: starting as exposure id {cs.exp.id}')
@@ -61,7 +77,7 @@ try:
 except (Exception, KeyboardInterrupt) as e:
     logger.info(f'{name}: back illumination failed to turn off with exception: {e}')
     logger.error(f'{name}: could not turn on back illumination! Please investigate before continuing!')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 logger.info('FP_SETUP: turning on fiducials...')
 try:
@@ -70,30 +86,35 @@ try:
 except (Exception, KeyboardInterrupt) as e:
     logger.info(f'{name}: turning on fiducials failed with exception: {e}')
     logger.error(f'{name}: could not turn on fiducials! Please investigate before continuing!')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 ### Here's the bulk of the script: 1p ###
 try:
-    for i in range(num_tries):
-        violating_pos = check_if_out_of_limits()
-        if violating_pos:
-            # Park
-            logger.info(f'{name}: Parking positioners...')
-            res = cs.park_and_measure(violating_pos, mode='normal', coords=parktype, log_note='end of night park_positioners observer script',
-                                      match_radius=None, check_unmatched=True, test_tp=True, theta=t_angle)
-            if res.empty:
-                logger.info(f'{name}: No matches in FVC image. Mirror covers may be closed. Continuing...')
-                break
-        else:
-            break
-    out_of_limits = check_if_out_of_limits()
-    if not out_of_limits:
-        print(f'SUCCESS! All {len(cs.posids)} selected positioners within desired limits!')
+    if mirrors == 'open':
+        res = cs.ptlm.petals('park_positioners', mode='normal', coords=parktype,
+                            log_note='end of night park_positioners observer script', theta=t_angle)
     else:
-        print(f'FAILED. {len(out_of_limits)} positioners remain beyond desired limits. POSIDS: {sorted(list(out_of_limits))}')
+        for i in range(num_tries):
+            violating_pos = check_if_out_of_limits()
+            if violating_pos:
+                # Park
+                logger.info(f'{name}: Parking positioners...')
+                res = cs.park_and_measure(violating_pos, mode='normal', coords=parktype, log_note='end of night park_positioners observer script',
+                                          match_radius=None, check_unmatched=True, test_tp=True, theta=t_angle)
+                if res.empty:
+                    logger.info(f'{name}: No matches in FVC image. Mirror covers may be closed. Continuing...')
+                    break
+            else:
+                break
+        out_of_limits = check_if_out_of_limits()
+        if not out_of_limits:
+            logger.info(f'{name}: SUCCESS! All {len(cs.posids)} selected positioners within desired limits!')
+        else:
+            logger.info(f'{name}: FAILED. {len(out_of_limits)} positioners remain beyond desired limits. POSIDS: {sorted(list(out_of_limits))}')
 
 except (Exception, KeyboardInterrupt) as e:
     err = e
+    status = 1
     logger.error(f'{name} crashed! See traceback below:')
     logger.critical(traceback.format_exc())
 
@@ -125,3 +146,4 @@ else:
 ### Clean up logger ###
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
+sys.exit(status)
