@@ -1,6 +1,6 @@
 * text=auto !eol
-bin/petal -text
-bin/petalcontroller -text
+bin/end_park_positioners -text
+bin/park_positioners -text
 pecs/1p_calib.py -text
 pecs/disambiguate_theta.py -text
 pecs/dummy_rc_calib.py -text
