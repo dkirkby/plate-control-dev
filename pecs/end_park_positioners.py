@@ -23,10 +23,10 @@ status = 0
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 name = 'END_PARK_POSITIONERS'
 parktype = 'poslocTP'
-num_tries = 3 if parktype in ['poslocTP','posintTP'] else 1
+num_tries = 1 if parktype in ['poslocTP','posintTP'] else 1
 t_angle = 30
 
-axis_limits = {'T': [t_angle+5, t_angle-5], 'P': [152, 148]}
+axis_limits = {'T': [t_angle+5, t_angle-5], 'P': [155, 145]}
 columns = {'T': 'X1', 'P': 'X2'}
 def check_if_out_of_limits():
     all_pos = cs.ptlm.get_positions(return_coord=parktype, drop_devid=False)
@@ -50,7 +50,7 @@ logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
 logger_fh.setLevel(logging.DEBUG)
 logger_sh.setLevel(logging.INFO)
 logger.info(f'{name}: script is starting. The logging is rather verbose, but please try to follow along. A summary of important notes are provided at the end.')
-simple_logger.input2(f'Alert: you are about to run the park positioners script to park positioners at the end of the night. This takes about 2 minutes to execute. Keep power on while executing. Hit enter to continue. ')
+#simple_logger.input2(f'Alert: you are about to run the park positioners script to park positioners at the end of the night. This takes about 2 minutes to execute. Keep power on while executing. Hit enter to continue. ')
 
 if opsstate != 'observing':
     logger.info('DESI not in OBSERVING. Nothing to do. Script exiting.')
@@ -59,11 +59,6 @@ if opsstate != 'observing':
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 
 logger.info(f'{name}: starting as exposure id {cs.exp.id}')
-
-#from 1p_calib import onepoint # doesn't work
-import importlib
-onept = importlib.import_module('1p_calib')
-onepoint = onept.onepoint
 
 err = None #no exception
 
@@ -90,8 +85,8 @@ except (Exception, KeyboardInterrupt) as e:
 
 ### Here's the bulk of the script: 1p ###
 try:
-    if mirrors == 'open':
-        res = cs.ptlm.petals('park_positioners', mode='normal', coords=parktype,
+    if mirrors != 'open':
+        res = cs.ptlm.petals('park_positioners', 'all', mode='normal', coords=parktype,
                             log_note='end of night park_positioners observer script', theta=t_angle)
     else:
         for i in range(num_tries):
