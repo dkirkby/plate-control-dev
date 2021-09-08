@@ -167,6 +167,7 @@ class Petal(object):
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
+        self.refresh_relay_map()
 
         # database setup
         self.db_commit_on = False
@@ -354,7 +355,17 @@ class Petal(object):
         self.previous_animator_move_number = 0
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
-        
+
+    def refresh_relay_map(self):
+        """
+        Query the petalcontroller to pick up a new relay map.
+        """
+        if not(self.simulator_on):
+            ret = self.comm.pbget('relay_settings')
+            if isinstance(ret, str):
+                raise_error(f'refresh_relay_map: Could not query relay map from petalcontroller. Returned {ret}')
+            self.relay_map = ret.set_index('device_id')
+        return
 
     # METHODS FOR POSITIONER CONTROL
 
@@ -2521,6 +2532,11 @@ class Petal(object):
             self.disabled_devids.append(devid)
         if not self.get_posfid_val(devid, 'CTRL_ENABLED'):
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+        if hasattr(self, 'relay_map'):
+            if self.relay_map.loc[devid]['state'] == 'closed':
+                self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with closed relay state.')
+                self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
+                self.pos_flags[devid] |= self.flags.get('RELAYOFF', self.missing_flag)
 
     def _apply_all_state_enable_settings(self):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
@@ -2565,6 +2581,7 @@ class Petal(object):
         #Reset values
         self._cancel_move(reset_flags=False) 
         # Reset posflags, leave disabled flags alone for record
+        self.refresh_relay_map()
         self._initialize_pos_flags(enabled_only=True)
         self._apply_all_state_enable_settings()
         self._clear_exposure_info() #Get rid of lingering exposure details
