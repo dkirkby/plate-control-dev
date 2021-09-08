@@ -363,8 +363,10 @@ class Petal(object):
         if not(self.simulator_on):
             ret = self.comm.pbget('relay_settings')
             if isinstance(ret, str):
-                raise_error(f'refresh_relay_map: Could not query relay map from petalcontroller. Returned {ret}')
-            self.relay_map = ret.set_index('device_id')
+                self.printfunc(f'WARNING: refresh_relay_map: Could not query relay map from petalcontroller. Returned {ret}')
+            else:
+                # it is ok to not have a self.relay_map attribute since I check for it before using it to work with the simulator
+                self.relay_map = ret.set_index('device_id')
         return
 
     # METHODS FOR POSITIONER CONTROL
