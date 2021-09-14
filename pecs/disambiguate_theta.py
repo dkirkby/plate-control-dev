@@ -11,19 +11,19 @@ script_name = os.path.basename(__file__)
 
 # command line argument parsing
 import argparse
-parser = argparse.ArgumentParser(description=__doc__)
+parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 max_tries = 10
-parser.add_argument('-nt', '--num_tries', type=int, default=4, help='int, max number of tries of the algorithm (default is 4, max is {max_tries})')
+parser.add_argument('-nt', '--num_tries', type=int, default=4, help=f'int, max number of tries of the algorithm (max is {max_tries})')
 max_fvc_iter = 10
-parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (default is 1, max is {max_fvc_iter})')
-parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
-parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners, default is False')
+parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (max is {max_fvc_iter})')
+parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius')
+parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
+parser.add_argument('-oc', '--only_creep', type=str, default='True', help='True --> move ambigous positioners slowly when going toward their possible hard limits, False --> cruise speed, None --> use existing individual positioner values')
+parser.add_argument('-cp', '--creep_period', type=int, default=1, help='int, overrides positioners\' values for parameter CREEP_PERIOD (1 is fastest possible, as of 2021-09-05 a setting of 2 is typical during observations, enter 0 to use existing individual positioner values')
 uargs = parser.parse_args()
 
-# input validation
-assert 1 <= uargs.num_tries <= max_tries, f'out of range argument {uargs.num_tries} for num_tries parameter'
-assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
-
+# set up logger
+import simple_logger
 try:
     import posconstants as pc
 except:
@@ -35,6 +35,20 @@ except:
 # other imports
 import random
 import pandas
+
+# input validation
+assert 1 <= uargs.num_tries <= max_tries, f'out of range argument {uargs.num_tries} for num_tries parameter'
+assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
+assert 0 <= uargs.creep_period <= 2, f'out of range argument {uargs.creep_period} for creep_period parameter'
+if pc.is_none(uargs.only_creep):
+    uargs.only_creep = None
+elif pc.is_boolean(uargs.only_creep):
+    uargs.only_creep = pc.boolean(uargs.only_creep)
+else:
+    assert False, f'out of range argument {uargs.only_creep} for only_creep parameter'
+    
+# common definitions
+pos_settings_keys = ['ONLY_CREEP', 'CREEP_PERIOD']
 
 class disambig_class():
     '''
@@ -83,6 +97,12 @@ class disambig_class():
         self.neighbors = {}
         for these in self.neighbor_data.values():
             self.neighbors.update(these)
+   
+        # gather initial settings
+        pos_settings_by_petal = self.pecs.ptlm.batch_get_posfid_val(uniqueids=self.allowed_to_fix, keys=pos_settings_keys)
+        self.orig_pos_settings = {}
+        for dictionary in pos_settings_by_petal.values():
+            self.orig_pos_settings.update(dictionary)
 
     # algorithm
     def disambig(self, n_try=None):
@@ -174,6 +194,19 @@ class disambig_class():
         
         # theta test moves on ambiguous positioners
         anticollision = 'freeze'
+        old_settings = {}
+        new_settings = {}
+        settings_note = ''
+        for key, skipval in {'ONLY_CREEP': None, 'CREEP_PERIOD': 0}.items():
+            uarg = getattr(uargs, key.lower())
+            if uarg != skipval:
+                for posid in ambig:
+                    if posid not in new_settings:  # and by implication, not in old_settings yet, either
+                        new_settings[posid] = {}
+                        old_settings[posid] = {}
+                    new_settings[posid][key] = uarg  # don't worry about whether this is actually different from old value, the batch setter function a few lines below handles this more generally
+                    old_settings[posid][key] = self.orig_pos_settings[posid][key]
+                settings_note = pc.join_notes(settings_note, f'{key}={uarg}')
         intT_current = self.pecs.quick_query(key='posintT', posids=ambig)
         ambig_max = self.pecs.quick_query(key='max_theta_hardstop_ambiguous_zone', posids=ambig)
         ambig_min = self.pecs.quick_query(key='min_theta_hardstop_ambiguous_zone', posids=ambig)
@@ -183,13 +216,19 @@ class disambig_class():
         dT = {posid: dT_abs[posid] * move_dir[posid] for posid in ambig}
         dir_note = {posid: f'{"away from" if presumed_no_hardstop_dir[posid] == move_dir[posid] else "toward"} currently-presumed closest hardstop' for posid in ambig}
         dtdp_requests = {posid: {'target': [dT[posid], 0.0],
-                                 'log_note': pc.join_notes(script_name, 'theta test move on ambiguous positioner', dir_note[posid]),
+                                 'log_note': pc.join_notes(script_name, 'theta test move on ambiguous positioner', dir_note[posid], settings_note),
                                  } for posid in ambig
                          }
+        if any(new_settings):
+            self.logger.info(f'Applying pos settings: {new_settings}')
+            self.pecs.ptlm.batch_set_posfid_val(settings=new_settings, check_existing=True)
         self.logger.info(f'Doing theta test move for {len(dtdp_requests)} ambiguous positioners. Anticollision mode: {anticollision}')
         self.pecs.ptlm.request_direct_dtdp(dtdp_requests, return_posids_only=True)
         self.pecs.ptlm.schedule_moves(anticollision=anticollision)
         self.pecs.move_measure(request=None, anticollision=anticollision, **self.common_move_meas_kwargs)
+        if any(new_settings):
+            self.logger.info(f'Restoring pos settings: {old_settings}')
+            self.pecs.ptlm.batch_set_posfid_val(settings=old_settings, check_existing=True)
         return self.disambig(n_try=n_try - 1)
 
 if __name__ == '__main__':
