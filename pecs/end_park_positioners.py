@@ -22,7 +22,7 @@ from pecs import PECS
 status = 0
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 name = 'END_PARK_POSITIONERS'
-parktype = 'poslocTP'
+parktype = 'intTlocP' #'poslocTP'
 num_tries = 1 if parktype in ['poslocTP','posintTP'] else 1
 t_angle = 30
 

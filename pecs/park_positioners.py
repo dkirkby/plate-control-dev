@@ -57,7 +57,7 @@ except (Exception, KeyboardInterrupt) as e:
 try:
     # Park
     logger.info(f'{name}: Parking positioners...')
-    res = cs.park_and_measure('all', mode='normal', coords='poslocTP', log_note='park_positioners observer script',
+    res = cs.park_and_measure('all', mode='normal', coords='intTlocP', log_note='park_positioners observer script',
                               match_radius=None, check_unmatched=True, test_tp=True)
 
 except (Exception, KeyboardInterrupt) as e:
