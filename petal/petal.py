@@ -1057,7 +1057,7 @@ class Petal(object):
         if req_state_def['PS1_EN'] == req_state_def['PS2_EN']:
             req_state_def['PS_EN'] = req_state_def['PS1_EN']
             del req_state_def['PS1_EN']
-            del req_state_def['PS1_EN']
+            del req_state_def['PS2_EN']
         # Set petalbox State
         if self.simulator_on:
             if hasattr(self, 'ops_state_sv'):
@@ -1105,7 +1105,7 @@ class Petal(object):
                     if new_state[0] == req_state_def[key][0] and new_state[1] == req_state_def[key][1]:
                         todo.remove(key)
                 elif key == 'GFA_FAN': #GFA has different structure
-                    req = req_state_def[key][0]['inlet'][0], pc.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
+                    req = req_state_def[key][0]['inlet'][0], req_state_def[key][0]['outlet'][0]
                     new = new_state['inlet'][0], new_state['outlet'][0]
                     if req == new:
                         todo.remove(key)
