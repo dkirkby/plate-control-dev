@@ -1052,6 +1052,12 @@ class Petal(object):
         # Notation: key (device name), tuple with value, max wait time for state change
         if hw_state in ['INITIALIZED', 'STANDBY', 'READY', 'OBSERVING']: 
             self._last_state = hw_state
+        req_state_def = pc.PETAL_OPS_STATES[self._last_state].copy()
+        # Re-define PS1_EN/PS2_EN to PS_EN if value the same
+        if req_state_def['PS1_EN'] == req_state_def['PS2_EN']:
+            req_state_def['PS_EN'] = req_state_def['PS1_EN']
+            del req_state_def['PS1_EN']
+            del req_state_def['PS1_EN']
         # Set petalbox State
         if self.simulator_on:
             if hasattr(self, 'ops_state_sv'):
@@ -1068,13 +1074,16 @@ class Petal(object):
                 self.printfunc(f'WARNING: check_can_ready returned {ready}')
                 #raise_error(f'_set_hardware_state: check_can_ready returned {ready}. Will not move to OBSERVING.')
                 return f'FAILED: will not move to {hw_state}. check_can_ready returned {ready}.'
-        todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
-        for key, value in pc.PETAL_OPS_STATES[self._last_state].items():
+        todo = list(req_state_def.keys())
+        for key, value in req_state_def.items():
             old_state = self.comm.pbget(key)
-            if old_state == pc.PETAL_OPS_STATES[self._last_state][key][0]:
+            if old_state == req_state_def[key][0]:
                 # Don't change state if it's where we want it
                 todo.remove(key)
             # Ignore GFAFAN
+            elif key == 'PS_EN':
+                    if old_state[0] == req_state_def[key][0] and old_state[1] == req_state_def[key][1]:
+                        todo.remove(key)
             else:
                 # Change state because it needs to be changed
                 ret = self.comm.pbset(key, value[0])
@@ -1086,20 +1095,23 @@ class Petal(object):
         failed = {}
         start = time.time()
         while len(todo) != 0:
-            for key in pc.PETAL_OPS_STATES[self._last_state].keys():
+            for key in req_state_def.keys():
                 if key not in todo:
                     continue
                 new_state = self.comm.pbget(key)
-                if new_state == pc.PETAL_OPS_STATES[self._last_state][key][0]:
+                if new_state == req_state_def[key][0]:
                     todo.remove(key)
+                elif key == 'PS_EN':
+                    if new_state[0] == req_state_def[key][0] and new_state[1] == req_state_def[key][1]:
+                        todo.remove(key)
                 elif key == 'GFA_FAN': #GFA has different structure
-                    req = pc.PETAL_OPS_STATES[self._last_state][key][0]['inlet'][0], pc.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
+                    req = req_state_def[key][0]['inlet'][0], pc.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
                     new = new_state['inlet'][0], new_state['outlet'][0]
                     if req == new:
                         todo.remove(key)
                 else:   # check timeout
-                    if time.time() > start + pc.PETAL_OPS_STATES[self._last_state][key][1]:
-                        failed[key] = (new_state, pc.PETAL_OPS_STATES[self._last_state][key][0])
+                    if time.time() > start + req_state_def[key][1]:
+                        failed[key] = (new_state, req_state_def[key][0])
                         self.printfunc('_set_hardware_state: Timeout for %r' % key)
                         todo.remove(key)
             time.sleep(1)
