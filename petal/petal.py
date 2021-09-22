@@ -167,7 +167,6 @@ class Petal(object):
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
-        self.refresh_relay_map()
 
         # database setup
         self.db_commit_on = False
@@ -191,6 +190,8 @@ class Petal(object):
         self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
+        # Requires init_posmodels to be ran
+        self.refresh_relay_map()
         
         # extra limitations on addressable target area. limit is a minimum phi value (like a maximum radius)
         self.typical_phi_limit_angle = self.collider.Eo_phi
@@ -361,12 +362,26 @@ class Petal(object):
         Query the petalcontroller to pick up a new relay map.
         """
         if not(self.simulator_on):
-            ret = self.comm.pbget('relay_settings')
+            ret = self.comm.pbget('relay_settingsd') # regular pandas version cannot be pickled because PC python much older than cluster python
             if isinstance(ret, str):
                 self.printfunc(f'WARNING: refresh_relay_map: Could not query relay map from petalcontroller. Returned {ret}')
             else:
-                # it is ok to not have a self.relay_map attribute since I check for it before using it to work with the simulator
-                self.relay_map = ret.set_index('device_id')
+                # ret is a dict in an ugly format, lets parse it to what I want: dict keyed by device ID with relay open or closed
+                # assume all relays open (unusable) initially, good guess for missing devs/errors
+                self.relay_map = {posid: 'open' for posid in self.posids}
+                for idx in ret['state'].keys():
+                    busid = ret['bus_id'][idx]
+                    canid = ret['can_id'][idx]
+                    state = ret['state'][idx]
+                    try:
+                        posid = self.buscan_to_posids[(busid,canid)]
+                    except:
+                        self.printfunc(f'refresh_relay_map: no known posid with bus {busid}, can {canid}')
+                        continue 
+                    if isinstance(state, str):
+                        state = state.lower()
+                        if state in ['open','closed']:
+                            self.relay_map[posid] = state
         return
 
     # METHODS FOR POSITIONER CONTROL
