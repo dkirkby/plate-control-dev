@@ -2551,7 +2551,7 @@ class Petal(object):
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
         if hasattr(self, 'relay_map'):
             if self.relay_map[devid] == 'open':
-                self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with closed relay state.')
+                self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with open relay state.')
                 self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
                 self.pos_flags[devid] |= self.flags.get('RELAYOFF', self.missing_flag)
 
