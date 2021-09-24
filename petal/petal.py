@@ -376,7 +376,7 @@ class Petal(object):
                     try:
                         posid = self.buscan_to_posids[(busid,int(canid))]
                     except:
-                        self.printfunc(f'refresh_relay_map: no known posid with bus {busid}, can {canid}')
+                        self.printfunc(f'DEBUG: refresh_relay_map: no known posid with bus {busid}, can {canid}')
                         continue 
                     if isinstance(state, str):
                         state = state.lower()
