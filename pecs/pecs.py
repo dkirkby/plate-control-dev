@@ -453,7 +453,7 @@ class PECS:
         Returns whatever fvc_measure returns.
         '''
         assert mode in {'normal', 'center'}
-        assert coords in {'posintTP', 'poslocTP'}
+        assert coords in {'posintTP', 'poslocTP', 'intTlocP', 'locTintP'}
         self.print(f'Parking positioners, mode={mode}, coords={coords}' +
                    f', exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(move='park', ids=posids, mode=mode,
