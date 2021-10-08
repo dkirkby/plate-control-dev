@@ -460,21 +460,26 @@ class PECS:
                                                 coords=coords, log_note=log_note,
                                                 match_radius=match_radius, 
                                                 check_unmatched=check_unmatched,
-                                                test_tp=test_tp, theta=0)
+                                                test_tp=test_tp, theta=0,
+                                                expid=self.exp.id, iteration=self.iteration)
         
     def _rehome_or_park_and_measure(self, move='rehome', **kwargs):
         '''Common operations for both "rehome_and_measure" and "park_and_measure".
+
+        KF - note RE expid/iteration, park_positioners in petalman handles the setting
+        of expid/iteration (for use by OCS), rehome needs this done here.
         '''
         funcs = {'rehome': self.ptlm.rehome_pos,
                  'park': self.ptlm.park_positioners}
         move_args = {'rehome': {'ids', 'axis', 'anticollision', 'debounce', 'log_note'},
-                     'park': {'ids', 'mode', 'coords', 'log_note', 'theta'}}
+                     'park': {'ids', 'mode', 'coords', 'log_note', 'theta', 'expid', 'iteration'}}
         meas_args = {'match_radius', 'check_unmatched', 'test_tp'}
         missing_args = (move_args[move] | meas_args) - set(kwargs)
         assert move in funcs, f'unrecognized move type {move}'
         assert not(any(missing_args)), f'missing args {missing_args}'
-        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         posids = kwargs['ids']
+        if move == 'rehome':
+            self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         enabled = self.get_enabled_posids(posids)
         move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
         move_kwargs['ids'] = enabled
