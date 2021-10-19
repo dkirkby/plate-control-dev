@@ -88,7 +88,7 @@ if not(ret == 'SUCCESS' or ret is None):
 # Re-setup petal/posids in pecs to reflect newly enabled positioners
 cs.ptl_setup(cs.pcids)
 
-### Here's the bulk of the setup: 1p, disambiguate, 1p ###
+### Here's the bulk of the setup: 1p, disambiguate, park overlaps, 1p ###
 try:
     logger.info('FP_SETUP: running 1p calibration...')
     enabled_before_1p = get_pos_set('enabled')
@@ -110,8 +110,10 @@ try:
 
     logger.info('FP_SETUP: shrinking keepouts for overlapping positioners')
     overlapping = cs.ptlm.get_overlaps(as_dict=True)
+    overlapping_posids = set()
     for petal, overlaps in overlapping.items():
         posids = set(overlaps.keys())
+        overlapping_posids |= posids
         if posids:
             logger.info(f'FP_SETUP: {petal} has {len(posids)} overlapping positioners! List: {posids}')
             logger.info(f'FP_SETUP: shrinking keepouts for above positioners...')
@@ -136,10 +138,19 @@ try:
         logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
     else:
         logger.info('FP_SETUP: All selected ambiguous cases were resolved!')
+
     enabled_after_disambig = get_pos_set('enabled')
     disabled_during_disambig = enabled_before_disambig - enabled_after_disambig
     logger.info(f'FP_SETUP: {len(disabled_during_disambig)} disabled during disambiguation loops. Posids {disabled_during_disambig}')
 
+    #Park overlapping positioners to guarentee we tried to move them with shrunk keepouts
+    #Do AFTER disambiguation in case overlapping positioner in ambiguous zone!!!
+    if overlapping_posids:
+        logger.info(f'FP_SETUP: tucking {len(overlapping_posids)} overlapping positioners.')
+        #easiest to tuck by telling them to park
+        cs.park_and_measure(overlapping_posids, coords='intTlocP', log_note='FP_Setup tucking overlapping positioners')
+
+    # 1p calibration to clean up and tell us how we did
     logger.info(f'FP_SETUP: running final 1p calibration...')
     enabled_before_1p2 = get_pos_set('enabled')
     updates = onepoint(cs, mode='posTP', move=False, commit=True, tp_tol=0.065,

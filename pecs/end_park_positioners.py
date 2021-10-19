@@ -24,7 +24,7 @@ update_error_report_thresh = 1.0 #warn user that an update of more than value mm
 name = 'END_PARK_POSITIONERS'
 parktype = 'intTlocP' #'poslocTP'
 num_tries = 1 if parktype in ['poslocTP','posintTP'] else 1
-t_angle = 30
+t_angle = 0
 
 axis_limits = {'T': [t_angle+5, t_angle-5], 'P': [155, 145]}
 columns = {'T': 'X1', 'P': 'X2'}
