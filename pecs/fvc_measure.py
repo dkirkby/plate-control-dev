@@ -26,7 +26,7 @@ try:
 	for i in range(uargs.loops):
 		while True:
 			now = time.time()
-			remaining = last + cadence - now
+			remaining = last + uargs.cadence - now
 			if remaining <= 0:
 				break
 			print(f'{remaining:.0f}s until next image...')
