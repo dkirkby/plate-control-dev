@@ -5,9 +5,31 @@ import logging
 import simple_logger
 import traceback
 import os
+import sys
 import posconstants as pc
 from pecs import PECS
-import DOSlib.flags as flags 
+import DOSlib.flags as flags
+from DOSlib.util import obs_day
+from DOSlib.join_instance import join_instance
+from argparse import ArgumentParser
+
+parser = ArgumentParser(description="FP_SETUP: nightly setup for the DESI focal plane.")
+parser.add_argument("-i", "--instance",type=str, help = 'Instance name (desi_<obsday> is default>')
+args = parser.parse_args()
+
+inst = args.instance
+# reset Pyro variables
+os.environ['PYRO_NS_HOST'] = ''
+os.environ['PYRO_NS_PORT'] = ''
+os.environ['PYRO_NS_BCPORT'] = ''
+if not isinstance(inst, str):
+    inst = f'desi_{obs_day()}'
+print(f'connecting to instance {inst}')
+try:
+    join_instance(inst, must_be_running=True)
+except Exception as e:
+    print(f'FP_SETUP: Exception joining instance {inst}: {str(e)}')
+    sys.exit(1) 
 
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 
@@ -22,7 +44,7 @@ logger.info('FP_SETUP: script is starting. The logging is rather verbose, but pl
 simple_logger.input2(f'Alert: you are about to run the focalplane setup script to recover positioners or prepare the focalplane. This takes *up to half an hour* to execute. Hit enter to continue. ')
 
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
-
+cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP starting...')
 logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
 
 #from 1p_calib import onepoint # doesn't work
@@ -56,7 +78,7 @@ try:
 except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: back illumination failed to turn off with exception: {e}')
     logger.error('FP_SETUP: could not turn on back illumination! Please investigate before continuing!')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 logger.info('FP_SETUP: turning on fiducials...')
 try:
@@ -65,7 +87,7 @@ try:
 except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: turning on fiducials failed with exception: {e}')
     logger.error('FP_SETUP: could not turn on fiducials! Please investigate before continuing!')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 logger.info('FP_SETUP: caching keepouts...')
 try:
@@ -73,7 +95,7 @@ try:
 except (Exception, KeyboardInterrupt) as e:
     logger.info(f'FP_SETUP: caching keepouts failed with exception: {e}')
     logger.error('FP_SETUP: could not cache keepouts! Please investigate before continuing!')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 # Do enable last since we want to re-disable if we fail
 logger.info('FP_SETUP: enabling positioners...')
@@ -83,7 +105,7 @@ if not(ret == 'SUCCESS' or ret is None):
     logger.error('FP_SETUP: failed to enable positioners! Exiting and try again, if failed twice contact FP expert!')
     ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
     logger.info(f'FP_SETUP: disable_positioners returned: {ret}')
-    import sys; sys.exit(1)
+    sys.exit(1)
 
 # Re-setup petal/posids in pecs to reflect newly enabled positioners
 cs.ptl_setup(cs.pcids)
@@ -222,8 +244,10 @@ if err is None:
     if non_ambig_disabled:
         logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors or communication errors.')
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
+    cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP completed successfully!')
 else:
-    logger.error('FP_SETUP: focalplane setup failed to complete. Please wait a moment to try again or contact an FP expert.')
+    logger.error('FP_SETUP: focal plane setup FAILED to complete! Please wait a moment to try again or contact an FP expert.')
+    cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP failed to complete!')
 if restore_keepout_err:
     logger.error('FP_SETUP: could not restore keepouts!!!! DO NOT continue until this is resolved. Contact an expert.')
 ### Clean up logger ###
