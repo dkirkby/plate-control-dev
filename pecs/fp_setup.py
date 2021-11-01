@@ -244,10 +244,10 @@ if err is None:
     if non_ambig_disabled:
         logger.info(f'FP_SETUP_NOTE: {len(non_ambig_disabled)} positioners were disabled during the course of this script for other reasons, likely due to match errors or communication errors.')
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
-    cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP completed successfully!')
+    cs.ptlm.raise_script_alarm(script='fp_setup', alarm_id=1801, level='event', message='FP_SETUP completed successfully!')
 else:
     logger.error('FP_SETUP: focal plane setup FAILED to complete! Please wait a moment to try again or contact an FP expert.')
-    cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP failed to complete!')
+    cs.ptlm.raise_script_alarm(script='fp_setup', alarm_id=1801, level='error', message='FP_SETUP failed to complete!')
 if restore_keepout_err:
     logger.error('FP_SETUP: could not restore keepouts!!!! DO NOT continue until this is resolved. Contact an expert.')
 ### Clean up logger ###
