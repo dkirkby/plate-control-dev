@@ -61,6 +61,9 @@ class PECS:
         self.logger = logger
         self.input = inputfunc
 
+        self.fvc_feedback_timeout = 60.0
+        self.execute_move_timeout = 120.0
+
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
@@ -358,10 +361,12 @@ class PECS:
                 this_data = self.quick_query_df(key=key, posids=posids)
                 exppos = exppos.join(this_data, on='DEVICE_ID')
 
+            control = {'timeout': self.fvc_feedback_timeout}
             self.ptlm.handle_fvc_feedback(fvc_data, check_unmatched=check_unmatched,
                                           test_tp=test_tp, auto_update=True,
                                           err_thresh=self.max_err, up_tol=self.tp_tol,
-                                          up_frac=self.tp_frac, postscript=submeas)
+                                          up_frac=self.tp_frac, postscript=submeas,
+                                          control=control)
         else:
             exppos, meapos, matched, unmatched = pd.DataFrame(), pd.DataFrame(), set(), set()
 
@@ -420,7 +425,7 @@ class PECS:
             request = request.merge(self.petal_locs, on='DEVICE_ID')
         if should_prepare_move:
             self.ptlm.prepare_move(request, anticollision=anticollision)
-        self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
+        self.ptlm.execute_move(reset_flags=False, control={'timeout': self.execute_move_timeout})
         exppos, meapos, matched, _ = self.fvc_measure(
             exppos=None, matched_only=True, match_radius=match_radius, 
             check_unmatched=check_unmatched, test_tp=test_tp, num_meas=num_meas)
@@ -484,9 +489,9 @@ class PECS:
         move_kwargs = {key: kwargs[key] for key in move_args[move] if key != 'ids'}
         move_kwargs['ids'] = enabled
         if 'control' not in list(move_kwargs.keys()):
-            move_kwargs['control'] = {'timeout': 90.0}
+            move_kwargs['control'] = {'timeout': self.execute_move_timeout}
         else:
-            move_kwargs['control']['timeout'] = 90.0
+            move_kwargs['control']['timeout'] = self.execute_move_timeout
         funcs[move](**move_kwargs)
         
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here

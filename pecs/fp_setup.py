@@ -6,6 +6,7 @@ import simple_logger
 import traceback
 import os
 import sys
+from datetime import datetime
 import posconstants as pc
 from pecs import PECS
 import DOSlib.flags as flags
@@ -46,6 +47,9 @@ simple_logger.input2(f'Alert: you are about to run the focalplane setup script t
 cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=simple_logger.input2)
 cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP starting...')
 logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
+
+if datetime.today().weekday() == 6: #this is sunday
+    cs.fvc_feedback_timeout = 120.0 #2 minutes!
 
 #from 1p_calib import onepoint # doesn't work
 import importlib
@@ -246,7 +250,7 @@ if err is None:
         logger.info(f'FP_SETUP_NOTE: other disabled posids: {non_ambig_disabled}')
     cs.ptlm.raise_script_alarm(script='fp_setup', alarm_id=1801, level='event', message='FP_SETUP completed successfully!')
 else:
-    logger.error('FP_SETUP: focal plane setup FAILED to complete! Please wait a moment to try again or contact an FP expert.')
+    logger.error('FP_SETUP: focal plane setup FAILED to complete! Please wait a moment before trying again or contact an FP expert.')
     cs.ptlm.raise_script_alarm(script='fp_setup', alarm_id=1801, level='error', message='FP_SETUP failed to complete!')
 if restore_keepout_err:
     logger.error('FP_SETUP: could not restore keepouts!!!! DO NOT continue until this is resolved. Contact an expert.')
