@@ -2401,7 +2401,10 @@ class Petal(object):
                                           'target': [req['cmd_val1'], req['cmd_val2']],
                                           'log_note': req['log_note']}
                     self.request_targets(cleaned, _is_retry=True) # 2020-04-30 [JHS] anything useful to be done with return value?
-                anticollision = self.__current_schedule_moves_anticollision
+                if self.__current_schedule_moves_anticollision == 'adjust':
+                    anticollision = 'adjust_requested_only'
+                else:
+                    anticollision = self.__current_schedule_moves_anticollision
                 should_anneal = self.__current_schedule_moves_should_anneal
                 self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
                 return self.send_move_tables(n_retries - 1, previous_failed=all_failed_send)
