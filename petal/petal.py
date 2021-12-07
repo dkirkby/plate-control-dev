@@ -361,12 +361,26 @@ class Petal(object):
         Query the petalcontroller to pick up a new relay map.
         """
         if not(self.simulator_on):
-            ret = self.comm.pbget('relay_settings')
+            ret = self.comm.pbget('relay_settingsd') # regular pandas version cannot be pickled because PC python much older than cluster python
             if isinstance(ret, str):
                 self.printfunc(f'WARNING: refresh_relay_map: Could not query relay map from petalcontroller. Returned {ret}')
             else:
-                # it is ok to not have a self.relay_map attribute since I check for it before using it to work with the simulator
-                self.relay_map = ret.set_index('device_id')
+                # ret is a dict in an ugly format, lets parse it to what I want: dict keyed by device ID with relay open or closed
+                # assume all relays open (unusable) initially, good guess for missing devs/errors
+                self.relay_map = {posid: 'open' for posid in self.posids}
+                for idx in ret['state'].keys():
+                    busid = ret['bus_id'][idx]
+                    canid = ret['can_id'][idx]
+                    state = ret['state'][idx]
+                    try:
+                        posid = self.buscan_to_posids[(busid,int(canid))]
+                    except:
+                        self.printfunc(f'DEBUG: refresh_relay_map: no known posid with bus {busid}, can {canid}')
+                        continue
+                    if isinstance(state, str):
+                        state = state.lower()
+                        if state in ['open','closed']:
+                            self.relay_map[posid] = state
         return
 
     # METHODS FOR POSITIONER CONTROL
@@ -2535,7 +2549,7 @@ class Petal(object):
         if not self.get_posfid_val(devid, 'CTRL_ENABLED'):
             self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
         if hasattr(self, 'relay_map'):
-            if self.relay_map.loc[devid]['state'] == 'closed':
+            if self.relay_map[devid] == 'open':
                 self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled to comply with closed relay state.')
                 self.pos_flags[devid] |= self.flags.get('NOTCTLENABLED', self.missing_flag)
                 self.pos_flags[devid] |= self.flags.get('RELAYOFF', self.missing_flag)
