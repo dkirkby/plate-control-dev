@@ -167,7 +167,6 @@ class Petal(object):
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
-        self.refresh_relay_map()
 
         # database setup
         self.db_commit_on = False
@@ -191,6 +190,8 @@ class Petal(object):
         self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
+        # Requires init_posmodels to be ran
+        self.refresh_relay_map()
         
         # extra limitations on addressable target area. limit is a minimum phi value (like a maximum radius)
         self.typical_phi_limit_angle = self.collider.Eo_phi
