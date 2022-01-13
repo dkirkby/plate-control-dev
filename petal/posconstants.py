@@ -148,6 +148,7 @@ up_tol_disabled = 0.5 #mm over which to apply tp updates to disabled positioners
 up_frac = 1.0 # amount of update to apply to posTP
 err_disable = False # automatically disable positioners above error threshhold
 unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
+didnotmove_tol = up_tol
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
