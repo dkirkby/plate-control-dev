@@ -106,24 +106,31 @@ class PECS:
             self.ptlm = ptlm
             self.print(f'Reusing existing PetalMan proxy with active petals: '
                        f'{self.ptlm.participating_petals}')
+        self._all_petals = list(self.ptlm.Petals.keys())
         if self.illuminated_pcids == 'all':
-            self.illuminated_ptl_roles = list(self.ptlm.Petals.keys())
+            self.illuminated_ptl_roles = self._all_petals
         else:
             self.illuminated_ptl_roles = [self._pcid2role(pcid)
                                           for pcid in self.illuminated_pcids
                                           if self._pcid2role(pcid)
-                                          in list(self.ptlm.Petals.keys())]
+                                          in self._all_petals]
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
         if self.interactive or (self.pcids is None):
             self.interactive_ptl_setup(device_locs=device_locs, posids=posids)
+            self.fid_petals = self.ptlm.participating_petals
         elif self.interactive is False:
             # In non-interactive mode, check against obs_petals in petalman
             obs_petals = self.ptlm.get('obs_petals')
             obs_locs = [self._role2pcid(role) for role in obs_petals]
             self.pcids = list(set(self.pcids) & set(obs_locs))
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
+            # Check illum_petals and fid_petals
+            illum_petals = self.ptlm.get('illum_petals')
+            fid_petals = self.ptlm.get('fid_petals')
+            self.illuminated_ptl_roles = list(set(self.illuminated_ptl_roles) & set(illum_petals))
+            self.fid_petals = list(set(fid_petals) & set([self._pcid2role(p) for p in self.pcids]))
         # Do this after interactive_ptl_setup
         if self.interactive:
             self.home_adc() #asks to home, not automatic
@@ -168,7 +175,7 @@ class PECS:
             for pcid in pcids:  # illumination check
                 assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                     f'PETAL{pcid} must be illuminated.')
-        self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in self.pcids]
+        self.ptlm.participating_petals = [self._pcid2role(pcid) for pcid in pcids]
         all_posinfo_dicts = self.ptlm.get_positioners(enabled_only=False)
         self.all_posinfo = pd.concat(all_posinfo_dicts.values(), ignore_index=True)
         self.petal_locs = self.all_posinfo[['DEVICE_ID', 'PETAL_LOC']]
@@ -518,7 +525,7 @@ class PECS:
         do_on = self._parse_yn(self.input('Turn on fiducials (y/n): ')) if self.interactive else True
         if do_on:
             responses = self.ptlm.set_fiducials(setting='on',
-                            participating_petals=self.ptlm.get('fid_petals'))
+                            participating_petals=self.fid_petals)
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
@@ -541,7 +548,7 @@ class PECS:
         do_off = self._parse_yn(self.input('Turn off fiducials (y/n): ')) if self.interactive else True
         if do_off:
             responses = self.ptlm.set_fiducials(setting='off',
-                            participating_petals=self.ptlm.get('fid_petals'))
+                            participating_petals=self.fid_petals)
             # Set fiducials for all availible petals
         else:
             responses = self.ptlm.get_fiducials()
