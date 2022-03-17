@@ -747,9 +747,13 @@ class Petal(object):
             if self.verbose:
                 self.printfunc('Simulator skips sending move tables to positioners.')
         else:
+            self.printfunc('send_move_tables: calling _wait_while moving')
             self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
+            self.printfunc('send_move_tables: _wait_while moving done')
             response = self.comm.send_tables(hw_tables)
+            self.printfunc('send_move_tables: _send_tables done')
         failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
+        self.printfunc('send_move_tables: _handle_any_failed_send_move_tables done')
         if n_retries == 0 or not failed_posids:
             frozen = self.schedule.get_frozen_posids()
             for posid in frozen:
@@ -843,6 +847,7 @@ class Petal(object):
         INPUTS:  None
         """
         failed_posids, n_retries = self.send_move_tables()
+        self.printfunc('send_and_execute_moves: send_move_tables done')
         self.execute_moves()
         return failed_posids, n_retries
 
@@ -1536,22 +1541,33 @@ class Petal(object):
 
         See comments in posmodel.py for explanation of these values.
         """
-        (intT, intP) = self.posmodels[posid].expected_current_posintTP
-        (locT, locP) = self.posmodels[posid].expected_current_poslocTP
-        if key == 'posintTP':
-            return (intT, intP)
-        elif key == 'poslocTP':
-            return (locT, locP)
-        elif key == 'intTlocP':
-            return (intT, locP)
-        elif key == 'locTintP':
-            return (locT, intP)
+        if key in ['posintTP', 'poslocTP', 'intTlocP', 'locTintP']:
+            (intT, intP) = self.posmodels[posid].expected_current_posintTP
+            (locT, locP) = self.posmodels[posid].expected_current_poslocTP
+            if key == 'posintTP':
+                return (intT, intP)
+            elif key == 'poslocTP':
+                return (locT, locP)
+            elif key == 'intTlocP':
+                return (intT, locP)
+            elif key == 'locTintP':
+                return (locT, intP)
         pos = self.posmodels[posid].expected_current_position
-        if key in pos.keys():
-            return pos[key]
+        if isinstance(key, list):
+            positions = []
+            for k in key:
+                if k in pos.keys():
+                    positions.append(pos[k])
+                else:
+                    self.printfunc(f'Unrecognized key {key} when requesting '
+                                   f'expected_current_position of posid {posid}')
+            return positions
         else:
-            self.printfunc(f'Unrecognized key {key} when requesting '
-                           f'expected_current_position of posid {posid}')
+            if key in pos.keys():
+                return pos[key]
+            else:
+                self.printfunc(f'Unrecognized key {key} when requesting '
+                               f'expected_current_position of posid {posid}')
 
     def all_enabled_posids(self):
         """Returns set of all posids of positioners with CTRL_ENABLED == True.
