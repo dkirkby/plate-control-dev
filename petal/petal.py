@@ -92,7 +92,7 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=True,
+                 printfunc=print, verbose=False, save_debug=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
                  phi_limit_on=True, sync_mode='hard', anneal_mode='filled', n_strikes=2):
@@ -764,8 +764,7 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-        if self.save_debug:
-            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
 
     def set_motor_parameters(self, wait_on=False):
@@ -2284,8 +2283,9 @@ class Petal(object):
         filename_id_str = f'ptlid{self.petal_id:02}_{exp_str}_{pc.filename_timestamp_str()}'
         debug_path = os.path.join(pc.dirs['temp_files'], f'hwtables_{filename_id_str}.csv')
         debug_table.write(debug_path, overwrite=True)
-        density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
-        self.schedule.plot_density(density_path)
+        if self.save_debug: #03172022 KF: moved here to _always_ save hwtables, these are "important" data now and backed up on NERSC
+            density_path = os.path.join(pc.dirs['temp_files'], f'density_{filename_id_str}.png')
+            self.schedule.plot_density(density_path)
 
     def _postmove_cleanup(self):
         """This always gets called after performing a set of moves, so that
