@@ -582,6 +582,10 @@ class PECS:
                 logbook=False, remove_after_transfer=self.fvc_cleanup)
             self.print(f'FVCCollector.collect returned code: {retcode}')
             if retcode == 'SUCCESS':
+                wait_time = 60 #wait for data transfer, maybe make this calculated time*iterations?
+                exit_cond = lambda : os.path.isfile(f'{destination}/fvc-{self.exp.id:08}.fits.fz')
+                self.print(f'Sleeping for maximum {wait_time} to wait for FVC data transfer...')
+                self.countdown_sec(wait_time, break_condition=exit_cond) #wait a minute for data transfer/break early if file exists
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')
             expserv = SimpleProxy('EXPOSURESERVER')
@@ -593,13 +597,20 @@ class PECS:
             self.print(f'FVC collection failed with exception: {e}')
 
     @staticmethod
-    def countdown_sec(t):  # in seconds
+    def countdown_sec(t, break_condition=lambda : False):  # in seconds
         t = int(t)
+        t_wait = 0
         for i in reversed(range(t)):
             sys.stderr.write(f'\rSleeping... ({i} s / {t} s)')
             time.sleep(1)
+            t_wait += 1
             sys.stdout.flush()
-        print(f'\nSleep finished ({t} s)')
+            if break_condition():
+                break
+        if t_wait < t:
+            print(f'\nSleep finished early ({t_wait} s)')
+        else:
+            print(f'\nSleep finished ({t} s)')
 
     def pause(self, press_enter=False):
         '''pause operation between positioner moves for heat monitoring'''
