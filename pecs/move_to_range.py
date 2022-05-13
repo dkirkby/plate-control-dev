@@ -90,7 +90,7 @@ for i in range(uargs.iterations):
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits for test setup; move_to_range.py'
     # Now selected is a proper move request
-    cs.move_measure(selected, test_tp=True, anticollision=anticollision)
+    cs.move_measure(selected, test_tp=True, anticollision=uargs.anticollision)
 
 out_of_limits = check_if_out_of_limits()
 if not out_of_limits:
