@@ -380,7 +380,7 @@ class PECS:
         return exppos, meapos, matched, unmatched
 
     def move_measure(self, request=None, match_radius=None, check_unmatched=False,
-                     test_tp=False, anticollision=None, num_meas=1):
+                     test_tp=False, anticollision='default', num_meas=1):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request.
@@ -442,7 +442,7 @@ class PECS:
     
     def rehome_and_measure(self, posids, axis='both', debounce=True, log_note='',
                            match_radius=None, check_unmatched=False, test_tp=False,
-                           anticollision=None):
+                           anticollision='freeze'):
         '''Wrapper for sending rehome command and then measuring result.
         Returns whatever fvc_measure returns.
         '''

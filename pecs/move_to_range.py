@@ -14,7 +14,11 @@ parser.add_argument('-m', '--mode', type=str, default=modes[0], help=f'str, cont
 default_padding = 10.0
 parser.add_argument('-p', '--angle_padding', type=float, default=default_padding, help=f'Float, angle padding by which to exceed limits when only one limit is specified. Defaults to {default_padding}.')
 parser.add_argument('-d', '--disable', action='store_true', help='Argue to disable positioners that remain out of range at the end of iterations.')
+parser.add_argument('-a', '--anticollision', type=str, default='freeze', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "freeze"')
 uargs = parser.parse_args()
+if uargs.anticollision == 'None':
+    uargs.anticollision = None
+assert uargs.anticollision in {'adjust', 'adjust_requested_only', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 assert uargs.iterations < max_iter, f'cannot exceed {max_iter} iterations.'
 command = uargs.mode
 assert command in modes, f'Invalid mode type {command}. Must be in {modes}.'
@@ -86,7 +90,7 @@ for i in range(uargs.iterations):
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits for test setup; move_to_range.py'
     # Now selected is a proper move request
-    cs.move_measure(selected, test_tp=True)
+    cs.move_measure(selected, test_tp=True, anticollision=anticollision)
 
 out_of_limits = check_if_out_of_limits()
 if not out_of_limits:
