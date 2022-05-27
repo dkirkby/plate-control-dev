@@ -1089,6 +1089,10 @@ class Petal(object):
                 return f'FAILED: will not move to {hw_state}. check_can_ready returned {ready}.'
         todo = list(pc.PETAL_OPS_STATES[self._last_state].keys())
         for key, value in pc.PETAL_OPS_STATES[self._last_state].items():
+            if key in ['GFAPWR_EN', 'TEC_CTRL', 'GFA_FAN'] and self.use_gfacontrol:
+                self.printfunc(f'not setting GFA components ({key}')
+                todo.remove(key)
+                continue
             old_state = self.comm.pbget(key)
             if old_state == pc.PETAL_OPS_STATES[self._last_state][key][0]:
                 # Don't change state if it's where we want it
