@@ -328,7 +328,8 @@ class PECS:
                     self.print('Measured positions of positioners by FVC '
                                'are contaminated by fiducials.')
                 this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
-                this_meapos = self._batch_transform(this_meapos, 'QS', 'obsXY')
+                this_meapos = self._batch_transform(this_meapos, 'QS', 'obsXY',
+                                                    participating_petals=self.illuminated_ptl_roles)
                 if i == 0:
                     meapos = this_meapos
                 for column in ['obsX', 'obsY', 'Q', 'S']:
@@ -340,7 +341,8 @@ class PECS:
                 these_columns = [f'{column}{i}' for i in range(num_meas)]
                 medians = meapos[these_columns].median(axis=1)
                 meapos[column] = medians
-            meapos = self._batch_transform(meapos, 'obsXY', 'QS')
+            meapos = self._batch_transform(meapos, 'obsXY', 'QS',
+                                           participating_petals=self.illuminated_ptl_roles)
             exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                       .set_index('DEVICE_ID').sort_index())
             exppos.columns = exppos.columns.str.upper()
@@ -365,7 +367,8 @@ class PECS:
             # gather tracked angles *prior* to their possible updates by handle_fvc_feedback()
             posids = exppos.index.tolist()
             for key in ['posintT', 'posintP']:
-                this_data = self.quick_query_df(key=key, posids=posids)
+                this_data = self.quick_query_df(key=key, posids=posids,
+                                                participating_petals=self.illuminated_ptl_roles)
                 exppos = exppos.join(this_data, on='DEVICE_ID')
 
             control = {'timeout': self.fvc_feedback_timeout}
@@ -373,7 +376,7 @@ class PECS:
                                           test_tp=test_tp, auto_update=True,
                                           err_thresh=self.max_err, up_tol=self.tp_tol,
                                           up_frac=self.tp_frac, postscript=submeas,
-                                          control=control)
+                                          control=control, participating_petals=self.illuminated_ptl_roles)
         else:
             exppos, meapos, matched, unmatched = pd.DataFrame(), pd.DataFrame(), set(), set()
 
@@ -700,7 +703,7 @@ class PECS:
             out[posid] = s
         return out
     
-    def quick_query(self, key=None, op='', value='', posids='all', mode='iterable'):
+    def quick_query(self, key=None, op='', value='', posids='all', mode='iterable', participating_petals=None):
         '''Returns a collection containing values for all petals of a quick_query()
         call. See documentation for petal.quick_query() for details.
         '''
@@ -708,7 +711,10 @@ class PECS:
         # 'PETAL1', 'PETAL2', etc, and corresponding return data from those petals, OR just the return
         # data from that one petal. It's not perfectly clear when this does or doesn't happen, but
         # from discussion with Kevin and some trials at the CONSOLE this ought to be ok here.
-        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids, mode=mode, skip_unknowns=True)
+        if participating_petals is None:
+            participating_petals = self.ptlm.participating_petals
+        data_by_petal = self.ptlm.quick_query(key=key, op=op, value=value, posids=posids,
+                                              mode=mode, skip_unknowns=True, participating_petals=participating_petals)
         if isinstance(data_by_petal, (str, list, tuple)):
             return data_by_petal
         check_val = data_by_petal[list(data_by_petal.keys())[0]]
@@ -730,11 +736,13 @@ class PECS:
             assert False, f'unrecognized return type {type(check_val)} from quick_query()'
         return combined
         
-    def quick_query_df(self, key, posids='all'):
+    def quick_query_df(self, key, posids='all', participating_petals=None):
         '''Wrapper for quick_query which returns a pandas DataFrame, whose
         index is 'DEVICE_ID' and data column is key.
         '''
-        data = self.quick_query(key=key, posids=posids)
+        if participating_petals is None:
+            participating_petals = self.ptlm.participating_petals
+        data = self.quick_query(key=key, posids=posids, participating_petals=participating_petals)
         ordered_posids = list(data)
         ordered_data = [data[posid] for posid in posids]
         listed = {'DEVICE_ID': ordered_posids, key: ordered_data}
@@ -772,14 +780,14 @@ class PECS:
         suffix = '_after_updates'
         posids = exppos.index.tolist()
         for key in ['posintT', 'posintP']:
-            this_data = self.quick_query_df(key=key, posids=posids)
+            this_data = self.quick_query_df(key=key, posids=posids, participating_petals=self.illuminated_ptl_roles)
             exppos = exppos.join(this_data, on='DEVICE_ID', rsuffix=suffix)
         posint_keys = [key for key in exppos.columns if 'posint' in key]
         result = merged.merge(exppos[posint_keys], on='DEVICE_ID')
         
         return result
     
-    def _batch_transform(self, frame, cs1, cs2):
+    def _batch_transform(self, frame, cs1, cs2, participating_petals=None):
         '''Calculate values in cs2 for a frame that has columns for coordinate
         system cs1. E.g. cs1='QS', cs2='obsXY'. Index is 'DEVICE_ID'. Then return
         a new frame that now includes new columns (or replaces existing columns)
@@ -788,13 +796,15 @@ class PECS:
 
         DOES NOT change frame
         '''
+        if participating_petals is None:
+            participating_petals = self.ptlm.participating_petals
         if not(frame.index.name == 'DEVICE_ID'):
             df = frame.set_index('DEVICE_ID')
             reset_index = True
         else:
             df = frame.copy()
             reset_index = False
-        ret = self.ptlm.batch_transform(df, cs1, cs2)
+        ret = self.ptlm.batch_transform(df, cs1, cs2, participating_petals=participating_petals)
         df = pd.concat([x for x in ret.values()])
         if reset_index:
             df.reset_index(inplace=True)
