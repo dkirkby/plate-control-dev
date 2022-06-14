@@ -1192,6 +1192,9 @@ class Petal(object):
         err_strings = []
         current = {}
         for key in pc.PETAL_OPS_STATES[state].keys():
+            if key in ['GFAPWR_EN', 'TEC_CTRL', 'GFA_FAN'] and self.use_gfacontrol:
+                # skip GFA keys if using gfacontrol
+                continue
             fbk = self.comm.pbget(key)
             if what == 'list' or what == key:
                 current[key] = fbk
