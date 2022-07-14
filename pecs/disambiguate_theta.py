@@ -20,7 +20,7 @@ parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, s
 parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
 parser.add_argument('-oc', '--only_creep', type=str, default='True', help='True --> move ambigous positioners slowly when going toward their possible hard limits, False --> cruise speed, None --> use existing individual positioner values')
 #20220604 - default creep period for this script was 1 (faster) compared to normal 2, this functionality didn't work
-parser.add_argument('-cp', '--creep_period', type=int, default=2, help='int, overrides positioners\' values for parameter CREEP_PERIOD (1 is fastest possible, as of 2021-09-05 a setting of 2 is typical during observations, enter 0 to use existing individual positioner values')
+parser.add_argument('-cp', '--creep_period', type=int, default=0, help='int, overrides positioners\' values for parameter CREEP_PERIOD (1 is fastest possible, as of 2021-09-05 a setting of 2 is typical during observations, enter 0 to use existing individual positioner values')
 uargs = parser.parse_args()
 
 # set up logger
@@ -40,7 +40,7 @@ import pandas
 # input validation
 assert 1 <= uargs.num_tries <= max_tries, f'out of range argument {uargs.num_tries} for num_tries parameter'
 assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
-assert 2 == uargs.creep_period, 'Creep period different from 2 (default) not supported!'
+assert (2 == uargs.creep_period) or (0 == uargs.creep_period), 'Creep period different from 2 (default) not supported!' #Note 0 is no change
 # remove the above assertion when/if functionality to infrom petalcontroller of creep period (and clean up if crashes) is added
 assert 0 <= uargs.creep_period <= 2, f'out of range argument {uargs.creep_period} for creep_period parameter'
 if pc.is_none(uargs.only_creep):
