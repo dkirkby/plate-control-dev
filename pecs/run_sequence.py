@@ -678,6 +678,9 @@ try:
                 logger.info('Turning off fiducials')
                 pecs.ptlm.set_fiducials('off', participating_petals=pecs.ptlm.get('fid_petals'))
             more_moves_to_do = more_corrections_to_do or m < final_move or uargs.postpark
+            if not(correction_pause):
+                global last_move_time
+                last_move_time = time.time()
             if more_moves_to_do and (not(more_corrections_to_do) or correction_pause):
                 do_pause()
     if uargs.postpark:
