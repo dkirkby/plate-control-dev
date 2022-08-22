@@ -430,6 +430,9 @@ class PECS:
             for posids in requested_posids.values():
                 all_requested |= posids
             dummy_req = {'DEVICE_ID': list(all_requested), 'COMMAND': 'dummy_cmd', 'X1': 0.0, 'X2': 0.0, 'LOG_NOTE': ''}
+            if len(all_requested) == 0:
+                self.print('WARNING: No independently requested / scheduled moves. Check for rejected requests, IE invalid or all devices disabled.')
+                dummy_req = {'DEVICE_ID': list(self.posids), 'COMMAND': 'dummy_cmd', 'X1': np.nan, 'X2': np.nan, 'LOG_NOTE': ''}
             request = pd.DataFrame(dummy_req)
         if 'PETAL_LOC' not in request.columns:
             request = request.merge(self.petal_locs, on='DEVICE_ID')

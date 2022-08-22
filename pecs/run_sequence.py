@@ -39,6 +39,8 @@ parser.add_argument('-ms', '--start_move', type=int, default=0, help='start the 
 parser.add_argument('-mf', '--final_move', type=int, default=-1, help='finish the test at this move index (or defaults to last row)')
 parser.add_argument('-curr', '--motor_current', type=int, default=None, help='set motor currents (duty cycle) for the duration of the test. Overrides any values in the online system or sequence file. Must be an integer between 1 and 100')
 parser.add_argument('-v', '--verbose', action='store_true', help='turn on verbosity at terminal window (note that the log file on disk will always be verbose)')
+parser.add_argument('-cf', '--cycle_fiducials', action='store_true', help='Set flag to cycle fiducials between moves like in an OCS sequence (they are left on between submoves - it is ok to turn fiducials on or off with the pecs prompt in the beginning)')
+parser.add_argument('-ncp','--no_correction_pause', action='store_true', help='Set this flag to skip pauses for correction moves (example use is to act more like on-mountain moves)')
 
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
@@ -51,6 +53,8 @@ assert uargs.postpark in park_options, f'invalid park option, must be one of {pa
 uargs.prepark = None if uargs.prepark in ['None', 'False'] else uargs.prepark
 uargs.postpark = None if uargs.postpark in ['None', 'False'] else uargs.postpark
 assert uargs.motor_current == None or 0 < uargs.motor_current <= 100, f'out of range argument {uargs.motor_current} for motor current parameter'
+cycle_fids = uargs.cycle_fiducials
+correction_pause = not(uargs.no_correction_pause)
 
 # read sequence file
 import sequence
@@ -548,7 +552,13 @@ def park(park_option, is_prepark=True):
             if orig_tp_frac != pecs.tp_frac:
                 logger.info(f'For pre-parking, temporarily adjusted tp update error fraction from {orig_tp_frac} to {pecs.tp_frac}')
         apply_pos_settings(override_settings)
+        if cycle_fids:
+            logger.info('Turning on fiducials')
+            pecs.ptlm.set_fiducials('on', participating_petals=pecs.ptlm.get('fid_petals'))
         pecs.park_and_measure(**kwargs)
+        if cycle_fids:
+            logger.info('Turning off fiducials')
+            pecs.ptlm.set_fiducials('off', participating_petals=pecs.ptlm.get('fid_petals'))
         apply_pos_settings(original_settings)
         if uargs.test_tp and orig_tp_frac != pecs.tp_frac:
             pecs.tp_frac = orig_tp_frac
@@ -586,6 +596,9 @@ try:
         targ_errs = None
         calc_errors = move.command not in sequence.delta_commands | sequence.homing_commands
         initial_request = None
+        if (n_corr > 0) and cycle_fids and pecs_on:
+            logger.info('Turing on fiducials')
+            pecs.ptlm.set_fiducials('on', participating_petals=pecs.ptlm.get('fid_petals'))
         for submove_num in range(1 + n_corr):
             extra_log_note = pc.join_notes(f'sequence_move_idx {m}', f'move {move_counter}')
             submove_txt = f'submove {submove_num}'
@@ -660,8 +673,15 @@ try:
                 err_str += '\n' + summarize_errors(targ_errs, prefix='TARGETING')
                 err_str += '\n' + summarize_errors(trac_errs, prefix=' TRACKING')
                 logger.info(err_str + '\n')
-            more_moves_to_do = submove_num < n_corr or m < final_move or uargs.postpark
-            if more_moves_to_do:
+            more_corrections_to_do = submove_num < n_corr
+            if not(more_corrections_to_do) and cycle_fids and pecs_on:
+                logger.info('Turning off fiducials')
+                pecs.ptlm.set_fiducials('off', participating_petals=pecs.ptlm.get('fid_petals'))
+            more_moves_to_do = more_corrections_to_do or m < final_move or uargs.postpark
+            if not(correction_pause):
+                global last_move_time
+                last_move_time = time.time()
+            if more_moves_to_do and (not(more_corrections_to_do) or correction_pause):
                 do_pause()
     if uargs.postpark:
         park(park_option=uargs.postpark, is_prepark=False)
