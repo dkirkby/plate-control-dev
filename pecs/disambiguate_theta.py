@@ -31,7 +31,7 @@ class disambig_class():
     KF - 20210212
         Not the best but putting this in a class so it can accept an outside PECS or logger instance.
     '''
-    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4, only_creep=None, creep_period=0):
+    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4, only_creep=True, creep_period=0):
         if logger is None:
             # set up logger
             import simple_logger
