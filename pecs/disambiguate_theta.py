@@ -31,7 +31,7 @@ class disambig_class():
     KF - 20210212
         Not the best but putting this in a class so it can accept an outside PECS or logger instance.
     '''
-    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4):
+    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4, only_creep=None, creep_period=0):
         if logger is None:
             # set up logger
             import simple_logger
@@ -58,6 +58,7 @@ class disambig_class():
         self.match_radius = match_radius
         self.check_unmatched = check_unmatched
         self.num_meas = num_meas
+        self.settings = {'ONLY_CREEP': only_creep, 'CREEP_PERIOD': creep_period}
         # some boilerplate
         self.common_move_meas_kwargs = {'match_radius': self.match_radius,
                                         'check_unmatched': self.check_unmatched,
@@ -174,7 +175,7 @@ class disambig_class():
         new_settings = {}
         settings_note = ''
         for key, skipval in {'ONLY_CREEP': None, 'CREEP_PERIOD': 0}.items():
-            uarg = getattr(uargs, key.lower())
+            uarg = self.settings[key] #getattr(uargs, key.lower())
             if uarg != skipval:
                 for posid in ambig:
                     if posid not in new_settings:  # and by implication, not in old_settings yet, either
@@ -236,7 +237,8 @@ if __name__ == '__main__':
         assert False, f'out of range argument {uargs.only_creep} for only_creep parameter'
 
     disambig_obj = disambig_class(pecs=None, logger=None, num_meas=uargs.num_meas, num_tries=uargs.num_tries,
-                                  match_radius=uargs.match_radius, check_unmatched=uargs.check_unmatched)
+                                  match_radius=uargs.match_radius, check_unmatched=uargs.check_unmatched,
+                                  only_creep=uargs.only_creep, creep_period=uargs.creep_period)
     ambig = disambig_obj.disambig()
     disambig_obj.logger.info('Disambiguation loops complete.')
     if ambig:
