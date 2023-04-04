@@ -88,7 +88,7 @@ try:
     updates = onepoint(cs, mode='posTP', move=False, commit=True, tp_tol=0.065,
                        tp_frac=1.0, num_meas=1, use_disabled=True, check_unmatched=True)
     enabled_after_1p = get_pos_set('enabled')
-    updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', 'POS_T', 'POS_P', 'OLD_POS_T', 'OLD_POS_P']]
+    updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY']]
     updates.sort_values('ERR_XY', inplace=True, ascending=False)
     logger.debug('Updates sorted by descending ERR_XY:')
     logger.debug(updates.to_string())
