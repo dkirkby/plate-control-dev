@@ -370,7 +370,7 @@ class Petal(object):
                 # assume all relays open (unusable) initially, good guess for missing devs/errors
                 self.relay_map = {posid: 'open' for posid in self.posids}
                 for idx in ret['state'].keys():
-                    busid = ret['bus_id'][idx]
+                    busid = ret['bus20_id'][idx]
                     canid = ret['can_id'][idx]
                     state = ret['state'][idx]
                     try:
