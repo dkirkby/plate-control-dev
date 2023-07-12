@@ -78,6 +78,11 @@ class PosModel(object):
         return self.state._val['CTRL_ENABLED']
     
     @property
+    def axis_locks(self):
+        """Returns 1x2 tuple of booleans, stating whether the (theta, phi) axes are locked."""
+        return (self.axis[pc.T].is_locked, self.axis[pc.P].is_locked)
+    
+    @property
     def classified_as_retracted(self):
         """Returns whether the positioner has been classified as retracted or not."""
         return self.state._val['CLASSIFIED_AS_RETRACTED']
@@ -240,7 +245,9 @@ class PosModel(object):
         specific meanings.
         """
         start = self.expected_current_posintTP if not init_posintTP else init_posintTP
-        if limits:
+        if self.axis[axisid].is_locked:
+            distance = 0.0
+        elif limits:
             use_near_full_range = (limits == 'near_full')
             distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
@@ -320,7 +327,10 @@ class Axis(object):
         self.hardstop_clearance_near_full_range = self._calc_hardstop_clearance_near_full_range()
         self.hardstop_debounce = self._calc_hardstop_debounce()
         motor_props = self.motor_calib_properties
-        self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio'] / motor_props['gear_calib']
+        self.is_locked = motor_props['locked']
+        self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio']
+        if not self.is_locked:
+            self.signed_gear_ratio /= motor_props['gear_calib'] # avoid divide-by-zero for disabled axis
         self._full_range = self._calc_full_range()
         self._debounced_range = self._calc_debounced_range()
         self._near_full_range = self._calc_near_full_range()
@@ -447,6 +457,7 @@ class Axis(object):
             prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_P']]
             prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
             prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_P']
+        prop['locked'] = prop['gear_calib'] == 0.0
         return prop
 
     def motor_to_shaft(self, distance):

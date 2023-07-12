@@ -37,7 +37,9 @@ code_version = petal_directory.split(os.path.sep)[-2]
 
 # Directory locations
 dirs = {}
-if 'DESI_HOME' in os.environ:
+if 'FOCALPLANE_HOME' in os.environ:
+    home = os.environ.get('FOCALPLANE_HOME')
+elif 'DESI_HOME' in os.environ:
     home = os.environ.get('DESI_HOME')
 elif 'HOME' in os.environ:
     home = os.environ.get('HOME')
@@ -135,11 +137,19 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
+# common print function
+# note the implementation may be replaced at runtime by petal.py, for logging
+printfunc = print
+
 # handle_fvc_feedback defaults
-err_thresh = False # tracing error over which to disable, False means none
+err_thresh = 0.5 # tracking error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
+up_tol_disabled = 0.2 #mm over which to apply tp updates to disabled positioners
 up_frac = 1.0 # amount of update to apply to posTP
+err_disable = False # automatically disable positioners above error threshhold
 unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
+didnotmove_tol = 0.080 # Margin for how close to old move a positioner needs to be to be considered "nonmoving"
+didnotmove_check_tol = 0.080 # Margin for how far off tracking needs to be to check for non motion
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
@@ -147,8 +157,6 @@ near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop c
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 theta_hardstop_ambig_tol = 8.0 # deg, for determining when within ambiguous zone of theta hardstops
 theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure getting out of ambiguous zone
-keepout_typ_angular_padding = 3.5 # deg, per DESI-0899-v14
-low_risk_rotation = keepout_typ_angular_padding - 0.1 # deg, delta theta or phi smaller than this threshold have low risk if hardware should fail to execute them as scheduled
 
 # Annealing spreads out motor power consumption in time, as well as naturally reducing
 # potential collision frequency. See posschedulestage.py for more info. Do *not* increase
@@ -168,8 +176,8 @@ nominals['OFFSET_X']         = {'value':   0.0, 'tol': 1000.0}
 nominals['OFFSET_Y']         = {'value':   0.0, 'tol': 1000.0}
 nominals['PHYSICAL_RANGE_T'] = {'value': 370.0, 'tol':   50.0}
 nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
-nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.99}
-nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.99}
+nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    1.0}
+nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    1.0}
 
 # Tolerance for theta guesses when performing xy2tp transform
 default_t_guess_tol = 30.0  # deg
@@ -185,7 +193,7 @@ phi_off_center_threshold = 180 - math.floor(_off_center_threshold_mm / _min_leng
 ctrd_phi_theta_change_tol = math.ceil(_ctrd_phi_theta_change_tol_mm / _nom_max_r * deg_per_rad)
 
 # Hardware (operations) States
-PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                  'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                                  'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
                                                  'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
@@ -196,7 +204,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                                  #PetalBox Power ON - controlled by physical raritan switch
                                                  'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                                  'PS2_EN':('off', 1.0)}),
-                    'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'STANDBY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                              'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
                                              'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                              'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
@@ -207,7 +215,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                              #PetalBox Power ON - controlled by physical raritan switch
                                              'PS1_EN':('off', 1.0), #Positioner Power EN OFF
                                              'PS2_EN':('off', 1.0)}),
-                    'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'READY' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                            'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                            'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                            'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
@@ -218,7 +226,7 @@ PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #C
                                            #PetalBox Power ON - controlled by physical raritan switch
                                            'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
                                            'PS2_EN': ('off', 1.0)}),
-                    'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                    'OBSERVING' : OrderedDict({#'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                                'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                                'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
                                                'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
@@ -457,18 +465,6 @@ def linspace(start,stop,num):
     List has num elements."""
     return [i*(stop-start)/(num-1)+start for i in range(num)]
 
-def plural(string, test_item):
-    '''Returns string appropriately pluralized according to length of test_item.
-    Alternately if test_item is an integer, uses that number. If string ends in
-    "y", replaces with "ies" to pluralize. Otherwise simply appends and "s".
-    '''
-    length = test_item if is_integer(test_item) else len(test_item)
-    if length == 1:
-        return string
-    if string[-1] == 'y':
-        return string[:-1] + 'ies'
-    return string + 's'
-
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):
     """Turn [u,v] into [[u],[v]], if it isn't already.
@@ -620,9 +616,6 @@ def is_integer(x):
 def is_float(x):
     return isinstance(x, (float, np.floating))
 
-def is_number(x):
-    return is_integer(x) or is_float(x)
-
 def is_string(x):
     return isinstance(x, (str, np.str))
 
@@ -661,6 +654,12 @@ plot_styles = {
 
     'phi arm':
         {'linestyle' : '-',
+         'linewidth' : 1,
+         'edgecolor' : 'green',
+         'facecolor' : 'none'},
+
+    'phi arc':
+        {'linestyle' : '--',
          'linewidth' : 1,
          'edgecolor' : 'green',
          'facecolor' : 'none'},

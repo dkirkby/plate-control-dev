@@ -149,12 +149,22 @@ class PosSchedStats(object):
             this_dict[method] = set()
         this_dict[method] = this_dict[method].union(collision_pair_ids)
         for pair in collision_pair_ids:
-            split = set(pair.split('-'))
-            assert posid in split, f'posschedstats: {posid} not found in collision pair {pair}!'
-            other = (split - {posid}).pop()
-            if posid not in self.avoidances[latest]:
-                self.avoidances[latest][posid] = []
-            self.avoidances[latest][posid] += [f'{method}/{other}']
+            self.add_avoidance(posid, method, pair)
+            
+    def add_avoidance(self, posid, method, collision_pair_id):
+        '''Add an avoidance method for a collision that has been resolved in the
+        current schedule.
+            posid ... string, the positioner that was adjusted
+            method ... string, collision resolution method
+            collision_pair_id ... collision_pair_id resolved by method, posid must be one of the pair!
+        '''
+        split = set(collision_pair_id.split('-'))
+        assert posid in split, f'posschedstats: {posid} not found in collision pair {collision_pair_id}!'
+        other = (split - {posid}).pop()
+        latest = self.latest
+        if posid not in self.avoidances[latest]:
+            self.avoidances[latest][posid] = []
+        self.avoidances[latest][posid] += [f'{method}/{other}']
         
     def get_collisions_resolved_by(self, method='freeze'):
         '''Returns set of all collisions resolved by method in the latest
@@ -471,7 +481,10 @@ class PosSchedStats(object):
             parent_dir = os.path.dirname(dir_name)
             parent_dir_exists = os.path.isdir(parent_dir)
             if parent_dir_exists:
-                os.mkdir(dir_name)
+                try:
+                    os.mkdir(dir_name)
+                except FileExistsError: #multiple petals could be trying to do this at the same time
+                    pass
                 dir_exists = os.path.isdir(dir_name)
         if path is None or not dir_exists:
             suffix = str(self.filename_suffix)

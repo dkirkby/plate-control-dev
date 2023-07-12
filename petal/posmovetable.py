@@ -412,15 +412,16 @@ class PosMoveTable(object):
         Anti-backlash and final creep moves are added as necessary.
         """
         latest_TP = [x for x in self.init_posintTP]
-        backlash = [0,0]
-        true_moves = [[],[]]
-        new_moves = [[],[]]
-        true_and_new = [[],[]]
-        has_moved = [False,False]
+        backlash = [0, 0]
+        true_moves = [[], []]
+        new_moves = [[], []]
+        true_and_new = [[], []]
+        has_moved = [False, False]
         normal_row_limits = None if self.allow_exceed_limits else 'debounced'
         extra_row_limits = None if self.allow_exceed_limits else 'near_full'
+        axis_idxs = [pc.T, pc.P]
         for row in self.rows:
-            ideal_dist = [row.data['dT_ideal'],row.data['dP_ideal']]
+            ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
                 move = self.posmodel.true_move(axisid=i,
                                                distance=ideal_dist[i],
@@ -435,7 +436,7 @@ class PosMoveTable(object):
             backlash_dir = [self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T'],
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
-            for i in [pc.T,pc.P]:
+            for i in axis_idxs:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
                 move = self.posmodel.true_move(axisid=i,
                                                distance=backlash[i],
@@ -446,14 +447,15 @@ class PosMoveTable(object):
                 new_moves[i][-1]['auto_cmd'] = '(auto backlash backup)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
-            ideal_total = [0,0]
+            ideal_total = [0, 0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
             ideal_total[pc.P] = sum([row.data['dP_ideal'] for row in self.rows])
-            actual_total = [0,0]
-            err_dist = [0,0]
-            for i in [pc.T,pc.P]:
+            actual_total = [0, 0]
+            err_dist = [0, 0]
+            for i in axis_idxs:
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
-                err_dist[i] = ideal_total[i] - actual_total[i]
+                if not self.posmodel.axis[i].is_locked:
+                    err_dist[i] = ideal_total[i] - actual_total[i]
                 if abs(err_dist[i]) > pc.max_auto_creep_distance:
                     auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
                                        f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
@@ -513,6 +515,22 @@ class PosMoveTable(object):
         if output_type in {'collider', 'schedule', 'full', 'hardware', 'timing'}:
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],
                                       true_moves[pc.P][i]['move_time']) for i in row_range]
+        if output_type in {'full', 'cleanup', 'hardware'}:
+            lock_note = ''
+            locked_axes = [name for num, name in {pc.T: 'T', pc.P: 'P'}.items() if self.posmodel.axis[num].is_locked]
+            for axis in locked_axes:
+                dkey = f'motor_steps_{axis}' if output_type == 'hardware' else f'd{axis}'
+                if any(table[dkey]):
+                    pc.printfunc(f'ERROR: {self.posid}: lock calculation failed on axis {axis}, non-zero {dkey} detected in' + \
+                                   ' posmovetable.py. Move command to positioner will be altered to prevent any motion, though' + \
+                                   ' could still result in timing errors or collisions.')
+                    table[dkey] = [0 for i in row_range]
+                    lock_note = pc.join_notes(lock_note, f'lock error on axis {axis}')
+                if output_type in {'full', 'cleanup'}:
+                    ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
+                    zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
+                    if any(zeroed_deltas):
+                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables        
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
@@ -562,8 +580,8 @@ class PosMoveTable(object):
                 table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'][i] != 0)
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
-            table['log_note'] = self.log_note
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
+            table['log_note'] = pc.join_notes(self.log_note, lock_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
