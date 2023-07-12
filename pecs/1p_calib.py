@@ -84,11 +84,7 @@ if __name__ == '__main__':
         updates = onepoint(cs, mode=uargs.mode, move=uargs.prepark, commit=not(uargs.no_update),
                            tp_tol=uargs.tp_tol, tp_frac=uargs.tp_frac, match_radius=uargs.match_radius,
                            num_meas=uargs.num_meas, use_disabled=uargs.use_disabled, check_unmatched=uargs.check_unmatched)
-        if uargs.mode == 'posTP':
-            key1, key2 = 'POS_T', 'POS_P'
-        else:
-            key1, key2 = 'OFFSET_T', 'OFFSET_P'
-        updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY', key1, key2, f'OLD_{key1}', f'OLD_{key2}']]
+        updates = updates[['DEVICE_ID', 'DEVICE_LOC', 'PETAL_LOC', 'ERR_XY']]
         updates.sort_values('ERR_XY', inplace=True, ascending=False)
         logger.info('Updates sorted by descending ERR_XY:')
         logger.debug(updates.to_string())
