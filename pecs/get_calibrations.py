@@ -65,8 +65,8 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'OFFSET_Y': 'y position of robot\'s central axis, in "flat" coordinate system',
               'PHYSICAL_RANGE_T': 'angular distance between theta hardstops',
               'PHYSICAL_RANGE_P': 'angular distance between phi hardstops',
-              'GEAR_CALIB_T': 'scale factor for theta shaft rotations, actual/nominal',
-              'GEAR_CALIB_P': 'scale factor for phi shaft rotations, actual/nominal',
+              'GEAR_CALIB_T': 'scale factor for theta shaft rotations, actual/nominal. value of 0 locks the theta axis',
+              'GEAR_CALIB_P': 'scale factor for phi shaft rotations, actual/nominal. value of 0 locks the phi axis',
               'KEEPOUT_EXPANSION_PHI_RADIAL': 'radially expands phi keepout polygon by this amount',
               'KEEPOUT_EXPANSION_THETA_RADIAL': 'radially expands theta keepout polygon by this amount',
               'KEEPOUT_EXPANSION_PHI_ANGULAR': 'angularly expands phi keepout polygon by + and - this amount',
@@ -130,8 +130,13 @@ offset_variant_keys = {f'{coord}_{var}': f'{coord} transformed into {system}' fo
 range_desc = lambda func, c: f'{func} targetable internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
 range_keys = {f'{func.upper()}_{c}': range_desc(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
 range_keys_map = {key: f'{key[:-1].lower()}targetable_range_posint{key[-1]}' for key in range_keys}
+range_desc2 = lambda func, c: f'{func} full range internally-tracked {"theta" if c == "T" else "phi"} angle (i.e. "POS_{c}" or "posint{c}" or "{c.lower()}_int"'
+range_keys2 = {f'FULL_{func.upper()}_{c}': range_desc2(func, c) for c in ['T', 'P'] for func in ['max', 'min']}
+range_keys_map2 = {key: f'{key[5:-1].lower()}full_range_posint{key[-1]}' for key in range_keys2}
 query_keys.update(range_keys)
 query_keys_map.update(range_keys_map)
+query_keys.update(range_keys2)
+query_keys_map.update(range_keys_map2)
 
 # summarize all keys and units (where applicable)
 all_pos_keys = {}
@@ -141,9 +146,10 @@ all_pos_keys.update(collider_query_keys)
 all_pos_keys.update(collider_pos_poly_keys)
 all_pos_keys.update(offset_variant_keys)
 all_pos_keys.update(range_keys)
+all_pos_keys.update(range_keys2)
 angular_keys = {'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
                 'KEEPOUT_EXPANSION_PHI_ANGULAR', 'KEEPOUT_EXPANSION_THETA_ANGULAR'}
-angular_keys |= set(range_keys)
+angular_keys |= set(range_keys) | set(range_keys2)
 mm_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y', 'OBS_X', 'OBS_Y', 'PTL_X', 'PTL_Y',
            'KEEPOUT_EXPANSION_PHI_RADIAL', 'KEEPOUT_EXPANSION_THETA_RADIAL'}
 mm_keys |= set(offset_variant_keys)
@@ -375,3 +381,7 @@ if online:
 # re-raise exception from above if we have one
 if exception_during_run:
     raise(exception_during_run)
+
+#Sometimes hangs? Should fix but no time now.
+time.sleep(60)
+sys.exit(0)
