@@ -611,10 +611,10 @@ def ordinal_str(number):
     return numstr + 'th'
 
 def is_integer(x):
-    return isinstance(x, (int))     #, np.integer))
+    return isinstance(x, (int, np.integer))
 
 def is_float(x):
-    return isinstance(x, (float))   #, np.floating))
+    return isinstance(x, (float, np.floating))
 
 def is_string(x):
     return isinstance(x, (str))
