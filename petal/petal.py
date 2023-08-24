@@ -799,6 +799,9 @@ class Petal(object):
                 busid = posmodel.busid
                 p = {key:posmodel.state._val[key] for key in parameter_keys}
                 currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+                speedparams = tuple([p[key] for key in ['LIN_T','LIN_P']])
+                msg = 'speed parameters: ' + str(speedparams)   # zeno
+                self.printfunc(msg)                             # zeno
                 currents_by_busid[busid][canid] = [currents, currents]
                 periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
                 if self.verbose:
