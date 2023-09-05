@@ -16,6 +16,8 @@ uargs = parser.parse_args()
 import os
 import sys
 import time
+from DOSlib.util import obs_day
+from DOSlib.join_instance import *
 from astropy.table import Table
 try:
     import posconstants as pc
@@ -181,12 +183,24 @@ if online:
     import signal
     # First check for Pyro Name Server
     import Pyro4
+    # try to join instance
+    inst='desi_'+obs_day()
+    logger.info('Joining instance')
+    try:
+        join_instance(inst, must_be_running=True)
+        logger.info('Joined instance')
+    except Exception as e:
+        logger.info('Failed to join instance. %r' % str(e))
+        sys.exit()
     try:
         Pyro4.locateNS()
+        logger.info('found name server')
     except Pyro4.errors.NamingError:
         ns_thread = subprocess.Popen(['pyro4-ns'])
+        logger.warning('name server not found')
     else:
         ns_thread = None
+    logger.warning('pyro setup done')
     ptlid2loc = {0: 8, 1: 3, 2: 7, 3: 3, 4: 0, 5: 1, 6: 2, 7: 8, 8: 4, 9: 9, 10: 5, 11: 6}
     def run_petal(petal_id, role):
         # petal_loc and petalbox_id (same number) are required to not read the petal states/configobj
