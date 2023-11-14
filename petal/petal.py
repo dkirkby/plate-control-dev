@@ -2017,6 +2017,7 @@ class Petal(object):
                                'mac': 'open',  # 2020-10-22 [JHS] I do not have a mac on which to test this
                                'posix': 'eog', 'debian': 'display'}
             import matplotlib.pyplot as plt
+            plt.switch_backend('Agg')
             c = self.collider  # just for brevity below
             posids = self._validate_posids_arg(posids)
             if include_neighbors:

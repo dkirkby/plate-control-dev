@@ -466,6 +466,7 @@ class PosSchedule(object):
         checking effects of annealing. Assumes that sweeps have been calculated
         already and stored (c.f. store_collision_finding_results).'''
         import matplotlib.pyplot as plt
+        plt.switch_backend('Agg')
         import poscollider
         import os
         plt.ioff()
