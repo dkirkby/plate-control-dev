@@ -243,6 +243,8 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
+        self.get_linphi_params()
+
 
 
     def is_pc_connected(self):
@@ -313,7 +315,8 @@ class Petal(object):
                 alt_move_adder=self._add_to_altered_states,
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
-                                             petal_alignment=self.alignment)
+                                             petal_alignment=self.alignment,
+                                             linphi_params=self._linphi_params)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
@@ -2779,6 +2782,26 @@ class Petal(object):
         overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
         clear = self.posids - set(overlaps)
         return sorted(clear)
+
+    def get_linphi_params(self):
+        '''Convenience function to reload the linear phi parameters.
+            init_posmodels should be executed next.
+        '''
+        linphi_params_path = os.path.join(pc.dirs['test_settings'],'linphi_params.csv')
+        self._linphi_params = {}
+        if os.path.exists(linphi_params_path):
+            with open(linphi_params_path, 'r', newline='') as file:
+                reader = csv.DictReader(file)
+                linphi_params_fields = [f for f in reader.fieldnames if f != 'DEVICE_ID']
+                for row in reader:
+                    self._linphi_params[row['DEVICE_ID']] = row
+        else:
+            self._linphi_params = 'not found: ' + linphi_params_path
+        if self.verbose:
+            self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
+
+        return self._linphi_params
+
 
 if __name__ == '__main__':
     '''
