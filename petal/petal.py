@@ -186,6 +186,9 @@ class Petal(object):
         # schedule settings
         self.anneal_mode = anneal_mode
 
+        # Linear Phi parameters must be read befor init_posmodels
+        self.get_linphi_params()
+
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
         self.init_posmodels(posids)
@@ -242,8 +245,6 @@ class Petal(object):
         self.strikes = {}
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
-
-        self.get_linphi_params()
 
 
 
