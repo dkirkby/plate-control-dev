@@ -60,13 +60,15 @@ class PosScheduleStage(object):
             self.move_tables[posid] = table
             self.start_posintTP[posid] = tuple(start_posintTP[posid])
 
-    def rewrite_linphi_move_tables(self):
-        for posid,table in self.move_tables.items():
+    def rewrite_linphi_move_tables(self, proposed_tables):
+        for idx, table in enumerate(proposed_tables):
             if table.posmodel.linphi_params:
-                self.rewrite_linphi_move_table(posid)
+                new_table = self.rewrite_linphi_move_table(table)
+                if new_table is not None:
+                    proposed_tables[idx] = new_table
+        return proposed_tables
 
-    def rewrite_linphi_move_table(self, posid):
-        table = self.move_tables[posid]
+    def rewrite_linphi_move_table(self, table):
         last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
         if table.has_phi_motion:
             linphi_table = table.copy()
@@ -107,8 +109,8 @@ class PosScheduleStage(object):
                     idx += 1
                     l_idx += 2
             if idx != l_idx:    # table was modified
-                self.move_tables[posid] = linphi_table
-        return
+                return linphi_table
+        return None
 
     def is_not_empty(self):
         """Returns boolean whether the stage is empty of move_tables.
