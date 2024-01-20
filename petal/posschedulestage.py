@@ -61,11 +61,11 @@ class PosScheduleStage(object):
             self.start_posintTP[posid] = tuple(start_posintTP[posid])
 
     def rewrite_linphi_move_tables(self, proposed_tables):
-        for idx, table in enumerate(proposed_tables):
+        for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params:
                 new_table = self.rewrite_linphi_move_table(table)
                 if new_table is not None:
-                    proposed_tables[idx] = new_table
+                    proposed_tables[posid] = new_table
         return proposed_tables
 
     def rewrite_linphi_move_table(self, table):
