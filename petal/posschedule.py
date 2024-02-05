@@ -689,7 +689,7 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            stage.move_tables = stage.rewrite_linphi_move_tables(stage.move_tables)
+            stage.move_tables = stage.rewrite_linphi_move_tables()
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
                 stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
