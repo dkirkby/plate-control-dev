@@ -25,6 +25,8 @@ class PosModel(object):
         if posid in linphi_params:
             self.linphi_params = linphi_params[posid]
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
+            new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
+            self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
         self._timer_update_rate          = 18e3   # Hz
         self._stepsize_creep             = 0.1    # deg
         self._stepsize_cruise            = 3.3    # deg
