@@ -23,10 +23,13 @@ class PosModel(object):
         self.linphi_params = None
         posid = self.posid
         if posid in linphi_params:
+            print(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params = linphi_params[posid]
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
+            print(f'linphi_params: {self.linphi_params}')  # DEBUG
             new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
             self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
+            print(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
         self._timer_update_rate          = 18e3   # Hz
         self._stepsize_creep             = 0.1    # deg
         self._stepsize_cruise            = 3.3    # deg
@@ -42,10 +45,12 @@ class PosModel(object):
         self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise[pc.P] / self.axis[pc.P].signed_gear_ratio)
         self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance))
         if self.linphi_params is not None:
+            print(f'_load_cached_params: LinPhi posid = {self.posid}')  # DEBUG
             speed = pc.P_zeno_speed
             ramp = pc.P_zeno_ramp
             gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
             self._abs_shaft_spinupdown_distance_P = speed*(speed+1)*ramp/20/gear_ratio # From DESI-1710 Motor Speed Parameters Spreadsheet
+            print(f'Spinupdown = {self._abs_shaft_spinupdown_distance_P}')  # DEBUG
         else:
             self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
 
