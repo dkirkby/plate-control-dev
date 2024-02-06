@@ -17,6 +17,7 @@ import os
 import random
 import numpy as np
 from astropy.table import Table as AstropyTable
+import csv
 
 # For using simulated petals at KPNO (PETAL90x)
 # Set KPNO_SIM to True
