@@ -44,7 +44,7 @@ class PosModel(object):
         if self.linphi_params is not None:
             speed = pc.P_zeno_speed
             ramp = pc.P_zeno_ramp
-            gear_ratio = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_T']]
+            gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
             self._abs_shaft_spinupdown_distance_P = speed*(speed+1)*ramp/20/gear_ratio # From DESI-1710 Motor Speed Parameters Spreadsheet
         else:
             self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
