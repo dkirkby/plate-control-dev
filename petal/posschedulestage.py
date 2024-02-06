@@ -63,6 +63,7 @@ class PosScheduleStage(object):
     def rewrite_linphi_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params:
+                print(f'Rewriting linphi table for {posid}')
                 new_table = self.rewrite_linphi_move_table(table)
                 if new_table is not None:
                     proposed_tables[posid] = new_table
@@ -74,9 +75,11 @@ class PosScheduleStage(object):
             linphi_table = table.copy()
             idx = 0
             l_idx = 0
+            print(f'Proposed table has phi movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 if phi_dist == 0:
+                    print(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
                     idx += 1
                     l_idx += 1
                 else:
@@ -102,12 +105,15 @@ class PosScheduleStage(object):
 #                   to adjust the other.
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
+                    print(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     linphi_table.set_move(l_idx, pc.P, first_move)
                     linphi_table.insert_new_row(l_idx + 1)
                     linphi_table.set_move(l_phi + 1, pc.P, second_move)
                     table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1
                     l_idx += 2
+            else:
+                print(f'Proposed table has no phi movement') # DEBUG
             if idx != l_idx:    # table was modified
                 return linphi_table
         return None
