@@ -570,6 +570,9 @@ class PosMoveTable(object):
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
+            if self.posmodel.linphi_params:
+                table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+
 
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
