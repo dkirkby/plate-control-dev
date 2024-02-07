@@ -444,7 +444,7 @@ class PosMoveTable(object):
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
                 if self.posmodel.linphi_params and i == pc.P:
-                    my_allow_cruise = False
+                    my_allow_cruise = True
                 else:
                     my_allow_cruise = self.allow_cruise
                 move = self.posmodel.true_move(axisid=i,
