@@ -110,7 +110,7 @@ class PosScheduleStage(object):
                     print(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     linphi_table.set_move(l_idx, pc.P, first_move)
                     linphi_table.insert_new_row(l_idx + 1)
-                    linphi_table.set_move(l_phi + 1, pc.P, second_move)
+                    linphi_table.set_move(l_idx + 1, pc.P, second_move)
                     table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1
                     l_idx += 2
