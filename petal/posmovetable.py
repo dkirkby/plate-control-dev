@@ -443,9 +443,13 @@ class PosMoveTable(object):
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
+                if self.posmodel.linphi_params and i == pc.P:
+                    my_allow_cruise = False
+                else:
+                    my_allow_cruise = self.allow_cruise
                 move = self.posmodel.true_move(axisid=i,
                                                distance=ideal_dist[i],
-                                               allow_cruise=self.allow_cruise,
+                                               allow_cruise=my_allow_cruise,
                                                limits=normal_row_limits,
                                                init_posintTP=latest_TP)
                 true_moves[i].append(move)
@@ -458,17 +462,21 @@ class PosMoveTable(object):
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in axis_idxs:
                 if self.posmodel.linphi_params and i == pc.P:
-                    pass    # do nothing for linphi Phi axis
+                    backlash[i] = 0.0
+                    auto_cmd_msg = ''
+                    my_allow_cruise = False
                 else:
                     backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
-                    move = self.posmodel.true_move(axisid=i,
-                                                   distance=backlash[i],
-                                                   allow_cruise=self.allow_cruise,
-                                                   limits=extra_row_limits,
-                                                   init_posintTP=latest_TP)
-                    new_moves[i].append(move)
-                    new_moves[i][-1]['auto_cmd'] = '(auto backlash backup)'
-                    latest_TP[i] += new_moves[i][-1]['distance']
+                    auto_cmd_msg = '(auto backlash backup)'
+                    my_allow_cruise = self.allow_cruise
+                move = self.posmodel.true_move(axisid=i,
+                                               distance=backlash[i],
+                                               allow_cruise=my_allow_cruise,
+                                               limits=extra_row_limits,
+                                               init_posintTP=latest_TP)
+                new_moves[i].append(move)
+                new_moves[i][-1]['auto_cmd'] = auto_cmd_msg
+                latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
             ideal_total = [0, 0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
