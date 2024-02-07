@@ -78,6 +78,7 @@ class PosScheduleStage(object):
             print(f'Proposed table has phi movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
+                theta_dist = table.get_move(idx, pc.T)
                 if phi_dist == 0:
                     print(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
                     idx += 1
@@ -109,8 +110,10 @@ class PosScheduleStage(object):
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
                     print(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     linphi_table.set_move(l_idx, pc.P, first_move)
+                    linphi_table.set_move(l_idx, pc.T, theta_dist)
                     linphi_table.insert_new_row(l_idx + 1)
                     linphi_table.set_move(l_idx + 1, pc.P, second_move)
+                    linphi_table.set_move(l_idx + 1, pc.T, 0.0)
                     table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1
                     l_idx += 2
