@@ -477,7 +477,8 @@ class PosMoveTable(object):
             err_dist = [0, 0]
             for i in axis_idxs:
                 if self.posmodel.linphi_params and i == pc.P:
-                    pass    # do nothing for linphi Phi axis
+                    err_dist[i] = 0.0
+                    auto_cmd_warning = ''
                 else:
                     actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                     if not self.posmodel.axis[i].is_locked:
@@ -489,14 +490,14 @@ class PosMoveTable(object):
                         err_dist[i] = pc.sign(err_dist[i]) * pc.max_auto_creep_distance
                     else:
                         auto_cmd_warning = ''
-                    move = self.posmodel.true_move(axisid=i,
-                                                   distance=err_dist[i],
-                                                   allow_cruise=False,
-                                                   limits=extra_row_limits,
-                                                   init_posintTP=latest_TP)
-                    new_moves[i].append(move)
-                    new_moves[i][-1]['auto_cmd'] = f'(auto final creep{auto_cmd_warning})'
-                    latest_TP[i] += new_moves[i][-1]['distance']
+                move = self.posmodel.true_move(axisid=i,
+                                               distance=err_dist[i],
+                                               allow_cruise=False,
+                                               limits=extra_row_limits,
+                                               init_posintTP=latest_TP)
+                new_moves[i].append(move)
+                new_moves[i][-1]['auto_cmd'] = f'(auto final creep{auto_cmd_warning})'
+                latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
         for i in range(len(new_moves[0])):
             self._rows_extra.append(PosMoveRow())
