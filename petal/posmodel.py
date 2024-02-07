@@ -72,7 +72,7 @@ class PosModel(object):
             speed = pc.P_zeno_speed
             ramp = pc.P_zeno_ramp
             gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
-            sud = speed*(speed+1)*ramp/20/gear_ratio # From DESI-1710 Motor Speed Parameters Spreadsheet
+            sud = speed*(speed+1)*ramp/20 # From DESI-1710 Motor Speed Parameters Spreadsheet
         elif self.state._val['CURR_SPIN_UP_DOWN'] == 0:
             sud = 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
         else:
