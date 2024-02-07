@@ -86,6 +86,8 @@ class PosScheduleStage(object):
                     new_phi_direction = 1 if phi_dist >= 0.0 else -1
                     scale_ccw = table.posmodel.linphi_params['CCW_SCALE_A'] if new_phi_direction == 1 else table.posmodel.linphi_params['CW_SCALE_A']
                     scale_cw = table.posmodel.linphi_params['CW_SCALE_A'] if new_phi_direction == 1 else table.posmodel.linphi_params['CCW_SCALE_A']
+                    scale_ccw = float(scale_ccw)
+                    scale_cw = float(scale_cw)
                     #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
                     if new_phi_direction == table.posmodel.linphi_params['LAST_P_DIR']:
                         if new_phi_direction > 0:
