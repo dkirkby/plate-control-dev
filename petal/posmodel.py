@@ -68,7 +68,9 @@ class PosModel(object):
     @property
     def _spinupdown_distance(self):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
-        if self.state._val['CURR_SPIN_UP_DOWN'] == 0:
+        if self.linphi_params is not None:
+            sud = self._abs_shaft_spinupdown_distance_P
+        elif self.state._val['CURR_SPIN_UP_DOWN'] == 0:
             sud = 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
         else:
             sud = self._spinupdown_dist_per_period * self.state._val['SPINUPDOWN_PERIOD']
