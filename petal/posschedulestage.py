@@ -65,8 +65,8 @@ class PosScheduleStage(object):
             if table.posmodel.linphi_params:
                 print(f'Rewriting linphi table for {posid}')
                 new_table = self.rewrite_linphi_move_table(table)
-                print(f'old {posid} table: {str(table)})
-                print(f'new {posid} table: {str(new_table)})
+                print(f'old {posid} table: {str(table)}')
+                print(f'new {posid} table: {str(new_table)}')
                 if new_table is not None:
                     proposed_tables[posid] = new_table
         return proposed_tables
