@@ -30,9 +30,11 @@ class PosModel(object):
             new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
             self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
             print(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
+            self._stepsize_cruise = 0.1 * float(pc.P_zeno_speed)
+        else:
+            self._stepsize_cruise            = 3.3    # deg
         self._timer_update_rate          = 18e3   # Hz
         self._stepsize_creep             = 0.1    # deg
-        self._stepsize_cruise            = 3.3    # deg
         self._motor_speed_cruise         = {pc.T: 9900.0 * 360.0 / 60.0, pc.P: 9900.0 * 360.0 / 60.0} # deg/sec (= RPM *360/60)
         if self.linphi_params is not None:
             self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
