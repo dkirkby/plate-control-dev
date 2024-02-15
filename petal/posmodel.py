@@ -300,7 +300,7 @@ class PosModel(object):
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
             if self.linphi_params is not None and axisid == pc.P and abs(distance) > 0.00001:
                 ddist = self.motor_to_shaft(distance)
-                print(f'linphi Distance = {ddist}, steps = {distance}, WARNING: creep on linphi')  # DEBUG
+                print(f'linphi Distance = {ddist}, MotDist = {distance}, WARNING: creep on linphi')  # DEBUG
             move_data['motor_step']   = int(round(distance / self._stepsize_creep))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
             move_data['speed_mode']   = 'creep'
@@ -315,7 +315,7 @@ class PosModel(object):
             move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['speed']
             if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
                 ddist = self.motor_to_shaft(distance)
-                print(f'linphi Distance = {ddist}, steps = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
+                print(f'linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
         return move_data
 
     def postmove_cleanup(self, cleanup_table):
