@@ -278,13 +278,13 @@ class PosModel(object):
         if self.axis[axisid].is_locked:
             new_distance = 0.0
             if self.linphi_params is not None and axisid == pc.P and distance != new_distance:
-                self.printfunc(f'linphi Distance = {distance} changed to {new_distance}')  # DEBUG
+                self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
             distance = new_distance
         elif limits:
             use_near_full_range = (limits == 'near_full')
             new_distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
             if self.linphi_params is not None and axisid == pc.P and distance != new_distance:
-                self.printfunc(f'linphi Distance = {distance} changed to {new_distance}')  # DEBUG
+                self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
             distance = new_distance
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
@@ -301,7 +301,7 @@ class PosModel(object):
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
             if self.linphi_params is not None and axisid == pc.P and abs(distance) > 0.00001:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
-                self.printfunc(f'linphi Distance = {ddist}, MotDist = {distance}, WARNING: creep on linphi')  # DEBUG
+                self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, WARNING: creep on linphi')  # DEBUG
             move_data['motor_step']   = int(round(distance / self._stepsize_creep))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
             move_data['speed_mode']   = 'creep'
@@ -316,7 +316,7 @@ class PosModel(object):
             move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['speed']
             if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
-                self.printfunc(f'linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
+                self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
         return move_data
 
     def postmove_cleanup(self, cleanup_table):
