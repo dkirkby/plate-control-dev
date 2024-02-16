@@ -318,7 +318,8 @@ class Petal(object):
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment,
-                                             linphi_params=self._linphi_params)
+                                             linphi_params=self._linphi_params,
+                                             printfunc=self.printfunc)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)

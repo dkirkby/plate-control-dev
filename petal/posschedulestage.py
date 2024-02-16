@@ -63,10 +63,10 @@ class PosScheduleStage(object):
     def rewrite_linphi_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params:
-                print(f'Rewriting linphi table for {posid}')
+                self.printfunc(f'Rewriting linphi table for {posid}')
                 new_table = self.rewrite_linphi_move_table(table)
-                print(f'old {posid} table: {str(table)}')
-                print(f'new {posid} table: {str(new_table)}')
+                self.printfunc(f'old {posid} table: {str(table)}')
+                self.printfunc(f'new {posid} table: {str(new_table)}')
                 if new_table is not None:
                     proposed_tables[posid] = new_table
         return proposed_tables
@@ -77,12 +77,12 @@ class PosScheduleStage(object):
             linphi_table = table.copy()
             idx = 0
             l_idx = 0
-            print(f'Proposed table has phi movement') # DEBUG
+            self.printfunc(f'Proposed table has phi movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 theta_dist = table.get_move(idx, pc.T)
                 if phi_dist == 0:
-                    print(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
+                    self.printfunc(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
                     idx += 1
                     l_idx += 1
                 else:
@@ -108,7 +108,7 @@ class PosScheduleStage(object):
 #                   to adjust the other.
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
-                    print(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
+                    self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     linphi_table.set_move(l_idx, pc.P, first_move)
                     linphi_table.set_move(l_idx, pc.T, theta_dist)
                     linphi_table.insert_new_row(l_idx + 1)
@@ -118,7 +118,7 @@ class PosScheduleStage(object):
                     idx += 1
                     l_idx += 2
             else:
-                print(f'Proposed table has no phi movement') # DEBUG
+                self.printfunc(f'Proposed table has no phi movement') # DEBUG
             if idx != l_idx:    # table was modified
                 return linphi_table
         return None
