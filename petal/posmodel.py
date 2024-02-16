@@ -15,13 +15,13 @@ class PosModel(object):
             self.state = posstate.PosState()
         else:
             self.state = state
+        self.printfunc = printfunc
         self.state.set_posmodel_cache_refresher(self.refresh_cache)
         self.trans = postransforms.PosTransforms(this_posmodel=self, petal_alignment=petal_alignment)
         self.axis = [None, None]
-        self.axis[pc.T] = Axis(self, pc.T)
-        self.axis[pc.P] = Axis(self, pc.P)
+        self.axis[pc.T] = Axis(self, pc.T, printfunc=self.printfunc)
+        self.axis[pc.P] = Axis(self, pc.P, printfunc=self.printfunc)
         self.linphi_params = None
-        self.printfunc = printfunc
         posid = self.posid
         if posid in linphi_params:
             self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
@@ -355,9 +355,10 @@ class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
     """
 
-    def __init__(self, posmodel, axisid):
+    def __init__(self, posmodel, axisid, printfunc=print):
         self.posmodel = posmodel
         self.axisid = axisid
+        self.printfunc = printfunc
         self._load_cached_params()
 
     def _load_cached_params(self):
