@@ -17,6 +17,7 @@ import os
 import random
 import numpy as np
 from astropy.table import Table as AstropyTable
+import csv
 
 # For using simulated petals at KPNO (PETAL90x)
 # Set KPNO_SIM to True
@@ -186,6 +187,9 @@ class Petal(object):
         # schedule settings
         self.anneal_mode = anneal_mode
 
+        # Linear Phi parameters must be read befor init_posmodels
+        self.get_linphi_params()
+
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
         self.init_posmodels(posids)
@@ -313,7 +317,9 @@ class Petal(object):
                 alt_move_adder=self._add_to_altered_states,
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
-                                             petal_alignment=self.alignment)
+                                             petal_alignment=self.alignment,
+                                             linphi_params=self._linphi_params,
+                                             printfunc=self.printfunc)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
@@ -799,6 +805,9 @@ class Petal(object):
                 busid = posmodel.busid
                 p = {key:posmodel.state._val[key] for key in parameter_keys}
                 currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+                speedparams = tuple([p[key] for key in ['LIN_T','LIN_P']])
+                msg = 'speed parameters: ' + str(speedparams)   # zeno
+                self.printfunc(msg)                             # zeno
                 currents_by_busid[busid][canid] = [currents, currents]
                 periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
                 if self.verbose:
@@ -1995,7 +2004,7 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
 
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', arcP=False):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer=None, fmt='png', arcP=False):
         '''Graphical view of the current expected positions of one or many positioners.
 
         INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
@@ -2011,105 +2020,117 @@ class Petal(object):
 
         OUTPUT:  path of output plot file will be returned
         '''
-        default_viewers = {'nt': 'explorer',
-                           'mac': 'open',  # 2020-10-22 [JHS] I do not have a mac on which to test this
-                           'posix': 'eog'}
-        import matplotlib.pyplot as plt
-        c = self.collider  # just for brevity below
-        posids = self._validate_posids_arg(posids)
-        if include_neighbors:
-            for posid in posids.copy():
-                posids |= c.pos_neighbors[posid]
-        plt.ioff()
-        x0 = [c.x0[posid] for posid in posids]
-        y0 = [c.y0[posid] for posid in posids]
-        x_span = max(x0) - min(x0)
-        y_span = max(y0) - min(y0)
-        x_inches = max(8, np.ceil(x_span/16))
-        y_inches = max(6, np.ceil(y_span/16))
-        fig = plt.figure(num=0, figsize=(x_inches, y_inches), dpi=150)
+        try:
+            default_viewers = {'nt': 'explorer',
+                               'mac': 'open',  # 2020-10-22 [JHS] I do not have a mac on which to test this
+                               'posix': 'eog', 'debian': 'display'}
+            import matplotlib.pyplot as plt
+            c = self.collider  # just for brevity below
+            posids = self._validate_posids_arg(posids)
+            if include_neighbors:
+                for posid in posids.copy():
+                    posids |= c.pos_neighbors[posid]
+            plt.ioff()
+            x0 = [c.x0[posid] for posid in posids]
+            y0 = [c.y0[posid] for posid in posids]
+            x_span = max(x0) - min(x0)
+            y_span = max(y0) - min(y0)
+            x_inches = max(8, np.ceil(x_span/16))
+            y_inches = max(6, np.ceil(y_span/16))
+            fig = plt.figure(num=0, figsize=(x_inches, y_inches), dpi=150)
 
-        # 2020-10-22 [JHS] current implementation of labeling in legend is brittle,
-        # in that it relies on colors to determine which label to apply. Better
-        # implementation would be to combine legend labels into named styles.
-        color_labels = {'green': 'normal',
-                        'orange': 'disabled',
-                        'red': 'overlap',
-                        'black': 'poslocTP',
-                        'gray': 'posintT=0'}
-        label_order = [x for x in color_labels.values()]
-        def plot_poly(poly, style):
-            pts = poly.points
-            color = style['edgecolor']
-            if color in color_labels:
-                label = color_labels[color]
-                del color_labels[color]
-            else:
-                label = None
-            plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'], label=label)
-        overlaps = set(self.get_overlaps(posids=posids, as_dict=True, arcP=arcP))
-        for posid in posids:
-            locTP = self.posmodels[posid].expected_current_poslocTP
-            polys = {'Eo': c.Eo_polys[posid],
-                     'line t0': c.line_t0_polys[posid],
-                     'central body': c.place_central_body(posid, locTP[pc.T]),
-                     'arm lines': c.place_arm_lines(posid, locTP),
-                     'phi arm': c.place_phi_arm(posid, locTP),
-                     'ferrule': c.place_ferrule(posid, locTP),
-                     }
-            pos_parts = {'central body'}
-            if arcP:
-                polys['phi arc'] = c.place_phi_arc(posid, locTP[0])
-                pos_parts |= {'phi arc'}
-            else:
-                pos_parts |= {'phi arm', 'ferrule'}
-            styles = {key: pc.plot_styles[key].copy() for key in polys}
-            enabled = self.posmodels[posid].is_enabled
-            if self.posmodels[posid].classified_as_retracted:
-                styles['Eo'] = pc.plot_styles['Eo bold'].copy()
-                for key in pos_parts:
-                    styles[key]['edgecolor'] = pc.plot_styles['Eo']['edgecolor']
-                pos_parts = {'Eo'}
-            for key, poly in polys.items():
-                style = styles[key]
-                if key in pos_parts:
-                    if posid in overlaps:
-                        style['edgecolor'] = 'red'
-                    if not enabled:  # intentionally overrides overlaps
-                        style['edgecolor'] = 'orange'
-                plot_poly(poly, style)
-            plt.text(x=c.x0[posid], y=c.y0[posid],
-                     s=f'{posid}\n{self.posmodels[posid].deviceloc:03d}',
-                     family='monospace', horizontalalignment='center', size='x-small')
-        plt.axis('equal')
-        xlim = plt.xlim()  # will restore this zoom window after plotting petal and gfa
-        ylim = plt.ylim()  # will restore this zoom window after plotting petal and gfa
-        plot_poly(c.keepout_PTL, pc.plot_styles['PTL'])
-        plot_poly(c.keepout_GFA, pc.plot_styles['GFA'])
-        plt.xlim(xlim)
-        plt.ylim(ylim)
-        plt.xlabel('flat x (mm)')
-        plt.ylabel('flat y (mm)')
-        basename = f'posplot_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.{fmt}'
-        plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
-        handles, labels = plt.gca().get_legend_handles_labels()
-        handles = [handles[labels.index(L)] for L in label_order if L in labels]
-        labels = [L for L in label_order if L in labels]
-        plt.legend(handles, labels)
-        if not path:
-            path = pc.dirs['temp_files']
-        path = os.path.join(path, basename)
-        plt.tight_layout()
-        plt.savefig(path)
-        plt.close(fig)
-        if viewer and viewer not in {'None','none','False','false','0'}:
-            if viewer == 'default':
-                if os.name in default_viewers:
-                    viewer = default_viewers[os.name]
+            # 2020-10-22 [JHS] current implementation of labeling in legend is brittle,
+            # in that it relies on colors to determine which label to apply. Better
+            # implementation would be to combine legend labels into named styles.
+            color_labels = {'green': 'normal',
+                            'orange': 'disabled',
+                            'red': 'overlap',
+                            'black': 'poslocTP',
+                            'gray': 'posintT=0'}
+            label_order = [x for x in color_labels.values()]
+            def plot_poly(poly, style):
+                pts = poly.points
+                color = style['edgecolor']
+                if color in color_labels:
+                    label = color_labels[color]
+                    del color_labels[color]
                 else:
-                    self.printfunc(f'quick_plot: no default image viewer setting available for current os={os.name}')
-            os.system(f'{viewer} {path} &')
-        return path
+                    label = None
+                plt.plot(pts[0], pts[1], linestyle=style['linestyle'], linewidth=style['linewidth'], color=style['edgecolor'], label=label)
+            overlaps = set(self.get_overlaps(posids=posids, as_dict=True, arcP=arcP))
+            for posid in posids:
+                locTP = self.posmodels[posid].expected_current_poslocTP
+                polys = {'Eo': c.Eo_polys[posid],
+                         'line t0': c.line_t0_polys[posid],
+                         'central body': c.place_central_body(posid, locTP[pc.T]),
+                         'arm lines': c.place_arm_lines(posid, locTP),
+                         'phi arm': c.place_phi_arm(posid, locTP),
+                         'ferrule': c.place_ferrule(posid, locTP),
+                         }
+                pos_parts = {'central body'}
+                if arcP:
+                    polys['phi arc'] = c.place_phi_arc(posid, locTP[0])
+                    pos_parts |= {'phi arc'}
+                else:
+                    pos_parts |= {'phi arm', 'ferrule'}
+                styles = {key: pc.plot_styles[key].copy() for key in polys}
+                enabled = self.posmodels[posid].is_enabled
+                if self.posmodels[posid].classified_as_retracted:
+                    styles['Eo'] = pc.plot_styles['Eo bold'].copy()
+                    for key in pos_parts:
+                        styles[key]['edgecolor'] = pc.plot_styles['Eo']['edgecolor']
+                    pos_parts = {'Eo'}
+                for key, poly in polys.items():
+                    style = styles[key]
+                    if key in pos_parts:
+                        if posid in overlaps:
+                            style['edgecolor'] = 'red'
+                        if not enabled:  # intentionally overrides overlaps
+                            style['edgecolor'] = 'orange'
+                    plot_poly(poly, style)
+                plt.text(x=c.x0[posid], y=c.y0[posid],
+                         s=f'{posid}\n{self.posmodels[posid].deviceloc:03d}',
+                         family='monospace', horizontalalignment='center', size='x-small')
+            plt.axis('equal')
+            xlim = plt.xlim()  # will restore this zoom window after plotting petal and gfa
+            ylim = plt.ylim()  # will restore this zoom window after plotting petal and gfa
+            plot_poly(c.keepout_PTL, pc.plot_styles['PTL'])
+            plot_poly(c.keepout_GFA, pc.plot_styles['GFA'])
+            plt.xlim(xlim)
+            plt.ylim(ylim)
+            plt.xlabel('flat x (mm)')
+            plt.ylabel('flat y (mm)')
+            basename = f'posplot_ptlid{self.petal_id:02}_{pc.filename_timestamp_str()}.{fmt}'
+            plt.title(f'{pc.timestamp_str()}  /  {basename}\npetal_id {self.petal_id}  /  petal_loc {self.petal_loc}')
+            handles, labels = plt.gca().get_legend_handles_labels()
+            handles = [handles[labels.index(L)] for L in label_order if L in labels]
+            labels = [L for L in label_order if L in labels]
+            plt.legend(handles, labels)
+            if not path:
+                path = pc.dirs['temp_files']
+            path = os.path.join(path, basename)
+            plt.tight_layout()
+            plt.savefig(path)
+            plt.close(fig)
+            if viewer and viewer not in {'None','none','False','false','0'}:
+                if viewer == 'default':
+                    if os.name in default_viewers:
+                        viewer = default_viewers[os.name]
+                        if os.name =='posix':
+                            try:
+                                import distro
+                                if 'debian' in distro.id():
+                                    self.printfunc('Using display command as viewer')
+                                    viewer = 'display'
+                            except:
+                                pass
+                    else:
+                        self.printfunc(f'quick_plot: no default image viewer setting available for current os={os.name}')
+                os.system(f'{viewer} {path} &')
+            return path
+        except Exception as e:
+            self.printfunc(f'quick_plot: Exception: {str(e)}')
+            return None
 
     def get_overlaps(self, posids='all', as_dict=False, arcP=False):
         '''Returns a string describing all cases where positioners' current expected
@@ -2764,6 +2785,26 @@ class Petal(object):
         overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
         clear = self.posids - set(overlaps)
         return sorted(clear)
+
+    def get_linphi_params(self):
+        '''Convenience function to reload the linear phi parameters.
+            init_posmodels should be executed next.
+        '''
+        linphi_params_path = os.path.join(pc.dirs['test_settings'],'linphi_params.csv')
+        self._linphi_params = {}
+        if os.path.exists(linphi_params_path):
+            with open(linphi_params_path, 'r', newline='') as file:
+                reader = csv.DictReader(file)
+                linphi_params_fields = [f for f in reader.fieldnames if f != 'DEVICE_ID']
+                for row in reader:
+                    self._linphi_params[row['DEVICE_ID']] = row
+        else:
+            self._linphi_params = 'not found: ' + linphi_params_path
+        if self.verbose:
+            self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
+
+        return self._linphi_params
+
 
 if __name__ == '__main__':
     '''
