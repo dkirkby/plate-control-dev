@@ -295,8 +295,9 @@ class PosModel(object):
         an argued distance on the axis identified by axisid.
         """
         move_data = {}
+        allow_creep = False if self.linphi_params is not None and axisid == pc.P else True
         dist_spinup = 2 * pc.sign(distance) * self._spinupdown_distance(axisid)  # distance over which accel / decel to and from cruise speed
-        if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
+        if allow_creep and ( not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED'])):
             if self.linphi_params is not None and axisid == pc.P and abs(distance) > 0.00001:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
                 self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, WARNING: creep on linphi')  # DEBUG
