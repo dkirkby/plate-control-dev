@@ -87,33 +87,33 @@ class PosScheduleStage(object):
                     l_idx += 1
                 else:
                     new_phi_direction = 1 if phi_dist >= 0.0 else -1
-                    scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
-                    scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
+#                   scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
+#                   scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
                     #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
                     if new_phi_direction == table.posmodel.linphi_params['LAST_P_DIR']:
                         if new_phi_direction > 0:   # must go negative, then positive
-                            first_move = -pc.P_zeno_jog / scale_cw
-                            second_move = (pc.P_zeno_jog + phi_dist) / scale_ccw
+                            first_move = -pc.P_zeno_jog # / scale_cw
+                            second_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
                         else:                       # must go positive, then negative
-                            first_move = pc.P_zeno_jog / scale_ccw
-                            second_move = (-pc.P_zeno_jog + phi_dist) / scale_cw
+                            first_move = pc.P_zeno_jog # / scale_ccw
+                            second_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
                     else:
                         if new_phi_direction > 0:   # must go positive, then negative
-                            first_move = (pc.P_zeno_jog + phi_dist) / scale_ccw
-                            second_move = -pc.P_zeno_jog / scale_cw
+                            first_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
+                            second_move = -pc.P_zeno_jog # / scale_cw
                         else:                       # must go positive, then negative
-                            first_move = (-pc.P_zeno_jog + phi_dist) / scale_cw
-                            second_move = pc.P_zeno_jog / scale_ccw
+                            first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            second_move = pc.P_zeno_jog # / scale_ccw
 #                   Probably need next two lines to prevent banging into hard stops, but if they adjust either move, we'll need
 #                   to adjust the other.
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
                     self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     linphi_table.set_move(l_idx, pc.P, first_move)
-                    linphi_table.set_move(l_idx, pc.T, theta_dist)
+                    linphi_table.set_move(l_idx, pc.T, 0.0)
                     linphi_table.insert_new_row(l_idx + 1)
                     linphi_table.set_move(l_idx + 1, pc.P, second_move)
-                    linphi_table.set_move(l_idx + 1, pc.T, 0.0)
+                    linphi_table.set_move(l_idx + 1, pc.T, theta_dist)
                     table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1
                     l_idx += 2

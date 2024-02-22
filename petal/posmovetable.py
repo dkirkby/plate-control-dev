@@ -62,7 +62,12 @@ class PosMoveTable(object):
              'is_required':           c._is_required,
              }
         if c.posmodel.linphi_params:
+            ccw_scale_a = float(c.posmodel.linphi_params['CCW_SCALE_A'])
+            ccw_scale_b = float(c.posmodel.linphi_params['CCW_SCALE_B'])
+            cw_scale_a = float(c.posmodel.linphi_params['CW_SCALE_A'])
+            cw_scale_b = float(c.posmodel.linphi_params['CW_SCALE_B'])
             d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+            d['scale'] = {'PCCWA': ccw_scale_a, 'PCCWB': ccw_scale_b, 'PCWA': cw_scale_a, 'PCWB': cw_scale_b}
         return d
 
     def __repr__(self):
@@ -571,7 +576,12 @@ class PosMoveTable(object):
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
             if self.posmodel.linphi_params:
+                ccw_scale_a = float(self.posmodel.linphi_params['CCW_SCALE_A'])
+                ccw_scale_b = float(self.posmodel.linphi_params['CCW_SCALE_B'])
+                cw_scale_a = float(self.posmodel.linphi_params['CW_SCALE_A'])
+                cw_scale_b = float(self.posmodel.linphi_params['CW_SCALE_B'])
                 table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+                table['scale'] = {'PCCWA': ccw_scale_a, 'PCCWB': ccw_scale_b, 'PCWA': cw_scale_a, 'PCWB': cw_scale_b}
 
 
             # interior rows
