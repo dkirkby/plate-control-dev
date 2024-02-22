@@ -67,7 +67,10 @@ class PosMoveTable(object):
             cw_scale_a = float(c.posmodel.linphi_params['CW_SCALE_A'])
             cw_scale_b = float(c.posmodel.linphi_params['CW_SCALE_B'])
             d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-            d['scale'] = {'PCCWA': ccw_scale_a, 'PCCWB': ccw_scale_b, 'PCWA': cw_scale_a, 'PCWB': cw_scale_b}
+            d['PCCWA'] = ccw_scale_a
+            d['PCCWB'] = ccw_scale_b
+            d['PCWA'] = cw_scale_a
+            d['PCWB'] = cw_scale_b
         return d
 
     def __repr__(self):
@@ -581,8 +584,10 @@ class PosMoveTable(object):
                 cw_scale_a = float(self.posmodel.linphi_params['CW_SCALE_A'])
                 cw_scale_b = float(self.posmodel.linphi_params['CW_SCALE_B'])
                 table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-                table['scale'] = {'PCCWA': ccw_scale_a, 'PCCWB': ccw_scale_b, 'PCWA': cw_scale_a, 'PCWB': cw_scale_b}
-
+                table['PCCWA'] = ccw_scale_a
+                table['PCCWB'] = ccw_scale_b
+                table['PCWA'] = cw_scale_a
+                table['PCWB'] = cw_scale_b
 
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
