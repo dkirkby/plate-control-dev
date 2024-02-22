@@ -23,6 +23,10 @@ class PosModel(object):
         self.axis[pc.P] = Axis(self, pc.P, printfunc=self.printfunc)
         self.linphi_params = None
         posid = self.posid
+        self._timer_update_rate          = 18e3   # Hz
+        self._stepsize_creep             = 0.1    # deg
+        self._motor_speed_cruise         = {pc.T: 9900.0 * 360.0 / 60.0, pc.P: 9900.0 * 360.0 / 60.0} # deg/sec (= RPM *360/60)
+        self._stepsize_cruise            = {pc.T: 3.3, pc.P: 3.3} # deg/step
         if posid in linphi_params:
             self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params = linphi_params[posid]
@@ -31,22 +35,17 @@ class PosModel(object):
             new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
             self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
             self.printfunc(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
-            self._stepsize_cruise = 0.1 * float(pc.P_zeno_speed)
-        else:
-            self._stepsize_cruise            = 3.3    # deg
-        self._timer_update_rate          = 18e3   # Hz
-        self._stepsize_creep             = 0.1    # deg
-        self._motor_speed_cruise         = {pc.T: 9900.0 * 360.0 / 60.0, pc.P: 9900.0 * 360.0 / 60.0} # deg/sec (= RPM *360/60)
-        if self.linphi_params is not None:
+            self._stepsize_cruise[pc.P] = 0.1 * float(pc.P_zeno_speed)
             self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
-        self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
+        self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
+                                            pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
 
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
         self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise[pc.T] / self.axis[pc.T].signed_gear_ratio)
         self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise[pc.P] / self.axis[pc.P].signed_gear_ratio)
-        self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance))
+        self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance(pc.T)))
         if self.linphi_params is not None:
             self.printfunc(f'_load_cached_params: LinPhi posid = {self.posid}')  # DEBUG
             speed = pc.P_zeno_speed
@@ -55,7 +54,7 @@ class PosModel(object):
             self._abs_shaft_spinupdown_distance_P = speed*(speed+1)*ramp/20/gear_ratio # From DESI-1710 Motor Speed Parameters Spreadsheet
             self.printfunc(f'Spinupdown = {self._abs_shaft_spinupdown_distance_P}')  # DEBUG
         else:
-            self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance))
+            self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance(pc.P)))
 
     def refresh_cache(self):
         """Reloads state parameters with cached values."""
@@ -69,17 +68,17 @@ class PosModel(object):
         return self._timer_update_rate * self._stepsize_creep / self.state._val['CREEP_PERIOD']  # deg/sec
 
     @property
-    def _spinupdown_distance(self):
+    def _spinupdown_distance(self, axisid):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
-        if self.linphi_params is not None:
+        if self.linphi_params is not None and axisid == pc.P:
             speed = pc.P_zeno_speed
             ramp = pc.P_zeno_ramp
             gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
-            sud = speed*(speed+1)*ramp/20 # From DESI-1710 Motor Speed Parameters Spreadsheet
+            sud = speed*(speed+1)*ramp/20 * self.state._val['SPINUPDOWN_PERIOD'] # From DESI-1710 Motor Speed Parameters Spreadsheet
         elif self.state._val['CURR_SPIN_UP_DOWN'] == 0:
             sud = 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
         else:
-            sud = self._spinupdown_dist_per_period * self.state._val['SPINUPDOWN_PERIOD']
+            sud = self._spinupdown_dist_per_period[axisid] * self.state._val['SPINUPDOWN_PERIOD']
         return sud
 
     @property
@@ -297,7 +296,7 @@ class PosModel(object):
         an argued distance on the axis identified by axisid.
         """
         move_data = {}
-        dist_spinup = 2 * pc.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
+        dist_spinup = 2 * pc.sign(distance) * self._spinupdown_distance(axisid)  # distance over which accel / decel to and from cruise speed
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
             if self.linphi_params is not None and axisid == pc.P and abs(distance) > 0.00001:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
@@ -309,11 +308,11 @@ class PosModel(object):
             move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
         else:
             dist_cruise = distance - dist_spinup
-            move_data['motor_step']   = int(round(dist_cruise / self._stepsize_cruise))
-            move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
+            move_data['motor_step']   = int(round(dist_cruise / self._stepsize_cruise[axisid]))
+            move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise[axisid] + dist_spinup
             move_data['speed_mode']   = 'cruise'
             move_data['speed']        = self._motor_speed_cruise[axisid]
-            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['speed']
+            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise[axisid] + 4*self._spinupdown_distance(axisid)) / move_data['speed']
             if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
                 self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
