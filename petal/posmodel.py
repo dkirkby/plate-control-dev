@@ -67,7 +67,6 @@ class PosModel(object):
         """Returns motor creep speed (which depends on the creep period) in deg/sec."""
         return self._timer_update_rate * self._stepsize_creep / self.state._val['CREEP_PERIOD']  # deg/sec
 
-    @property
     def _spinupdown_distance(self, axisid):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
         if self.linphi_params is not None and axisid == pc.P:
