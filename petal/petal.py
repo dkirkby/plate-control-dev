@@ -2795,9 +2795,12 @@ class Petal(object):
         if os.path.exists(linphi_params_path):
             with open(linphi_params_path, 'r', newline='') as file:
                 reader = csv.DictReader(file)
-                linphi_params_fields = [f for f in reader.fieldnames if f != 'DEVICE_ID']
+                linphi_params_fields = [str(f).strip() for f in reader.fieldnames if str(f).strip() != 'DEVICE_ID']
                 for row in reader:
-                    self._linphi_params[row['DEVICE_ID']] = row
+                    for i,j in row.items():
+                        row[i] = str(j).strip()
+                    if '#' not in str(row['DEVICE_ID']):
+                        self._linphi_params[row['DEVICE_ID']] = row
         else:
             self._linphi_params = 'not found: ' + linphi_params_path
         if self.verbose:
