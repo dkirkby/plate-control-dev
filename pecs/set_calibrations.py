@@ -113,9 +113,9 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
+    commit_type_ok = table[commit_key].dtype in [int, bool]  #[np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [np.int, np.float, np.bool]
+    data_type_ok = column.dtype in [int, float, bool]     #[np.int, np.float, np.bool]
     assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):

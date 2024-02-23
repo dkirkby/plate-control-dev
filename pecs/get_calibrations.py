@@ -337,6 +337,15 @@ try:
         meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
                     
     logger.info('All data gathered, generating table format...')
+    # convert POS_NEIGHBORS eleenmts to lists
+    for key in data.keys():     #['POS_NEIGHBORS', 'FIXED_NEIGHBORS']:
+        if isinstance(data[key], list):
+            if len(data[key]) != 0 and isinstance(data[key][0],set):
+                logger.info('Converting data for key %r' % key)
+                pn = []
+                for i in data[key]:
+                    pn.append(list(i))
+                data[key] = pn
     t = Table(data)
     t.meta = meta
     
