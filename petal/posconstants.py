@@ -626,7 +626,7 @@ def is_float(x):
     return isinstance(x, (float, np.floating))
 
 def is_string(x):
-    return isinstance(x, str)
+    return isinstance(x, (str))
 
 def is_boolean(x):
     return x in [True, False, 0, 1] or str(x).lower() in ['true', 'false', '0', '1']
