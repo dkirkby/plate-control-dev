@@ -316,10 +316,12 @@ class Petal(object):
                 printfunc=self.printfunc, petal_id=self.petal_id,
                 alt_move_adder=self._add_to_altered_states,
                 alt_calib_adder=self._add_to_altered_calib_states)
+#            self.posmodels[posid] = PosModel(state=self.states[posid],
+#                                             petal_alignment=self.alignment,
+#                                             linphi_params=self._linphi_params,
+#                                             printfunc=self.printfunc)
             self.posmodels[posid] = PosModel(state=self.states[posid],
-                                             petal_alignment=self.alignment,
-                                             linphi_params=self._linphi_params,
-                                             printfunc=self.printfunc)
+                                             petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
@@ -805,9 +807,9 @@ class Petal(object):
                 busid = posmodel.busid
                 p = {key:posmodel.state._val[key] for key in parameter_keys}
                 currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-                speedparams = tuple([p[key] for key in ['LIN_T','LIN_P']])
-                msg = 'speed parameters: ' + str(speedparams)   # zeno
-                self.printfunc(msg)                             # zeno
+#               speedparams = tuple([p[key] for key in ['LIN_T','LIN_P']])
+#               msg = 'speed parameters: ' + str(speedparams)   # zeno
+#               self.printfunc(msg)                             # zeno
                 currents_by_busid[busid][canid] = [currents, currents]
                 periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
                 if self.verbose:
