@@ -2802,9 +2802,12 @@ class Petal(object):
                         row[i] = str(j).strip()
                     if '#' not in str(row['DEVICE_ID']):
                         self._linphi_params[row['DEVICE_ID']] = row
+                        if 1:
+                            self.printfunc('linphi row: ' + str(row))
         else:
             self._linphi_params = 'not found: ' + linphi_params_path
-        if self.verbose:
+            self.printfunc(str(self._linphi_params))
+        if 1:
             self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
 
         return self._linphi_params
