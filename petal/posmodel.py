@@ -27,16 +27,17 @@ class PosModel(object):
         self._stepsize_creep             = 0.1    # deg
         self._motor_speed_cruise         = {pc.T: 9900.0 * 360.0 / 60.0, pc.P: 9900.0 * 360.0 / 60.0} # deg/sec (= RPM *360/60)
         self._stepsize_cruise            = {pc.T: 3.3, pc.P: 3.3} # deg/step
-        if posid in linphi_params:
-            self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
-            self.linphi_params = linphi_params[posid]
-            self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
-            self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
-            new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
-            self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
-            self.printfunc(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
-            self._stepsize_cruise[pc.P] = 0.1 * float(pc.P_zeno_speed)
-            self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
+        if linphi_params:
+            if posid in linphi_params:
+                self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
+                self.linphi_params = linphi_params[posid]
+                self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
+                self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
+                new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
+                self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
+                self.printfunc(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
+                self._stepsize_cruise[pc.P] = 0.1 * float(pc.P_zeno_speed)
+                self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
         self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
                                             pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
