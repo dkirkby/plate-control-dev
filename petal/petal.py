@@ -2027,6 +2027,7 @@ class Petal(object):
                                'mac': 'open',  # 2020-10-22 [JHS] I do not have a mac on which to test this
                                'posix': 'eog', 'debian': 'display'}
             import matplotlib.pyplot as plt
+            plt.switch_backend('Agg')
             c = self.collider  # just for brevity below
             posids = self._validate_posids_arg(posids)
             if include_neighbors:
@@ -2803,6 +2804,8 @@ class Petal(object):
                         row[i] = str(j).strip()
                     if '#' not in str(row['DEVICE_ID']):
                         self._linphi_params[row['DEVICE_ID']] = row
+                        if 1:
+                            self.printfunc('linphi row: ' + str(row))
         else:
             self._linphi_params = 'not found: ' + linphi_params_path
         if self.verbose:
