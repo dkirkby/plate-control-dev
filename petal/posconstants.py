@@ -59,7 +59,7 @@ for key in dir_keys_settings:
 for directory in dirs.values():
     if not os.path.isfile(directory):
         os.makedirs(directory, exist_ok=True)
-        
+
 # File locations
 positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v18.csv')
 small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
@@ -144,10 +144,12 @@ printfunc = print
 # handle_fvc_feedback defaults
 err_thresh = 0.5 # tracking error over which to disable, False means none
 up_tol = 0.065 # mm over which to apply tp updates
-up_tol_disabled = 0.5 #mm over which to apply tp updates to disabled positioners
+up_tol_disabled = 0.2 #mm over which to apply tp updates to disabled positioners
 up_frac = 1.0 # amount of update to apply to posTP
 err_disable = False # automatically disable positioners above error threshhold
 unreachable_margin = 0.2 # Additional margin beyond max patrol radius which an unreachable measurement may still be considered valid for a TP update
+didnotmove_tol = 0.080 # Margin for how close to old move a positioner needs to be to be considered "nonmoving"
+didnotmove_check_tol = 0.080 # Margin for how far off tracking needs to be to check for non motion
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
@@ -529,7 +531,7 @@ def concat_lists_of_lists(L1, L2):
         L2 = []
     elif not(isinstance(L2[0],list)):
         L2 = [L2]
-    return L1 + L2        
+    return L1 + L2
 
 # Enumeration of verbosity level to stdout
 not_verbose = 0
@@ -615,7 +617,7 @@ def is_float(x):
     return isinstance(x, (float, np.floating))
 
 def is_string(x):
-    return isinstance(x, (str, np.str))
+    return isinstance(x, (str))
 
 def is_boolean(x):
     return x in [True, False, 0, 1] or str(x).lower() in ['true', 'false', '0', '1']
@@ -667,7 +669,7 @@ plot_styles = {
          'linewidth' : 1,
          'edgecolor' : 'green',
          'facecolor' : 'none'},
-        
+
     'positioner element unbold':
         {'linestyle' : '--',
          'linewidth' : 0.5,
@@ -684,26 +686,26 @@ plot_styles = {
         {'linestyle' : '-',
          'linewidth' : 2,
          'edgecolor' : 'blue',
-         'facecolor' : 'none'},                            
+         'facecolor' : 'none'},
 
     'line t0':
         {'linestyle' : '-.',
          'linewidth' : 0.5,
          'edgecolor' : 'gray',
          'facecolor' : 'none'},
-        
+
     'arm lines':
         {'linestyle' : '--',
          'linewidth' : 0.7,
          'edgecolor' : 'black',
-         'facecolor' : 'none'},        
+         'facecolor' : 'none'},
 
     'Eo':
         {'linestyle' : '-',
          'linewidth' : 0.5,
          'edgecolor' : '0.9',
          'facecolor' : 'none'},
-        
+
     'Eo bold':
         {'linestyle' : '-',
          'linewidth' : 1,
