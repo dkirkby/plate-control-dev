@@ -313,7 +313,10 @@ class PosModel(object):
             move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise[axisid] + dist_spinup
             move_data['speed_mode']   = 'cruise'
             move_data['speed']        = self._motor_speed_cruise[axisid]
-            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise[axisid] + 4*self._spinupdown_distance(axisid)) / move_data['speed']
+            if move_data['motor_step'] == 0:
+                move_data['move_time'] = 0
+            else:
+                move_data['move_time'] = (abs(move_data['motor_step'])*self._stepsize_cruise[axisid] + 4*self._spinupdown_distance(axisid)) / move_data['speed']
             if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
                 ddist = self.axis[axisid].motor_to_shaft(distance)
                 self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG

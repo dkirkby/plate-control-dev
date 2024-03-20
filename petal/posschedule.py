@@ -536,6 +536,7 @@ class PosSchedule(object):
                                                range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posintTP, dtdp)
+        stage.move_tables = stage.rewrite_linphi_move_tables(stage.move_tables)
         # double-negative syntax is to be compatible with various
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
