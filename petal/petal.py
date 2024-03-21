@@ -93,7 +93,7 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=False,
+                 printfunc=print, verbose=False, save_debug=True,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
                  phi_limit_on=True, sync_mode='hard', anneal_mode='filled', n_strikes=2):
@@ -772,7 +772,8 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-        self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        if self.save_debug:
+            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
 
     def set_motor_parameters(self, wait_on=False):
@@ -2006,7 +2007,7 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
 
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer=None, fmt='png', arcP=False):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', arcP=False):
         '''Graphical view of the current expected positions of one or many positioners.
 
         INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
