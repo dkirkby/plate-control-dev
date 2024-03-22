@@ -10,7 +10,7 @@ parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma
 parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
 parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
 parser.add_argument('-dl', '--disable_logger', action='store_true', help='Disable logging to disk.')
-parser.add_argument('-nn', '--no_neighbors', action='store_true', help='Do not record POS_NEIGHBORS or FIXED_NEIGHBROS if using a newer version of astropy (>5.0.0)')
+parser.add_argument('-nn', '--no_neighbors', action='store_true', help='Do not record POS_NEIGHBORS or FIXED_NEIGHBROS if using a newer version of astropy (>=5.0.0)')
 uargs = parser.parse_args()
 
 # general imports

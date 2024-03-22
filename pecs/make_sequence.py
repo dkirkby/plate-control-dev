@@ -161,7 +161,7 @@ def make_sequence_for_one_petal(table):
                       local_commit_on = False,
                       local_log_on    = False,
                       collider_file   = None,
-                      sched_stats_on  = False, #True,  KF 20240322, save wrong dir on summit
+                      sched_stats_on  = True,
                       anticollision   = 'adjust',
                       verbose         = False,
                       phi_limit_on    = uargs.enable_phi_limit,
