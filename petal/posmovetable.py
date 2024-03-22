@@ -537,6 +537,7 @@ class PosMoveTable(object):
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
         table = {}
+        lock_note = ''
         if output_type in {'collider', 'schedule', 'full', 'cleanup', 'angles'}:
             table['dT'] = [true_moves[pc.T][i]['distance'] for i in row_range]
             table['dP'] = [true_moves[pc.P][i]['distance'] for i in row_range]
@@ -559,7 +560,6 @@ class PosMoveTable(object):
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],
                                       true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type in {'full', 'cleanup', 'hardware'}:
-            lock_note = ''
             locked_axes = [name for num, name in {pc.T: 'T', pc.P: 'P'}.items() if self.posmodel.axis[num].is_locked]
             for axis in locked_axes:
                 dkey = f'motor_steps_{axis}' if output_type == 'hardware' else f'd{axis}'
@@ -574,6 +574,7 @@ class PosMoveTable(object):
                     zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
                     if any(zeroed_deltas):
                         lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables
+
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
@@ -634,7 +635,11 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-            table['log_note'] = pc.join_notes(self.log_note, lock_note)
+            linphi_note = ''
+            if self.posmodel.linphi_params:
+                for s in ['CCW_SCALE_A','CCW_SCALE_B','CW_SCALE_A','CW_SCALE_B']:
+                    linphi_note = pc.join_notes(linphi_note, f'p{s}={self.posmodel.linphi_params[s]}')
+            table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
