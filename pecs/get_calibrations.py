@@ -10,6 +10,7 @@ parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma
 parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
 parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
 parser.add_argument('-dl', '--disable_logger', action='store_true', help='Disable logging to disk.')
+parser.add_argument('-nn', '--no_neighbors', action='store_true', help='Do not record POS_NEIGHBORS or FIXED_NEIGHBROS if using a newer version of astropy (>5.0.0)')
 uargs = parser.parse_args()
 
 # general imports
@@ -114,17 +115,22 @@ collider_general_poly_keys = {'general_keepout_T': f'basic {keepout_T_note}',
                               'keepout_PTL': f'petal boundary keepout polygon {flat_note}',
                               'keepout_GFA': f'GFA boundary keepout polygon {flat_note}',
                               }
-collider_query_keys = {'POS_NEIGHBORS': 'neighboring positioners',
-                       'FIXED_NEIGHBORS': 'neighboring fixed boundaries',
-                       }
+collider_query_keys = {}
 collider_pos_poly_keys = {'KEEPOUT_T': keepout_T_note,
                          'KEEPOUT_P': keepout_P_note,
                          }
 collider_pos_attr_map = {'KEEPOUT_T': 'keepouts_T',
                          'KEEPOUT_P': 'keepouts_P',
-                         'POS_NEIGHBORS': 'pos_neighbors',
-                         'FIXED_NEIGHBORS': 'fixed_neighbor_cases',
                          }
+if not uargs.no_neighbors:
+    neighbors2 = {'POS_NEIGHBORS': 'neighboring positioners',
+                  'FIXED_NEIGHBORS': 'neighboring fixed boundaries',
+                  }
+    neighbors1 = {'POS_NEIGHBORS': 'pos_neighbors',
+                 'FIXED_NEIGHBORS': 'fixed_neighbor_cases',
+                }
+    collider_query_keys.update(neighbors2)
+    collider_pos_attr_map.update(neighbors1)
 
 # dependently-calculated fields
 offset_variants = {'PTL': 'ptlXY', 'CS5': 'obsXY'}
