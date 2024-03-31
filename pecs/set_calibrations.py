@@ -52,6 +52,7 @@ doc += f' intended to be saved to the online db. {format_info}'
 parser = argparse.ArgumentParser(description=doc)
 parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file')
 parser.add_argument('-s', '--simulate', action='store_true', help='perform the script "offline" with no storing to memory or database')
+parser.add_argument('-v', '--verbose', action='store_true', help='be verbose')
 args = parser.parse_args()
 
 # read input data
@@ -93,6 +94,8 @@ for key in float_keys & set(table.columns):
     table[key] = [float(x) for x in table[key]]
 
 # validate the table format
+if args.verbose:
+    logger.info(f'Columns: "{table.columns}"')
 assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
 for key in set(table.columns):  # set op provides a copy
     remapped_key = dbkey_for_key(key)
@@ -102,6 +105,8 @@ for key in set(table.columns):  # set op provides a copy
         table.rename_column(key, dbkey_for_key(key))
         logger.warning(f'For compatibility with online DB, renamed column {key} to {remapped_key}')
 keys = valid_keys & set(table.columns)
+if args.verbose:
+    logger.info(f'keys: "{keys}"')
 assert2(len(keys) > 0, 'No valid parameter columns found in input table')
 no_commit_key = {key for key in keys if commit_keys[key] not in table.columns}
 assert2(len(no_commit_key) == 0, f'Input table params {no_commit_key} lack {commit_prefix}-prefixed fields. {format_info}')
@@ -114,9 +119,9 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_type_ok = table[commit_key].dtype in [int, bool]  #[np.int, np.bool]
+    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [int, float, bool]     #[np.int, np.float, np.bool]
+    data_type_ok = column.dtype in [np.int, np.float, np.bool]
     assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):
