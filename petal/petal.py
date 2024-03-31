@@ -2793,7 +2793,7 @@ class Petal(object):
     def get_posfid_linphi_val(self, uniqueid, key):
         """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
         # Note: there is no self.posids at this point
-        return self.states[uniqueid]._val.get(key, None)
+        return self.states[uniqueid]._val[key]
 
     def get_linphi_params(self, posids):
         '''Convenience function to reload the linear phi parameters.
