@@ -187,9 +187,6 @@ class Petal(object):
         # schedule settings
         self.anneal_mode = anneal_mode
 
-        # Linear Phi parameters must be read befor init_posmodels
-        self.get_linphi_params(posids)
-
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
         self.init_posmodels(posids)
@@ -318,7 +315,6 @@ class Petal(object):
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment,
-                                             linphi_params=self._linphi_params,
                                              printfunc=self.printfunc)
 #            self.posmodels[posid] = PosModel(state=self.states[posid],
 #                                             petal_alignment=self.alignment)
@@ -2789,43 +2785,6 @@ class Petal(object):
         overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
         clear = self.posids - set(overlaps)
         return sorted(clear)
-
-    def get_posfid_linphi_val(self, uniqueid, key):
-        """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
-        # Note: there is no self.posids at this point
-        return self.states[uniqueid]._val[key]
-
-    def get_linphi_params(self, posids):
-        '''Convenience function to reload the linear phi parameters.
-            init_posmodels should be executed next.
-        '''
-#        linphi_params_path = os.path.join(pc.dirs['test_settings'],'linphi_params.csv')
-        self._linphi_params = {}
-#        if os.path.exists(linphi_params_path):
-#            with open(linphi_params_path, 'r', newline='') as file:
-#                reader = csv.DictReader(file)
-#                linphi_params_fields = [str(f).strip() for f in reader.fieldnames if str(f).strip() != 'DEVICE_ID']
-#                for row in reader:
-#                    for i,j in row.items():
-#                        row[i] = str(j).strip()
-#                    if '#' not in str(row['DEVICE_ID']):
-#                        self._linphi_params[row['DEVICE_ID']] = row
-#                        if 1:
-#                            self.printfunc('linphi row: ' + str(row))
-#        else:
-#            self._linphi_params = 'not found: ' + linphi_params_path
-        for posid in posids:
-            if self.get_posfid_linphi_val(posid, 'ZENO_MOTOR_P') is True:
-                self._linphi_params[posid] = {
-                        'DEVICE_ID': posid,
-                        'CCW_SCALE_A': self.get_posfid_linphi_val(posid, 'SZ_CCW_P'),
-                        'CW_SCALE_A': self.get_posfid_linphi_val(posid, 'SZ_CW_P'),
-                        }
-        if self.verbose:
-            self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
-
-        return self._linphi_params
-
 
 if __name__ == '__main__':
     '''
