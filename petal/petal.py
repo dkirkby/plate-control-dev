@@ -1918,7 +1918,7 @@ class Petal(object):
         '''
         import operator
         position_keys = set(pc.single_coords)
-        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED', 'zeno_motor_p', 'sz_cw_p', 'sz_ccw_p', 'zeno_motor_t', 'sz_cw_t', 'sz_ccw_t'}
         state_keys -= pc.fiducial_calib_keys  # fiducial data not currently supported
         constants_keys = set(pc.constants_keys)
         model_keys = set(pc.posmodel_keys)
