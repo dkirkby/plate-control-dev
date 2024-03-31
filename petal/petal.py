@@ -2790,6 +2790,11 @@ class Petal(object):
         clear = self.posids - set(overlaps)
         return sorted(clear)
 
+    def get_posfid_linphi_val(self, uniqueid, key):
+        """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
+        # Note: there is no self.posids at this point
+        return self.states[uniqueid]._val.get(key, None)
+
     def get_linphi_params(self, posids):
         '''Convenience function to reload the linear phi parameters.
             init_posmodels should be executed next.
@@ -2810,11 +2815,11 @@ class Petal(object):
 #        else:
 #            self._linphi_params = 'not found: ' + linphi_params_path
         for posid in posids:
-            if self.get_posfid_val(posid, 'ZENO_MOTOR_P') is True:
+            if self.get_posfid_linphi_val(posid, 'ZENO_MOTOR_P') is True:
                 self._linphi_params[posid] = {
                         'DEVICE_ID': posid,
-                        'CCW_SCALE_A': self.get_posfid_val(posid, 'SZ_CCW_P'),
-                        'CW_SCALE_A': self.get_posfid_val(posid, 'SZ_CW_P'),
+                        'CCW_SCALE_A': self.get_posfid_linphi_val(posid, 'SZ_CCW_P'),
+                        'CW_SCALE_A': self.get_posfid_linphi_val(posid, 'SZ_CW_P'),
                         }
         if self.verbose:
             self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
