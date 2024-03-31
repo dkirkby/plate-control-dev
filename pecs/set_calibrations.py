@@ -52,7 +52,7 @@ doc += f' intended to be saved to the online db. {format_info}'
 parser = argparse.ArgumentParser(description=doc)
 parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file')
 parser.add_argument('-s', '--simulate', action='store_true', help='perform the script "offline" with no storing to memory or database')
-parser.add_argument('-v', '--verbose', action='store_true', help='be verbose')
+parser.add_argument('-t', '--talkative', action='store_true', help='be talkative')
 args = parser.parse_args()
 
 # read input data
