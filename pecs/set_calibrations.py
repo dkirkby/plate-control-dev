@@ -93,7 +93,7 @@ for key in boolean_keys & set(table.columns):
 truefalse = {'TRUE': True, 'FALSE': False}
 
 for key in float_keys & set(table.columns):
-    table[key] = [float(x) if x not in truefalse else truefals[x] for x in table[key]]
+    table[key] = [float(x) if x not in truefalse else truefalse[x] for x in table[key]]
 
 # validate the table format
 if args.talkative:
