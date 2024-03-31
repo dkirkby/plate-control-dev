@@ -90,8 +90,10 @@ for key in boolean_keys & set(table.columns):
     table[key] = [pc.boolean(x) for x in table[key]]
 
 # deal with astropy's annoying restrictions on integer values
+truefalse = {'TRUE': True, 'FALSE': False}
+
 for key in float_keys & set(table.columns):
-    table[key] = [float(x) for x in table[key]]
+    table[key] = [float(x) if x not in truefalse else truefals[x] for x in table[key]]
 
 # validate the table format
 if args.talkative:
