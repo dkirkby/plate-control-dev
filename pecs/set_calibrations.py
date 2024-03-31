@@ -26,7 +26,8 @@ boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL', '
 float_keys = (valid_keys | fit_err_keys) - boolean_keys
 no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED', 'POS_P', 'POS_T',
                   'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_PHI_RADIAL',
-                  'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR'}
+                  'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR',
+                  'ZENO_MOTOR_P', 'ZENO_MOTOR_T', 'SZ_CW_P', 'SZ_CCW_P',  'SZ_CW_T', 'SZ_CCW_T'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
@@ -121,9 +122,9 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
+    commit_type_ok = table[commit_key].dtype in [int, bool]     # [np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [np.int, np.float, np.bool]
+    data_type_ok = column.dtype in [int, float, bool]    # [np.int, np.float, np.bool]
     assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):
