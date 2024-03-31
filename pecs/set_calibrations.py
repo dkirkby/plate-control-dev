@@ -94,7 +94,7 @@ for key in float_keys & set(table.columns):
     table[key] = [float(x) for x in table[key]]
 
 # validate the table format
-if args.verbose:
+if args.talkative:
     logger.info(f'Columns: "{table.columns}"')
 assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
 for key in set(table.columns):  # set op provides a copy
@@ -105,7 +105,7 @@ for key in set(table.columns):  # set op provides a copy
         table.rename_column(key, dbkey_for_key(key))
         logger.warning(f'For compatibility with online DB, renamed column {key} to {remapped_key}')
 keys = valid_keys & set(table.columns)
-if args.verbose:
+if args.talkative:
     logger.info(f'keys: "{keys}"')
 assert2(len(keys) > 0, 'No valid parameter columns found in input table')
 no_commit_key = {key for key in keys if commit_keys[key] not in table.columns}
