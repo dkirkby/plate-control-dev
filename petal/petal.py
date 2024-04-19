@@ -187,9 +187,6 @@ class Petal(object):
         # schedule settings
         self.anneal_mode = anneal_mode
 
-        # Linear Phi parameters must be read befor init_posmodels
-        self.get_linphi_params()
-
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
         self.init_posmodels(posids)
@@ -318,7 +315,6 @@ class Petal(object):
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment,
-                                             linphi_params=self._linphi_params,
                                              printfunc=self.printfunc)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
@@ -1915,7 +1911,7 @@ class Petal(object):
         '''
         import operator
         position_keys = set(pc.single_coords)
-        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED', 'zeno_motor_p', 'sz_cw_p', 'sz_ccw_p', 'zeno_motor_t', 'sz_cw_t', 'sz_ccw_t'}
         state_keys -= pc.fiducial_calib_keys  # fiducial data not currently supported
         constants_keys = set(pc.constants_keys)
         model_keys = set(pc.posmodel_keys)
@@ -2786,32 +2782,6 @@ class Petal(object):
         overlaps = self.get_overlaps(posids='all', as_dict=True, arcP=True)
         clear = self.posids - set(overlaps)
         return sorted(clear)
-
-    def get_linphi_params(self):
-        '''Convenience function to reload the linear phi parameters.
-            init_posmodels should be executed next.
-        '''
-        linphi_params_path = os.path.join(pc.dirs['test_settings'],'linphi_params.csv')
-        self._linphi_params = {}
-        if os.path.exists(linphi_params_path):
-            with open(linphi_params_path, 'r', newline='') as file:
-                reader = csv.DictReader(file)
-                linphi_params_fields = [str(f).strip() for f in reader.fieldnames if str(f).strip() != 'DEVICE_ID']
-                for row in reader:
-                    for i,j in row.items():
-                        row[i] = str(j).strip()
-                    if '#' not in str(row['DEVICE_ID']):
-                        self._linphi_params[row['DEVICE_ID']] = row
-                        if 1:
-                            self.printfunc('linphi row: ' + str(row))
-        else:
-            self._linphi_params = 'not found: ' + linphi_params_path
-            self.printfunc(str(self._linphi_params))
-        if 1:
-            self.printfunc(f'Linear Phi Parameters: {self._linphi_params}')
-
-        return self._linphi_params
-
 
 if __name__ == '__main__':
     '''
