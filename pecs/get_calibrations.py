@@ -10,6 +10,8 @@ parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma
 parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
 parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
 parser.add_argument('-dl', '--disable_logger', action='store_true', help='Disable logging to disk.')
+parser.add_argument('-az', '--add_zeno', action='store_true', help='Add Zeno parameters')
+parser.add_argument('-zo', '--zeno_only', action='store_true', help='Retrieve Zeno parameters only')
 uargs = parser.parse_args()
 
 # general imports
@@ -82,11 +84,24 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'OBS_X': 'current x position in global coordinates (a.k.a. "CS5" or "x_fp") as transformed from (POS_T, POS_P)',
               'OBS_Y': 'current y position in global coordinates (a.k.a. "CS5" or "y_fp") as transformed from (POS_T, POS_P)',
               }
+zeno_query_keys = {'ZENO_MOTOR_P': 'boolean of whether phi motor is ZENO',
+                   'ZENO_MOTOR_T': 'boolean of whether theta motor is ZENO',
+                   'SZ_CW_P': 'scale factor for zeno phi axis in clockwise direction', 
+                   'SZ_CCW_P': 'scale factor for zeno phi axis in counter-clockwise direction',  
+                   'SZ_CW_T': 'scale factor for zeno theta axis in clockwise direction', 
+                   'SZ_CCW_T': 'scale factor for zeno theta axis in counter-clockwise direction'}
 query_keys_map = {'PTL_X': 'ptlX',
                   'PTL_Y': 'ptlY',
                   'OBS_X': 'obsX',
                   'OBS_Y': 'obsY',
                   }
+
+if uargs.add_zeno:
+    query_keys.update(zeno_query_keys)
+
+if uargs.zeno_only:
+    query_keys = {'POS_ID': 'unique serial id number of fiber positioner'}
+    query_keys.update(zeno_query_keys)
 
 # petal-wide keys for storage in positioner data rows
 pos_petal_keys = {'PETAL_ID': 'unique serial id number of petal',
