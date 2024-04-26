@@ -85,9 +85,9 @@ query_keys = {'POS_ID': 'unique serial id number of fiber positioner',
               'OBS_Y': 'current y position in global coordinates (a.k.a. "CS5" or "y_fp") as transformed from (POS_T, POS_P)',
               }
 zeno_query_keys = {'ZENO_MOTOR_P': 'boolean of whether phi motor is ZENO',
-                   'ZENO_MOTOR_T': 'boolean of whether theta motor is ZENO',
                    'SZ_CW_P': 'scale factor for zeno phi axis in clockwise direction', 
                    'SZ_CCW_P': 'scale factor for zeno phi axis in counter-clockwise direction',  
+                   'ZENO_MOTOR_T': 'boolean of whether theta motor is ZENO',
                    'SZ_CW_T': 'scale factor for zeno theta axis in clockwise direction', 
                    'SZ_CCW_T': 'scale factor for zeno theta axis in counter-clockwise direction'}
 query_keys_map = {'PTL_X': 'ptlX',
@@ -343,20 +343,39 @@ try:
             meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
                     
     logger.info('All data gathered, generating table format...')
-    t = Table(data)
-    t.meta = meta
-    
-    # add units and descriptions
-    for key in t.columns:
-        t[key].description = all_pos_keys[key]
-        if key in units:
-            t[key].unit = units[key]
-        
+    if uargs.zeno_only:
+        cdata = []
+        header = ['POS_ID','ZENO_MOTOR_P','SZ_CW_P','SZ_CCW_P','ZENO_MOTOR_T','SZ_CW_T','SZ_CCW_T']
+        cdata.append(header)
+        for ndx, element in enumerate(data['POS_ID']):
+            if data['ZENO_MOTOR_P'][ndx] or data['ZENO_MOTOR_T'][ndx]:
+                ldata = [data[x][ndx] for x in header]
+                cdata.append(ldata)
+    else:
+        t = Table(data)
+        t.meta = meta
+
+        # add units and descriptions
+        for key in t.columns:
+            t[key].description = all_pos_keys[key]
+            if key in units:
+                t[key].unit = units[key]
+
     # save data to disk
     save_dir = os.path.realpath(uargs.outdir)
-    save_name = pc.filename_timestamp_str() + '_fp_calibs.ecsv'
+    if uargs.zeno_only:
+        save_name = pc.filename_timestamp_str() + '_fp_calibs.csv'
+    else:
+        save_name = pc.filename_timestamp_str() + '_fp_calibs.ecsv'
     save_path = os.path.join(save_dir, save_name)
-    t.write(save_path)
+    if uargs.zeno_only:
+        import csv
+        with open(save_path, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(cdata)
+        
+    else:
+        t.write(save_path)
     logger.info(f'Data saved to: {save_path}')
     
     # save a reference to this file in a standard place
