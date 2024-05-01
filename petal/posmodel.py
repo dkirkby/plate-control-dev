@@ -34,6 +34,9 @@ class PosModel(object):
                     'CCW_SCALE_A': self.state._val['SZ_CCW_P'],
                     'CW_SCALE_A': self.state._val['SZ_CW_P']
                     }
+            for scl in ['CCW_SCALE_A', 'CW_SCALE_A']:
+                if self.linphi_params[scl] is None:
+                    self.linphi_params[scl] = 1.0
             self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
             self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
@@ -48,6 +51,9 @@ class PosModel(object):
                     'CCW_SCALE_A': self.state._val['SZ_CCW_T'],
                     'CW_SCALE_A': self.state._val['SZ_CW_T']
                     }
+            for scl in ['CCW_SCALE_A', 'CW_SCALE_A']:
+                if self.lintheta_params[scl] is None:
+                    self.lintheta_params[scl] = 1.0
             self.printfunc(f'PosModel: new lintheta posid = {posid}')  # DEBUG
             self.lintheta_params['LAST_T_DIR'] = 1    # 1 is CCW, -1 is CW
             self.printfunc(f'lintheta_params: {self.lintheta_params}')  # DEBUG
