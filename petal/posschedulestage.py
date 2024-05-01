@@ -98,7 +98,7 @@ class PosScheduleStage(object):
         return first_move, second_move
     
     def rewrite_zeno_move_table(self, table, lin_params, axis):
-        if axis = pc.P:
+        if axis == pc.P:
             last_a_dir = 'LAST_P_DIR'
         else:
             last_a_dir = 'LAST_T_DIR'
