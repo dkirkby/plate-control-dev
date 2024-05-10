@@ -60,94 +60,67 @@ class PosScheduleStage(object):
             self.move_tables[posid] = table
             self.start_posintTP[posid] = tuple(start_posintTP[posid])
 
-    def rewrite_zeno_move_tables(self, proposed_tables):
+    def rewrite_linphi_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
-            if table.posmodel.linphi_params and table.has_phi_motion:
+            if table.posmodel.linphi_params:
                 self.printfunc(f'Rewriting linphi table for {posid}')
-                new_table = self.rewrite_zeno_move_table(table, table.posmodel.linphi_params, pc.P)
-                self.printfunc(f'old {posid} table: {str(table)}')
-                self.printfunc(f'new {posid} table: {str(new_table)}')
-                if new_table is not None:
-                    proposed_tables[posid] = new_table
-            if table.posmodel.lintheta_params and table.has_theta_motion:
-                self.printfunc(f'Rewriting lintheta table for {posid}')
-                new_table = self.rewrite_zeno_move_table(table, table.posmodel.lintheta_params, pc.T)
+                new_table = self.rewrite_linphi_move_table(table)
                 self.printfunc(f'old {posid} table: {str(table)}')
                 self.printfunc(f'new {posid} table: {str(new_table)}')
                 if new_table is not None:
                     proposed_tables[posid] = new_table
         return proposed_tables
 
-    @staticmethod
-    def _calc_first_and_second_moves(dist, jog, new_direction, last_direction):
-        #NOTE: The first and second moves should have abs(move) >= jog
-        if new_direction == last_direction:
-            if new_direction > 0:   # must go negative, then positive
-                first_move = -jog
-                second_move = (jog + dist)
-            else:                       # must go positive, then negative
-                first_move = jog
-                second_move = (-jog + dist)
-        else:
-            if new_direction > 0:   # must go positive, then negative
-                first_move = (jog + dist)
-                second_move = -jog
-            else:                       # must go positive, then negative
-                first_move = (-jog + dist)
-                second_move = jog
-        return first_move, second_move
-    
-    def rewrite_zeno_move_table(self, table, lin_params, axis):
-        if axis == pc.P:
-            last_a_dir = 'LAST_P_DIR'
-        else:
-            last_a_dir = 'LAST_T_DIR'
-        last_motor_direction = lin_params[last_a_dir]
-        lin_table = table.copy()
-        idx = 0
-        l_idx = 0
-        for row in table.rows:
-            phi_dist = table.get_move(idx, pc.P)
-            theta_dist = table.get_move(idx, pc.T)
-            if (axis == pc.P and phi_dist == 0) or (axis == pc.T and theta_dist == 0):
-                self.printfunc(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
-                idx += 1
-                l_idx += 1
-            elif axis == pc.P:  # handle Phi axis
-                dist = phi_dist
-                jog = pc.P_zeno_jog
-                new_direction = 1 if dist >= 0.0 else -1
-                first_move, second_move = self._calc_first_and_second_moves(dist, jog, new_direction, last_motor_direction)
-#               Probably need next two lines to prevent banging into hard stops, but if they adjust either move, we'll need
-#               to adjust the other.  Rely implicitly on the extra keepout to not need this!
-#               first_move_limited = self._range_limited_jog(first_move ... and other args)
-#               second_move_limited = self._range_limited_jog(second_move ... and other args)
-                self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
-                lin_table.set_move(l_idx, pc.P, first_move)
-                lin_table.set_move(l_idx, pc.T, 0.0)
-                lin_table.insert_new_row(l_idx + 1)
-                lin_table.set_move(l_idx + 1, pc.P, second_move)
-                lin_table.set_move(l_idx + 1, pc.T, theta_dist)
-                lin_params[last_a_dir] = 1 if second_move > 0 else -1  # store new direction
-                idx += 1
-                l_idx += 2
-            else:       # handle Theta axis
-                dist = theta_dist
-                jog = pc.T_zeno_jog
-                new_direction = 1 if dist >= 0.0 else -1
-                first_move, second_move = self._calc_first_and_second_moves(dist, jog, new_direction, last_motor_direction)
-#               See comment above about banging into hard stops - implicitly safe by extra theta keepout
-                self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
-                lin_table.set_move(l_idx, pc.P, 0.0)
-                lin_table.set_move(l_idx, pc.T, first_move)
-                lin_table.insert_new_row(l_idx + 1)
-                lin_table.set_move(l_idx + 1, pc.P, phi_dist)
-                lin_table.set_move(l_idx + 1, pc.T, second_move)
-                lin_params[last_a_dir] = 1 if second_move > 0 else -1  # store new direction
-                idx += 1
-                l_idx += 2
+    def rewrite_linphi_move_table(self, table):
+        last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
+        if table.has_phi_motion:
+            linphi_table = table.copy()
+            idx = 0
+            l_idx = 0
+            self.printfunc(f'Proposed table has phi movement') # DEBUG
+            for row in table.rows:
+                phi_dist = table.get_move(idx, pc.P)
+                theta_dist = table.get_move(idx, pc.T)
+                if phi_dist == 0:
+                    self.printfunc(f'no movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
+                    idx += 1
+                    l_idx += 1
+                else:
+                    new_phi_direction = 1 if phi_dist >= 0.0 else -1
+#                   scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
+#                   scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
+                    #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
+                    if new_phi_direction == table.posmodel.linphi_params['LAST_P_DIR']:
+                        if new_phi_direction > 0:   # must go negative, then positive
+                            first_move = -pc.P_zeno_jog # / scale_cw
+                            second_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
+                        else:                       # must go positive, then negative
+                            first_move = pc.P_zeno_jog # / scale_ccw
+                            second_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                    else:
+                        if new_phi_direction > 0:   # must go positive, then negative
+                            first_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
+                            second_move = -pc.P_zeno_jog # / scale_cw
+                        else:                       # must go positive, then negative
+                            first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            second_move = pc.P_zeno_jog # / scale_ccw
+#                   Probably need next two lines to prevent banging into hard stops, but if they adjust either move, we'll need
+#                   to adjust the other.
+#                   first_move_limited = self._range_limited_jog(first_move ... and other args)
+#                   second_move_limited = self._range_limited_jog(second_move ... and other args)
+                    self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
+                    linphi_table.set_move(l_idx, pc.P, first_move)
+                    linphi_table.set_move(l_idx, pc.T, 0.0)
+                    linphi_table.insert_new_row(l_idx + 1)
+                    linphi_table.set_move(l_idx + 1, pc.P, second_move)
+                    linphi_table.set_move(l_idx + 1, pc.T, theta_dist)
+                    table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
+                    idx += 1
+                    l_idx += 2
+            else:
+                self.printfunc(f'Proposed table has no phi movement') # DEBUG
             if idx != l_idx:    # table was modified
-                return lin_table
+                return linphi_table
         return None
 
     def is_not_empty(self):
