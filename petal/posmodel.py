@@ -45,7 +45,7 @@ class PosModel(object):
                                             pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
 
-    def get_zeno_scale(which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
+    def get_zeno_scale(self, which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
         scale = self.state._val[which]
         if scale is None:
             scale = 1.0
