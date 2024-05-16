@@ -30,8 +30,8 @@ class PosModel(object):
         if self.state._val['ZENO_MOTOR_P'] is True:
             self.linphi_params = {
                     'DEVICE_ID': posid,
-                    'CCW_SCALE_A': self.state._val['SZ_CCW_P'],
-                    'CW_SCALE_A': self.state._val['SZ_CW_P']
+#                   'CCW_SCALE_A': self.state._val['SZ_CCW_P'],
+#                   'CW_SCALE_A': self.state._val['SZ_CW_P']
                     }
             self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
@@ -44,6 +44,12 @@ class PosModel(object):
         self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
                                             pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
+
+    def get_zeno_scale(which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
+        scale = self.state._val[which]
+        if scale is None:
+            scale = 1.0
+        return scale
 
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''

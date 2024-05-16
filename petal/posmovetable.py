@@ -62,8 +62,8 @@ class PosMoveTable(object):
              'is_required':           c._is_required,
              }
         if c.posmodel.linphi_params:
-            ccw_scale_a = float(c.posmodel.linphi_params['CCW_SCALE_A'])
-            cw_scale_a = float(c.posmodel.linphi_params['CW_SCALE_A'])
+            ccw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CCW_P'))
+            cw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CW_P'))
             d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
             d['PCCWA'] = ccw_scale_a
             d['PCWA'] = cw_scale_a
@@ -576,8 +576,8 @@ class PosMoveTable(object):
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
             if self.posmodel.linphi_params:
-                ccw_scale_a = float(self.posmodel.linphi_params['CCW_SCALE_A'])
-                cw_scale_a = float(self.posmodel.linphi_params['CW_SCALE_A'])
+                ccw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
+                cw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
                 table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
                 table['PCCWA'] = ccw_scale_a
                 table['PCWA'] = cw_scale_a
@@ -629,8 +629,8 @@ class PosMoveTable(object):
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
             linphi_note = ''
             if self.posmodel.linphi_params:
-                for s in ['CCW_SCALE_A','CW_SCALE_A']:
-                    linphi_note = pc.join_notes(linphi_note, f'p{s}={self.posmodel.linphi_params[s]}')
+                for s in [('CCW_SCALE_A','SZ_CCW_P'),('CW_SCALE_A','SZ_CW_P')]:
+                    linphi_note = pc.join_notes(linphi_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
             table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
