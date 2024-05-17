@@ -55,7 +55,7 @@ class PosModel(object):
             self.state.store('KEEPOUT_EXPANSION_THETA_ANGULAR', new_theta_keepout, register_if_altered=False)
             self.printfunc(f'lintheta: new_theta_keepout = {new_theta_keepout}')  # DEBUG
             self._stepsize_cruise[pc.T] = 0.1 * float(pc.T_zeno_speed)
-            self._motor_speed_cruise[pc.T = (18000 * 60/3600 * pc.T_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
+            self._motor_speed_cruise[pc.T] = (18000 * 60/3600 * pc.T_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
         self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
                                             pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
