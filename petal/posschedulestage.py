@@ -137,7 +137,7 @@ class PosScheduleStage(object):
         return None
 
     def rewrite_lintheta_move_table(self, table):
-        last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
+        last_motor_direction = table.posmodel.lintheta_params['LAST_T_DIR']
         if table.has_theta_motion:
             new_table = table.copy()
             idx = 0
