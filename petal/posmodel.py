@@ -33,17 +33,14 @@ class PosModel(object):
             self.linphi_params = {
                     'DEVICE_ID': posid,
                     'CCW_SCALE_A': self.get_zeno_scale('SZ_CCW_P'),
-                    'CW_SCALE_A': self.get_zeno_scale('SZ_CW_P')
+                    'CW_SCALE_A': self.get_zeno_scale('SZ_CW_P'),
+                    'KEEPOUT_WITH_JOG': self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
                     }
             if self.DEBUG:
                 self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
             if self.DEBUG:
                 self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
-            new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
-            self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
-            if self.DEBUG:
-                self.printfunc(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
             self._stepsize_cruise[pc.P] = 0.1 * float(pc.P_zeno_speed)
             self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
         if self.state._val['ZENO_MOTOR_T'] is True:
@@ -51,16 +48,13 @@ class PosModel(object):
                     'DEVICE_ID': posid,
                     'CCW_SCALE_A': self.get_zeno_scale('SZ_CCW_T'),
                     'CW_SCALE_A': self.get_zeno_scale('SZ_CW_T')
+                    'KEEPOUT_WITH_JOG': self.state.read('KEEPOUT_EXPANSION_THETA_ANGULAR') + pc.T_zeno_jog
                     }
             if self.DEBUG:
                 self.printfunc(f'PosModel: new lintheta posid = {posid}')  # DEBUG
             self.lintheta_params['LAST_T_DIR'] = 1    # 1 is CCW, -1 is CW
             if self.DEBUG:
                 self.printfunc(f'lintheta_params: {self.lintheta_params}')  # DEBUG
-            new_theta_keepout = self.state.read('KEEPOUT_EXPANSION_THETA_ANGULAR') + pc.T_zeno_jog
-            self.state.store('KEEPOUT_EXPANSION_THETA_ANGULAR', new_theta_keepout, register_if_altered=False)
-            if self.DEBUG:
-                self.printfunc(f'lintheta: new_theta_keepout = {new_theta_keepout}')  # DEBUG
             self._stepsize_cruise[pc.T] = 0.1 * float(pc.T_zeno_speed)
             self._motor_speed_cruise[pc.T] = (18000 * 60/3600 * pc.T_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
         self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
