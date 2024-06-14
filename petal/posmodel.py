@@ -46,6 +46,12 @@ class PosModel(object):
                                             pc.P: sum(range(round(self._stepsize_cruise[pc.P]/self._stepsize_creep) + 1))*self._stepsize_creep}
         self.refresh_cache()
 
+    def get_zeno_scale(self, which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
+        scale = self.state._val[which]
+        if scale is None:
+            scale = 1.0
+        return scale
+
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
         self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise[pc.T] / self.axis[pc.T].signed_gear_ratio)
