@@ -11,6 +11,7 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
     def __init__(self, state=None, petal_alignment=None, printfunc=print):
+        self.DEBUG = 1
         if not(state):
             self.state = posstate.PosState()
         else:
@@ -30,15 +31,15 @@ class PosModel(object):
         if self.state._val['ZENO_MOTOR_P'] is True:
             self.linphi_params = {
                     'DEVICE_ID': posid,
-                    'CCW_SCALE_A': self.state._val['SZ_CCW_P'],
-                    'CW_SCALE_A': self.state._val['SZ_CW_P']
+                    'CCW_SCALE_A': self.get_zeno_scale('SZ_CCW_P'),
+                    'CW_SCALE_A': self.get_zeno_scale('SZ_CW_P'),
+                    'KEEPOUT_WITH_JOG': self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
                     }
-            self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
+            if self.DEBUG:
+                self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
             self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
-            self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
-            new_phi_keepout = self.state.read('KEEPOUT_EXPANSION_PHI_ANGULAR') + pc.P_zeno_jog
-            self.state.store('KEEPOUT_EXPANSION_PHI_ANGULAR', new_phi_keepout, register_if_altered=False)
-            self.printfunc(f'linphi: new_phi_keepout = {new_phi_keepout}')  # DEBUG
+            if self.DEBUG:
+                self.printfunc(f'linphi_params: {self.linphi_params}')  # DEBUG
             self._stepsize_cruise[pc.P] = 0.1 * float(pc.P_zeno_speed)
             self._motor_speed_cruise[pc.P] = (18000 * 60/3600 * pc.P_zeno_speed) * 360.0/60.0 # RPM * 360/60 = deg/sed
         self._spinupdown_dist_per_period = {pc.T: sum(range(round(self._stepsize_cruise[pc.T]/self._stepsize_creep) + 1))*self._stepsize_creep,
