@@ -47,7 +47,7 @@ class PosModel(object):
             self.lintheta_params = {
                     'DEVICE_ID': posid,
                     'CCW_SCALE_A': self.get_zeno_scale('SZ_CCW_T'),
-                    'CW_SCALE_A': self.get_zeno_scale('SZ_CW_T')
+                    'CW_SCALE_A': self.get_zeno_scale('SZ_CW_T'),
                     'KEEPOUT_WITH_JOG': self.state.read('KEEPOUT_EXPANSION_THETA_ANGULAR') + pc.T_zeno_jog
                     }
             if self.DEBUG:
