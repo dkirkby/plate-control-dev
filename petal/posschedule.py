@@ -536,7 +536,7 @@ class PosSchedule(object):
                                                range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posintTP, dtdp)
-        stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
+        stage.move_tables = stage.rewrite_linphi_move_tables(stage.move_tables)
         # double-negative syntax is to be compatible with various
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
@@ -610,7 +610,7 @@ class PosSchedule(object):
             # 1. Each time we initialize_move_tables, only updating the ones for which a new delta is proposed.
             # 2. No annealing allowed! (would mess up the "skip first x timesteps" during collision checking)
             stage.initialize_move_tables(start_tp, dtdp, update_only=True)
-            stage.rewrite_zeno_move_tables(stage.move_tables)  # i.e. a for loop of the single motor similar function
+            stage.rewrite_linphi_move_tables(stage.move_tables)  # i.e. a for loop of the single motor similar function
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, skip=skip)
             unresolved = set(colliding_sweeps)
         adjustments_failed = unresolved & enabled & overlapping
@@ -690,7 +690,7 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
+            stage.move_tables = stage.rewrite_linphi_move_tables(stage.move_tables)
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
                 stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
