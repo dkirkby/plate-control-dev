@@ -43,6 +43,23 @@ class PosMoveTable(object):
         self._error_flag = 'ERROR'
         self._not_yet_calculated = '(not yet calculated)'
 
+    def _set_zeno_dict(self, d):
+        if self.posmodel.linphi_params:
+            if 'zeno' in d:
+                d['zeno'] += 'P'
+            else:
+                d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+            d['PCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
+            d['PCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
+        if self.posmodel.lintheta_params:
+            if 'zeno' in d:
+                d['zeno'] += 'T'
+            else:
+                d['zeno'] = 'T'    # Denotes a movetable for a linear theta positioner
+            d['TCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_T'))
+            d['TCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_T'))
+        return d
+
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
         c = self.copy()
@@ -61,12 +78,7 @@ class PosMoveTable(object):
              'total_time':            self.total_time(suppress_automoves=False),
              'is_required':           c._is_required,
              }
-        if c.posmodel.linphi_params:
-            ccw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CCW_P'))
-            cw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CW_P'))
-            d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-            d['PCCWA'] = ccw_scale_a
-            d['PCWA'] = cw_scale_a
+        d = self._set_zeno_dict(d)
         return d
 
     def __repr__(self):
@@ -254,10 +266,19 @@ class PosMoveTable(object):
 
     @property
     def has_phi_motion(self):
-        """Boolean saying whether the move table contains zny phi motion at all in any row.
+        """Boolean saying whether the move table contains any phi motion at all in any row.
         """
         for row in self.rows:
             if row.has_phi_motion:
+                return True
+        return False
+
+    @property
+    def has_theta_motion(self):
+        """Boolean saying whether the move table contains any theta motion at all in any row.
+        """
+        for row in self.rows:
+            if row.has_theta_motion:
                 return True
         return False
 
@@ -446,8 +467,9 @@ class PosMoveTable(object):
         axis_idxs = [pc.T, pc.P]
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
-            for i in [pc.T,pc.P]:
-                if self.posmodel.linphi_params and i == pc.P:
+            for i in axis_idxs:
+                if (self.posmodel.linphi_params and i == pc.P) or \
+                   (self.posmodel.lintheta_params and i == pc.T):
                     my_allow_cruise = True
                 else:
                     my_allow_cruise = self.allow_cruise
@@ -465,7 +487,8 @@ class PosMoveTable(object):
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in axis_idxs:
-                if self.posmodel.linphi_params and i == pc.P:
+                if (self.posmodel.linphi_params and i == pc.P) or \
+                   (self.posmodel.lintheta_params and i == pc.T):
                     backlash[i] = 0.0
                     auto_cmd_msg = ''
                     my_allow_cruise = False
@@ -488,7 +511,8 @@ class PosMoveTable(object):
             actual_total = [0, 0]
             err_dist = [0, 0]
             for i in axis_idxs:
-                if self.posmodel.linphi_params and i == pc.P:
+                if (self.posmodel.linphi_params and i == pc.P) or \
+                   (self.posmodel.lintheta_params and i == pc.T):
                     err_dist[i] = 0.0
                     auto_cmd_warning = ''
                 else:
@@ -575,12 +599,7 @@ class PosMoveTable(object):
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-            if self.posmodel.linphi_params:
-                ccw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
-                cw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
-                table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-                table['PCCWA'] = ccw_scale_a
-                table['PCWA'] = cw_scale_a
+            table = self._set_zeno_dict(table)
 
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
@@ -627,11 +646,14 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-            linphi_note = ''
+            zeno_note = ''
             if self.posmodel.linphi_params:
                 for s in [('CCW_SCALE_A','SZ_CCW_P'),('CW_SCALE_A','SZ_CW_P')]:
-                    linphi_note = pc.join_notes(linphi_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
-            table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)
+                    zeno_note = pc.join_notes(zeno_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
+            if self.posmodel.lintheta_params:
+                for s in [('CCW_SCALE_A','SZ_CCW_T'),('CW_SCALE_A','SZ_CW_T')]:
+                    zeno_note = pc.join_notes(zeno_note, f't{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
+            table['log_note'] = pc.join_notes(self.log_note, lock_note, zeno_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
@@ -669,6 +691,10 @@ class PosMoveRow(object):
     @property
     def has_phi_motion(self):
         return self.data['dP_ideal'] != 0
+
+    @property
+    def has_theta_motion(self):
+        return self.data['dT_ideal'] != 0
 
     @property
     def has_prepause(self):
