@@ -389,8 +389,8 @@ try:
     if uargs.zeno_only:
         save_name = pc.filename_timestamp_str() + '_fp_calibs.csv'
     else:
-    save_name = pc.filename_timestamp_str() + '_fp_calibs.ecsv'
-    save_path = os.path.join(save_dir, save_name)
+        save_name = pc.filename_timestamp_str() + '_fp_calibs.ecsv'
+        save_path = os.path.join(save_dir, save_name)
     if uargs.zeno_only:
         import csv
         with open(save_path, mode='w', newline='') as f:
