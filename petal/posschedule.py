@@ -3,6 +3,9 @@ import posschedulestage
 import posschedstats
 import time
 
+DEBUG = 1
+debug_move_number = 1
+
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
@@ -211,6 +214,66 @@ class PosSchedule(object):
             self.stats.add_request_accepted()
         return None
 
+    def _schedule_moves(self, anticollision, should_anneal):
+        if self.expert_mode_is_on():
+            self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
+        else:
+            self._fill_enabled_but_nonmoving_with_dummy_requests()
+            if anticollision == 'adjust':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
+            elif anticollision == 'adjust_requested_only':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
+            else:
+                self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
+        self._combine_stages_into_final()
+        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
+        finalcheck_timer_start = time.perf_counter()
+        final = self.stages['final']
+        if anticollision:
+            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
+        else:
+            c, _, p = self._check_final_stage(msg_prefix='Final')
+        colliding_sweeps, collision_pairs = c, p # for readability
+        if anticollision:
+            if not colliding_sweeps:
+                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
+            else:
+                adjusted = set()
+                frozen = set()
+                for posid in colliding_sweeps:
+                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
+                    adjusted.update(these_adjusted)
+                    frozen.update(these_frozen)
+                prefix = 'Following from \'penultimate\' check:'
+                self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
+                self.printfunc(f'{prefix} frozen posids --> {frozen}')
+                c, _, p = self._check_final_stage(msg_prefix='Final',
+                                                  msg_suffix=' (should always be zero)',
+                                                  assert_no_unresolved=False)   # Cheanged to False 07/15/2024 cad - now handled by self.schedule_moves()
+                colliding_sweeps, collision_pairs = c, p # for readability
+        return colliding_sweeps, collision_pairs
+
+    def _handle_schedule_moves_collision(self, colliding_sweeps, collision_pairs):
+        zeno_posid = None
+        for posid in colliding_sweeps:
+            p_state = self.petal.posmodels[posid].state
+            if p_state._val['ZENO_MOTOR_P'] is True or p_state._val['ZENO_MOTOR_T'] is True:
+                zeno_posid = posid
+                break
+        if zeno_posid:
+            colliding = set(colliding_sweeps)
+            self.printfunc(self.get_details_str(colliding, label='Collision avoided: removed target for {zeno_posid}'))
+            self._make_dummy_request(zeno_posid, lognote='target removed due to potential collision')
+            if stats_enabled:
+                self.stats.sub_request_accepted()
+        else:
+            colliding = set(colliding_sweeps)
+            self.printfunc(self.get_details_str(colliding, label='colliding'))
+            err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+            self.printfunc(err_str)
+            # self.petal.enter_pdb()  # 2023-07-11 [CAD] This line causes a fault (no function enter_pdb)
+            assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
+
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
@@ -270,42 +333,15 @@ class PosSchedule(object):
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
             all_accepted |= accepted
         scheduling_timer_start = time.perf_counter()
-        if self.expert_mode_is_on():
-            self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
-        else:
-            self._fill_enabled_but_nonmoving_with_dummy_requests()
-            if anticollision == 'adjust':
-                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
-            elif anticollision == 'adjust_requested_only':
-                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
+        do_schedule = True
+        
+        while do_schedule:
+            colliding_sweeps, collision_pairs = self._schedule_moves(anticollision, should_anneal)
+            if not collision_pairs or not anticollision:
+                do_schedule = False
             else:
-                self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
-        self._combine_stages_into_final()
-        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
-        finalcheck_timer_start = time.perf_counter()
-        final = self.stages['final']
-        if anticollision:
-            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
-        else:
-            c, _, p = self._check_final_stage(msg_prefix='Final')
-        colliding_sweeps, collision_pairs = c, p # for readability
-        if anticollision:
-            if not colliding_sweeps:
-                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
-            else:
-                adjusted = set()
-                frozen = set()
-                for posid in colliding_sweeps:
-                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
-                    adjusted.update(these_adjusted)
-                    frozen.update(these_frozen)
-                prefix = 'Following from \'penultimate\' check:'
-                self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
-                self.printfunc(f'{prefix} frozen posids --> {frozen}')
-                c, _, p = self._check_final_stage(msg_prefix='Final',
-                                                  msg_suffix=' (should always be zero)',
-                                                  assert_no_unresolved=True)
-                colliding_sweeps, collision_pairs = c, p # for readability
+                self._handle_schedule_moves_collision(colliding_sweeps, collision_pairs)
+
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
@@ -734,25 +770,28 @@ class PosSchedule(object):
                     colliding_sweeps = {posid:stage.sweeps[posid] for posid in sorted_colliding}
                     self.stats.add_unresolved_colliding_at_stage(name, sorted_colliding, colliding_tables, colliding_sweeps)
 
+    def _make_dummy_request(posid, lognote='generated by path adjustment scheduler for enabled but untargeted positioner'):
+        posmodel = self.petal.posmodels[posid]
+        current_posintTP = posmodel.expected_current_posintTP
+        new_request = {'start_posintTP': current_posintTP,
+                       'targt_posintTP': current_posintTP,
+                       'posmodel': posmodel,
+                       'posid': posid,
+                       'command': '(autogenerated)',
+                       'cmd_val1': 0,
+                       'cmd_val2': 0,
+                       'log_note': lognote,
+                       'target_str': '',
+                       'is_dummy': True,
+                       }
+        self._requests[posid] = new_request
+
     def _fill_enabled_but_nonmoving_with_dummy_requests(self):
         enabled = set(self.petal.all_enabled_posids())
         requested = set(self._requests.keys())
         enabled_but_not_requested = enabled - requested
         for posid in enabled_but_not_requested:
-            posmodel = self.petal.posmodels[posid]
-            current_posintTP = posmodel.expected_current_posintTP
-            new_request = {'start_posintTP': current_posintTP,
-                           'targt_posintTP': current_posintTP,
-                           'posmodel': posmodel,
-                           'posid': posid,
-                           'command': '(autogenerated)',
-                           'cmd_val1': 0,
-                           'cmd_val2': 0,
-                           'log_note': 'generated by path adjustment scheduler for enabled but untargeted positioner',
-                           'target_str': '',
-                           'is_dummy': True,
-                           }
-            self._requests[posid] = new_request
+            self._make_dummy_request(posid)
 
     def _deny_request_because_disabled(self, posmodel):
         """Checks enabled status and includes setting flag.
