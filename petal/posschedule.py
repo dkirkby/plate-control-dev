@@ -214,7 +214,7 @@ class PosSchedule(object):
             self.stats.add_request_accepted()
         return None
 
-    def _schedule_moves(self, anticollision, should_anneal):
+    def _schedule_moves(self, anticollision, should_anneal, scheduling_timer_start):
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
@@ -251,7 +251,7 @@ class PosSchedule(object):
                                                   msg_suffix=' (should always be zero)',
                                                   assert_no_unresolved=False)   # Cheanged to False 07/15/2024 cad - now handled by self.schedule_moves()
                 colliding_sweeps, collision_pairs = c, p # for readability
-        return colliding_sweeps, collision_pairs
+        return colliding_sweeps, collision_pairs, finalcheck_timer_start, final
 
     def _handle_schedule_moves_collision(self, colliding_sweeps, collision_pairs):
         zeno_posid = None
@@ -336,7 +336,8 @@ class PosSchedule(object):
         do_schedule = True
         
         while do_schedule:
-            colliding_sweeps, collision_pairs = self._schedule_moves(anticollision, should_anneal)
+            colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
+                self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
