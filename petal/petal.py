@@ -2487,6 +2487,19 @@ class Petal(object):
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
 
+    def disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
+        """Receives a list of positioners that should be disabled, along with the reason.
+        (Optionally) automatically disables positioners to remove them from future send_move_tables attempts.
+        """
+        disabled = set()
+        for posid in posids:
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to {reason}')
+                if accepted:
+                    disabled.add(posid)
+        if disabled:
+            self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to {reason}: {disabled}')
+
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
         held until we could get the state committed to the log / db.
