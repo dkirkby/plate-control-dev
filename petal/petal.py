@@ -2487,7 +2487,7 @@ class Petal(object):
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
 
-    def disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
+    def temporary_disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
         """Receives a list of positioners that should be disabled, along with the reason.
         (Optionally) automatically disables positioners to remove them from future send_move_tables attempts.
         """
