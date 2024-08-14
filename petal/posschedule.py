@@ -362,7 +362,7 @@ class PosSchedule(object):
                     p_state_b = self.petal.posmodels[pid_collider_b].state
                     if p_state._val['CTRL_ENABLED'] is True:
                         colliding_sweeps.add(pid_collider)
-                        colliding_sweeps.add(pid_collidee])
+                        colliding_sweeps.add(pid_collidee)
                         collision_pairs.append(pid_collider + '-' + pid_collidee)
                     else:
                         self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
