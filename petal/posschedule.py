@@ -341,12 +341,15 @@ class PosSchedule(object):
             if DEBUG and not anticollision:
                 pid_collider = 'M01825'
                 pid_collidee = 'M02354'
-                if not collision_pairs and pid_collider in received:
+                if not collision_pairs:
+                    self.printfunc(f'DEBUG {pid_collider} in received: {pid_collider in received}')
                     p_state = self.petal.posmodels[pid_collider].state
                     if p_state._val['CTRL_ENABLED'] is True:
                         colliding_sweeps = set(pid_collider, pid_collidee)
                         collision_pairs = [pid_collider + '-' + pid_collidee]
                         self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
+                    else:
+                        self.printfunc(f'DEBUG {pid_coller} is not CTRL_ENABLED')
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
