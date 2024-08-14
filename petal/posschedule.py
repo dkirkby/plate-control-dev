@@ -262,6 +262,7 @@ class PosSchedule(object):
             for psid in zeno_posids:
                 self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
             self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+            stats_enabled = self.stats.is_enabled()
             if stats_enabled:
                 self.stats.sub_request_accepted()
         else:
