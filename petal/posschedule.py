@@ -345,7 +345,7 @@ class PosSchedule(object):
                     self.printfunc(f'schedule_moves: DEBUG {pid_collider} in received: {pid_collider in received}')
                     p_state = self.petal.posmodels[pid_collider].state
                     if p_state._val['CTRL_ENABLED'] is True:
-                        colliding_sweeps = set(pid_collider, pid_collidee)
+                        colliding_sweeps = set([pid_collider, pid_collidee])
                         collision_pairs = [pid_collider + '-' + pid_collidee]
                         self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
                     else:
