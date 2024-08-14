@@ -350,7 +350,7 @@ class PosSchedule(object):
                         collision_pairs = [pid_collider + '-' + pid_collidee]
                         self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
                     else:
-                        self.printfunc(f'DEBUG {pid_coller} is not CTRL_ENABLED')
+                        self.printfunc(f'DEBUG {pid_collider} is not CTRL_ENABLED')
                 else:
                     self.printfunc(f'DEBUG Collision pairs already set: {collision_pairs}')
             else:
