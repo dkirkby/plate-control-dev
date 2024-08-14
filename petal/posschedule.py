@@ -4,7 +4,6 @@ import posschedstats
 import time
 
 DEBUG = 1
-debug_move_number = 1
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -335,10 +334,19 @@ class PosSchedule(object):
             all_accepted |= accepted
         scheduling_timer_start = time.perf_counter()
         do_schedule = True
-        
+
         while do_schedule:
             colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
                 self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
+            if DEBUG and not anticollision:
+                pid_collider = 'M01825'
+                pid_collidee = 'M02354'
+                if not collision_pairs and pid_collider in received:
+                    p_state = self.petal.posmodels[pid_collider].state
+                    if p_state._val['CTRL_ENABLED'] is True:
+                        colliding_sweeps = set(pid_collider, pid_collidee)
+                        collision_pairs = [pid_collider + '-' + pid_collidee]
+                        self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
