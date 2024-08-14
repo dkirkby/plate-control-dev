@@ -3,8 +3,6 @@ import posschedulestage
 import posschedstats
 import time
 
-DEBUG = 1
-
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
@@ -315,6 +313,8 @@ class PosSchedule(object):
         The boolean flag should_anneal controls whether or not to spread out
         the move density in time.
         """
+        DEBUG = True
+
         self._schedule_moves_initialize_logging(anticollision)
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')

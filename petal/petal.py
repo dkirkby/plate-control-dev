@@ -245,6 +245,12 @@ class Petal(object):
             self.strikes[f'strike_{i}'] = set()
 
 
+    def petal_version(self):
+        version = 'PETAL_lbldev_v2.02'
+        if self.simulator_on:
+            return version+'-Sim'
+        else:
+            return version
 
     def is_pc_connected(self):
         if self.simulator_on:
