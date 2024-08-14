@@ -338,7 +338,7 @@ class PosSchedule(object):
         while do_schedule:
             colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
                 self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
-            if DEBUG and not anticollision:
+            if DEBUG and anticollision:
                 pid_collider = 'M01825'
                 pid_collidee = 'M02354'
                 if not collision_pairs:
@@ -347,11 +347,13 @@ class PosSchedule(object):
                     if p_state._val['CTRL_ENABLED'] is True:
                         colliding_sweeps = set(pid_collider, pid_collidee)
                         collision_pairs = [pid_collider + '-' + pid_collidee]
-                        self.printfunc(f'schedule_moves: DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
+                        self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
                     else:
-                        self.printfunc(f'schedule_moves: DEBUG {pid_coller} is not CTRL_ENABLED')
+                        self.printfunc(f'DEBUG {pid_coller} is not CTRL_ENABLED')
+                else:
+                    self.printfunc(f'DEBUG Collision pairs already set: {collision_pairs}')
             else:
-                self.printfunc(f'schedule_moves: DEBUG = {DEBUG}, anticollision is {anticollision}')
+                self.printfunc(f'DEBUG = {DEBUG}, anticollision is {anticollision}')
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
