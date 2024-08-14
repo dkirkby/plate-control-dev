@@ -353,14 +353,25 @@ class PosSchedule(object):
             if DEBUG and anticollision:
                 pid_collider = 'M01825'
                 pid_collidee = 'M02354'
+                pid_collider_b = 'M07770'
+                pid_collidee_b = 'M07771'
                 if not collision_pairs:
+                    colliding_sweeps = set()
+                    collision_pairs = []
                     p_state = self.petal.posmodels[pid_collider].state
+                    p_state_b = self.petal.posmodels[pid_collider_b].state
                     if p_state._val['CTRL_ENABLED'] is True:
-                        colliding_sweeps = set([pid_collider, pid_collidee])
-                        collision_pairs = [pid_collider + '-' + pid_collidee]
-                        self.printfunc(f'DBG Inserting unresolved collideing pairs: {collision_pairs}')
+                        colliding_sweeps.add([pid_collider, pid_collidee])
+                        collision_pairs.append(pid_collider + '-' + pid_collidee])
                     else:
                         self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
+                    if p_state_b._val['CTRL_ENABLED'] is True:
+                        colliding_sweeps.add([pid_collider_b, pid_collidee_b])
+                        collision_pairs.append(pid_collider_b + '-' + pid_collidee_b])
+                    else:
+                        self.printfunc(f'DBG {pid_collider_b} is not CTRL_ENABLED')
+                    if collision_pairs:
+                        self.printfunc(f'DBG Inserting unresolved collideing pairs: {collision_pairs}')
                 else:
                     self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
             else:
