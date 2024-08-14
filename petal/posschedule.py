@@ -268,7 +268,7 @@ class PosSchedule(object):
                 zeno_posids.add(posid)
         if zeno_posids:
             colliding = set(colliding_sweeps)
-            self.printfunc(self.get_details_str(colliding, label='Collision avoided: removed target(s) for {zeno_posids}'))
+            self.printfunc(self.get_details_str(colliding, label=f'Collision avoided: removed target(s) for {zeno_posids}'))
             for psid in zeno_posids:
                 self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
             self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
@@ -354,7 +354,6 @@ class PosSchedule(object):
                 pid_collider = 'M01825'
                 pid_collidee = 'M02354'
                 if not collision_pairs:
-                    self.printfunc(f'DBG {pid_collider} in received: {pid_collider in received}')
                     p_state = self.petal.posmodels[pid_collider].state
                     if p_state._val['CTRL_ENABLED'] is True:
                         colliding_sweeps = set([pid_collider, pid_collidee])

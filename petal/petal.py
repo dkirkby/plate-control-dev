@@ -1599,7 +1599,7 @@ class Petal(object):
     def sorted_all_enabled_posids(self):
         """Returns sorted list of all posids of positioners with CTRL_ENABLED == True.
         """
-        return sorted(self.all_enabled_posids)
+        return sorted(self.all_enabled_posids())
 
     def all_disabled_posids(self):
         """Returns set of all posids of positioners with CTRL_ENABLED == False.
@@ -1609,7 +1609,7 @@ class Petal(object):
     def sorted_all_disabled_posids(self):
         """Returns sorted list of all posids of positioners with CTRL_ENABLED == False.
         """
-        return sorted(self.all_disabled_posids)
+        return sorted(self.all_disabled_posids())
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for

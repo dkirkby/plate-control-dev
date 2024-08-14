@@ -63,11 +63,11 @@ class PosScheduleStage(object):
     def rewrite_zeno_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params or table.posmodel.lintheta_params:
-                self.printfunc(f'Rewriting zeno table for {posid}')
+                # self.printfunc(f'Rewriting zeno table for {posid}')
                 new_table = self.rewrite_zeno_move_table(table)
-                self.printfunc(f'old {posid} table: {str(table)}')
-                self.printfunc(f'new {posid} table: {str(new_table)}')
                 if new_table is not None:
+                    self.printfunc(f'old {posid} table: {str(table)}')
+                    self.printfunc(f'new {posid} table: {str(new_table)}')
                     proposed_tables[posid] = new_table
         return proposed_tables
 
@@ -84,18 +84,20 @@ class PosScheduleStage(object):
                 return lintheta_table
         return linphi_table
 
-    def rewrite_linphi_move_table(self, table):
+    def rewrite_linphi_move_table(self, table, verbose=False):
         last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
         if table.has_phi_motion:
             new_table = table.copy()
             idx = 0
             l_idx = 0
-            self.printfunc(f'Proposed table has phi movement') # DEBUG
+            if verbose:
+                self.printfunc(f'Proposed table has phi movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 theta_dist = table.get_move(idx, pc.T)
                 if phi_dist == 0:
-                    self.printfunc(f'no phi movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
+                    if verbose:
+                        self.printfunc(f'no phi movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
                     idx += 1
                     l_idx += 1
                 else:
@@ -121,7 +123,8 @@ class PosScheduleStage(object):
 #                   to adjust the other.
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
-                    self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
+                    if verbose:
+                        self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     new_table.set_move(l_idx, pc.P, first_move)
                     new_table.set_move(l_idx, pc.T, 0.0)
                     new_table.insert_new_row(l_idx + 1)
@@ -131,23 +134,26 @@ class PosScheduleStage(object):
                     idx += 1
                     l_idx += 2
             else:
-                self.printfunc(f'Proposed table has no phi movement') # DEBUG
+                if verbose:
+                    self.printfunc(f'Proposed table has no phi movement') # DEBUG
             if idx != l_idx:    # table was modified
                 return new_table
         return None
 
-    def rewrite_lintheta_move_table(self, table):
+    def rewrite_lintheta_move_table(self, table, verbose=False):
         last_motor_direction = table.posmodel.lintheta_params['LAST_T_DIR']
         if table.has_theta_motion:
             new_table = table.copy()
             idx = 0
             l_idx = 0
-            self.printfunc(f'Proposed table has theta movement') # DEBUG
+            if verbose:
+                self.printfunc(f'Proposed table has theta movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 theta_dist = table.get_move(idx, pc.T)
                 if theta_dist == 0:
-                    self.printfunc(f'no theta movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
+                    if verbose:
+                        self.printfunc(f'no theta movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
                     idx += 1
                     l_idx += 1
                 else:
@@ -171,7 +177,8 @@ class PosScheduleStage(object):
 #                   to adjust the other.
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
-                    self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
+                    if verbose:
+                        self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     new_table.set_move(l_idx, pc.P, 0.0)
                     new_table.set_move(l_idx, pc.T, first_move)
                     new_table.insert_new_row(l_idx + 1)
@@ -181,7 +188,8 @@ class PosScheduleStage(object):
                     idx += 1
                     l_idx += 2
             else:
-                self.printfunc(f'Proposed table has no theta movement') # DEBUG
+                if verbose:
+                    self.printfunc(f'Proposed table has no theta movement') # DEBUG
             if idx != l_idx:    # table was modified
                 return new_table
         return None
