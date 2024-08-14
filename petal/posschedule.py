@@ -60,6 +60,16 @@ class PosSchedule(object):
             return True
         return False
 
+    def _reinit_stages(self):
+        self.stages = {name:posschedulestage.PosScheduleStage(
+                                collider         = self.collider,
+                                stats            = self.stats,
+                                power_supply_map = self.petal.power_supply_map,
+                                verbose          = self.verbose,
+                                printfunc        = self.printfunc
+                            ) for name in self.stage_order}
+        return
+
     def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=True):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the
@@ -265,6 +275,7 @@ class PosSchedule(object):
             stats_enabled = self.stats.is_enabled()
             if stats_enabled:
                 self.stats.sub_request_accepted()
+            self._reinit_stages() # clear out old move tables - starting over
         else:
             colliding = set(colliding_sweeps)
             self.printfunc(self.get_details_str(colliding, label='colliding'))
@@ -343,16 +354,16 @@ class PosSchedule(object):
                 pid_collider = 'M01825'
                 pid_collidee = 'M02354'
                 if not collision_pairs:
-                    self.printfunc(f'schedule_moves: DEBUG {pid_collider} in received: {pid_collider in received}')
+                    self.printfunc(f'DBG {pid_collider} in received: {pid_collider in received}')
                     p_state = self.petal.posmodels[pid_collider].state
                     if p_state._val['CTRL_ENABLED'] is True:
                         colliding_sweeps = set([pid_collider, pid_collidee])
                         collision_pairs = [pid_collider + '-' + pid_collidee]
-                        self.printfunc(f'DEBUG Inserting unresolved collideing pairs: {collision_pairs}')
+                        self.printfunc(f'DBG Inserting unresolved collideing pairs: {collision_pairs}')
                     else:
-                        self.printfunc(f'DEBUG {pid_collider} is not CTRL_ENABLED')
+                        self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
                 else:
-                    self.printfunc(f'DEBUG Collision pairs already set: {collision_pairs}')
+                    self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
             else:
                 self.printfunc(f'DEBUG = {DEBUG}, anticollision is {anticollision}')
             if not collision_pairs or not anticollision:

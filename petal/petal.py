@@ -246,7 +246,9 @@ class Petal(object):
 
 
     def petal_version(self):
-        version = 'PETAL_lbldev_v2.02'
+        """Returns string PETAL version id
+        """
+        version = 'PETAL_lbldev_v2.03'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
@@ -1594,10 +1596,20 @@ class Petal(object):
         """
         return {p for p in self.posids if self.posmodels[p].is_enabled}
 
+    def sorted_all_enabled_posids(self):
+        """Returns sorted list of all posids of positioners with CTRL_ENABLED == True.
+        """
+        return sorted(self.all_enabled_posids)
+
     def all_disabled_posids(self):
         """Returns set of all posids of positioners with CTRL_ENABLED == False.
         """
         return set(self.posids) - set(self.all_enabled_posids())
+
+    def sorted_all_disabled_posids(self):
+        """Returns sorted list of all posids of positioners with CTRL_ENABLED == False.
+        """
+        return sorted(self.all_disabled_posids)
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
