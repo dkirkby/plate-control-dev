@@ -245,6 +245,14 @@ class Petal(object):
             self.strikes[f'strike_{i}'] = set()
 
 
+    def petal_version(self):
+        """Returns string PETAL version id
+        """
+        version = 'PETAL_kpnolin_v2.03'  # MUST be changed manually!
+        if self.simulator_on:
+            return version+'-Sim'
+        else:
+            return version
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -766,7 +774,8 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-        self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        if self.save_debug:
+            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
 
     def set_motor_parameters(self, wait_on=False):
@@ -1586,10 +1595,20 @@ class Petal(object):
         """
         return {p for p in self.posids if self.posmodels[p].is_enabled}
 
+    def sorted_all_enabled_posids(self):
+        """Returns sorted list of all posids of positioners with CTRL_ENABLED == True.
+        """
+        return sorted(self.all_enabled_posids())
+
     def all_disabled_posids(self):
         """Returns set of all posids of positioners with CTRL_ENABLED == False.
         """
         return set(self.posids) - set(self.all_enabled_posids())
+
+    def sorted_all_disabled_posids(self):
+        """Returns sorted list of all posids of positioners with CTRL_ENABLED == False.
+        """
+        return sorted(self.all_disabled_posids())
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
@@ -2484,6 +2503,19 @@ class Petal(object):
                 self.set_posfid_val(posid, 'LOG_NOTE', 'move canceled due to communication error.')
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
+
+    def temporary_disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
+        """Receives a list of positioners that should be disabled, along with the reason.
+        (Optionally) automatically disables positioners to remove them from future send_move_tables attempts.
+        """
+        disabled = set()
+        for posid in posids:
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to {reason}')
+                if accepted:
+                    disabled.add(posid)
+        if disabled:
+            self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to {reason}: {disabled}')
 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
