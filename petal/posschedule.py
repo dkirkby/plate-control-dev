@@ -325,7 +325,7 @@ class PosSchedule(object):
         The boolean flag should_anneal controls whether or not to spread out
         the move density in time.
         """
-        DEBUG = True
+        DEBUG = False
 
         self._schedule_moves_initialize_logging(anticollision)
         if not self._requests and not self.expert_mode_is_on():
