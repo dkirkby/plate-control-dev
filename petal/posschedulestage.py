@@ -66,7 +66,7 @@ class PosScheduleStage(object):
         """
         o_table = {}
         n_table = {}
-        for k,v in old_table.items():
+        for k, v in old_table.items():
             if k in new_table:
                 if v != new_table[k]:
                     o_table[k] = v
@@ -82,7 +82,7 @@ class PosScheduleStage(object):
                 # self.printfunc(f'Rewriting zeno table for {posid}')
                 new_table = self.rewrite_zeno_move_table(table)
                 if new_table is not None:
-                    self._print_table_diff(posid, table, new_table)
+                    self._print_table_diff(posid, table.as_dict(), new_table.as_dict())
 #                   self.printfunc(f'old {posid} table: {str(table)}')
 #                   self.printfunc(f'new {posid} table: {str(new_table)}')
                     proposed_tables[posid] = new_table
