@@ -60,14 +60,31 @@ class PosScheduleStage(object):
             self.move_tables[posid] = table
             self.start_posintTP[posid] = tuple(start_posintTP[posid])
 
+    def _print_table_diff(self, posid, old_table, new_table):
+        """
+        Print only the differences between two move tables
+        """
+        o_table = {}
+        n_table = {}
+        for k, v in old_table.items():
+            if k in new_table:
+                if v != new_table[k]:
+                    o_table[k] = v
+                    n_table[k] = new_table[k]
+        if o_table:
+            self.printfunc(f'old {posid} table: {str(o_table)}')
+            self.printfunc(f'new {posid} table: {str(n_table)}')
+        return                
+                
     def rewrite_zeno_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params or table.posmodel.lintheta_params:
                 # self.printfunc(f'Rewriting zeno table for {posid}')
                 new_table = self.rewrite_zeno_move_table(table)
                 if new_table is not None:
-                    self.printfunc(f'old {posid} table: {str(table)}')
-                    self.printfunc(f'new {posid} table: {str(new_table)}')
+                    self._print_table_diff(posid, table.as_dict(), new_table.as_dict())
+#                   self.printfunc(f'old {posid} table: {str(table)}')
+#                   self.printfunc(f'new {posid} table: {str(new_table)}')
                     proposed_tables[posid] = new_table
         return proposed_tables
 
