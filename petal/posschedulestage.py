@@ -72,10 +72,9 @@ class PosScheduleStage(object):
                     o_table[k] = v
                     n_table[k] = new_table[k]
         if o_table:
-            self.printfunc(f'old {posid} table: {str(o_table)}')
-            self.printfunc(f'new {posid} table: {str(n_table)}')
-        return                
-                
+            self.printfunc(f'zeno movetable change\nold {posid} table: {str(o_table)}\nnew {posid} table: {str(n_table)}')
+        return
+
     def rewrite_zeno_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
             if table.posmodel.linphi_params or table.posmodel.lintheta_params:

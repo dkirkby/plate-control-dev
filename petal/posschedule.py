@@ -3,6 +3,9 @@ import posschedulestage
 import posschedstats
 import time
 
+# enables debugging code
+DEBUG = False
+
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
@@ -261,14 +264,29 @@ class PosSchedule(object):
         return colliding_sweeps, collision_pairs, finalcheck_timer_start, final
 
     def _handle_schedule_moves_collision(self, colliding_sweeps, collision_pairs):
+        """
+        This function handles the case when, after all the collision mitigation strategies have run, there are still collisions
+        in the planned moves.
+
+        If some of the colliding posids are from zeno devices, replace the target for those device(s) with a dummy,
+        and also temporarily disable that device, then when this function exits, the plan will be re-run (takes 2-4 sec at KPNO).
+
+        If none of the colliding posids are from zeno devices, then resolve_non_zeno determines what happens.
+
+        If resolve_non_zeno is False, then this code does what it originally did, which is to print error messages, then cause an exception.
+
+        If resolve_non_zeno is True, then all colliding devices will have targets replaced with dummies and they will be temporarily disabled.
+        Again, after this function exits, the planning for the remaining devices will be re-run.
+        """
         zeno_posids = set()
-        for posid in colliding_sweeps:
+        colliding_posids = [posid for posid in colliding_sweeps]
+        for posid in colliding_posids:
             p_state = self.petal.posmodels[posid].state
             if p_state._val['ZENO_MOTOR_P'] is True or p_state._val['ZENO_MOTOR_T'] is True:
                 zeno_posids.add(posid)
         if zeno_posids:
             colliding = set(colliding_sweeps)
-            self.printfunc(self.get_details_str(colliding, label=f'Collision avoided: removed target(s) for {zeno_posids}'))
+            self.printfunc(self.get_details_str(colliding, label=f'Unresolved zeno collision avoided: removed target(s) for {zeno_posids}'))
             for psid in zeno_posids:
                 self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
             self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
@@ -279,10 +297,57 @@ class PosSchedule(object):
         else:
             colliding = set(colliding_sweeps)
             self.printfunc(self.get_details_str(colliding, label='colliding'))
-            err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
-            self.printfunc(err_str)
-            # self.petal.enter_pdb()  # 2023-07-11 [CAD] This line causes a fault (no function enter_pdb)
-            assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
+            resolve_non_zeno = True
+            if not resolve_non_zeno:  # blow up PETAL on purpose to call attention to it
+                err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+                self.printfunc(err_str)
+                # self.petal.enter_pdb()  # 2023-07-11 [CAD] This line causes a fault (no function enter_pdb)
+                assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
+            else: # temporarily disable the offending robots and press on
+                self.printfunc(self.get_details_str(colliding, label=f'Unresolved collision avoided: removed target(s) for {colliding_posids}'))
+                for psid in colliding_posids:
+                    self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
+                self.petal.temporary_disable_positioners_reason(colliding_posids,'collision avoidance failure')  # Disable the involved motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+                stats_enabled = self.stats.is_enabled()
+                if stats_enabled:
+                    self.stats.sub_request_accepted()
+                self._reinit_stages() # clear out old move tables - starting over
+        return
+
+    if DEBUG:
+        def _possibly_induce_scheduling_error(self, colliding_sweeps, collision_pairs, anticollision):
+            if hasattr(self.petal, 'petal_debug') and 'collision' in self.petal.petal_debug and anticollision:
+                pid_colliders = []
+                pid_collidees = []
+                if self.petal.petal_debug['collision'] == 1:
+                    pid_colliders = ['M01825']  # 1 zeno collider with non-zeno collidee
+                    pid_collidees = ['M02354']
+                if self.petal.petal_debug['collision'] == 2:
+                    pid_colliders = ['M01825', 'M07770']  # 2 zeno colliders with non-zeno collidees
+                    pid_collidees = ['M02354', 'M07771']
+                if self.petal.petal_debug['collision'] == 3:
+                    pid_colliders = ['M01995']  # a non-zeno collider with non-zeno collidee
+                    pid_collidees = ['M02095']
+                if self.petal.petal_debug['collision'] == 4:
+                    pid_colliders = ['M01995', 'M01973']  # 2 non-zeno colliders with non-zeno collidees
+                    pid_collidees = ['M02095', 'M02020']
+
+                if not collision_pairs:
+                    colliding_sweeps = {}
+                    collision_pairs = []
+                    for ndx, pid_collider in enumerate(pid_colliders):
+                        pid_collidee = pid_collidees[ndx]
+                        p_state = self.petal.posmodels[pid_collider].state
+                        if p_state._val['CTRL_ENABLED'] is True:
+                            colliding_sweeps[pid_collider] = set()
+                            colliding_sweeps[pid_collidee] = set()
+                            collision_pairs.append(pid_collider + '-' + pid_collidee)
+                        else:
+                            self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
+                    self.printfunc(f'DBG Collision pairs set: {collision_pairs}')
+                else:
+                    self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
+            return colliding_sweeps, collision_pairs
 
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -325,7 +390,6 @@ class PosSchedule(object):
         The boolean flag should_anneal controls whether or not to spread out
         the move density in time.
         """
-        DEBUG = False
 
         self._schedule_moves_initialize_logging(anticollision)
         if not self._requests and not self.expert_mode_is_on():
@@ -350,34 +414,8 @@ class PosSchedule(object):
         while do_schedule:
             colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
                 self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
-            if DEBUG and anticollision:
-                pid_collider = 'M01825'
-                pid_collidee = 'M02354'
-                pid_collider_b = 'M07770'
-                pid_collidee_b = 'M07771'
-                if not collision_pairs:
-                    colliding_sweeps = {}
-                    collision_pairs = []
-                    p_state = self.petal.posmodels[pid_collider].state
-                    p_state_b = self.petal.posmodels[pid_collider_b].state
-                    if p_state._val['CTRL_ENABLED'] is True:
-                        colliding_sweeps[pid_collider] = set()
-                        colliding_sweeps[pid_collidee] = set()
-                        collision_pairs.append(pid_collider + '-' + pid_collidee)
-                    else:
-                        self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
-                    if p_state_b._val['CTRL_ENABLED'] is True:
-                        colliding_sweeps[pid_collider_b] = set()
-                        colliding_sweeps[pid_collidee_b] = set()
-                        collision_pairs.append(pid_collider_b + '-' + pid_collidee_b)
-                    else:
-                        self.printfunc(f'DBG {pid_collider_b} is not CTRL_ENABLED')
-                    if collision_pairs:
-                        self.printfunc(f'DBG Inserting unresolved collideing pairs: {collision_pairs}')
-                else:
-                    self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
-            else:
-                self.printfunc(f'DEBUG = {DEBUG}, anticollision is {anticollision}')
+            if DEBUG:
+                colliding_sweeps, collision_pairs = self._possibly_induce_scheduling_error(colliding_sweeps, collision_pairs, anticollision)
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
