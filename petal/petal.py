@@ -24,7 +24,7 @@ import csv
 KPNO_SIM = False
 
 # For using debug_petal dictionary and associated functions
-DEBUG = True
+DEBUG = False
 
 try:
     from DOSlib.positioner_index import PositionerIndex
