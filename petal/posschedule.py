@@ -344,6 +344,7 @@ class PosSchedule(object):
                             collision_pairs.append(pid_collider + '-' + pid_collidee)
                         else:
                             self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
+                    self.printfunc(f'DBG Collision pairs set: {collision_pairs}')
                 else:
                     self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
             return colliding_sweeps, collision_pairs
