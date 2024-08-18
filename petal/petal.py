@@ -278,7 +278,7 @@ class Petal(object):
             """
             remove key from petal_debug dictionary
             """
-            del self.petal_debug.pop(key, None)
+            self.petal_debug.pop(key, None)
             return
 
     def is_pc_connected(self):
