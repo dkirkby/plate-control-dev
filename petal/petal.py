@@ -23,6 +23,9 @@ import csv
 # Set KPNO_SIM to True
 KPNO_SIM = False
 
+# For using debug_petal dictionary and associated functions
+DEBUG = True
+
 try:
     from DOSlib.positioner_index import PositionerIndex
     INDEX_AVAILABLE = True
@@ -244,15 +247,39 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
+        self.petal_debug = {}
+
 
     def petal_version(self):
-        """Returns string PETAL version id
+        """
+        Returns string PETAL version id
         """
         version = 'PETAL_lbldev_v2.03'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
             return version
+
+    if DEBUG:
+        def get_petal_debug(self):
+            """
+            Returns petal_debug dictionary
+            """
+            return self.petal_debug
+
+        def set_petal_debug(self, key, value):
+            """
+            set key and value in petal_debug dictionary
+            """
+            self.petal_debug[key] = value
+            return
+
+        def del_petal_debug(self, key):
+            """
+            remove key from petal_debug dictionary
+            """
+            del self.petal_debug.pop(key, None)
+            return
 
     def is_pc_connected(self):
         if self.simulator_on:
