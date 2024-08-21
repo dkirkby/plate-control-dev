@@ -274,15 +274,6 @@ class PosMoveTable(object):
         return False
 
     @property
-    def has_theta_motion(self):
-        """Boolean saying whether the move table contains any theta motion at all in any row.
-        """
-        for row in self.rows:
-            if row.has_theta_motion:
-                return True
-        return False
-
-    @property
     def log_note(self):
         '''Returns a copy of property log_note.'''
         return self._log_note
@@ -467,9 +458,8 @@ class PosMoveTable(object):
         axis_idxs = [pc.T, pc.P]
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
-            for i in axis_idxs:
-                if (self.posmodel.linphi_params and i == pc.P) or \
-                   (self.posmodel.lintheta_params and i == pc.T):
+            for i in [pc.T,pc.P]:
+                if self.posmodel.linphi_params and i == pc.P:
                     my_allow_cruise = True
                 else:
                     my_allow_cruise = self.allow_cruise
@@ -487,8 +477,7 @@ class PosMoveTable(object):
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in axis_idxs:
-                if (self.posmodel.linphi_params and i == pc.P) or \
-                   (self.posmodel.lintheta_params and i == pc.T):
+                if self.posmodel.linphi_params and i == pc.P:
                     backlash[i] = 0.0
                     auto_cmd_msg = ''
                     my_allow_cruise = False
@@ -511,8 +500,7 @@ class PosMoveTable(object):
             actual_total = [0, 0]
             err_dist = [0, 0]
             for i in axis_idxs:
-                if (self.posmodel.linphi_params and i == pc.P) or \
-                   (self.posmodel.lintheta_params and i == pc.T):
+                if self.posmodel.linphi_params and i == pc.P:
                     err_dist[i] = 0.0
                     auto_cmd_warning = ''
                 else:
@@ -646,14 +634,11 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-            zeno_note = ''
+            linphi_note = ''
             if self.posmodel.linphi_params:
                 for s in [('CCW_SCALE_A','SZ_CCW_P'),('CW_SCALE_A','SZ_CW_P')]:
-                    zeno_note = pc.join_notes(zeno_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
-            if self.posmodel.lintheta_params:
-                for s in [('CCW_SCALE_A','SZ_CCW_T'),('CW_SCALE_A','SZ_CW_T')]:
-                    zeno_note = pc.join_notes(zeno_note, f't{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
-            table['log_note'] = pc.join_notes(self.log_note, lock_note, zeno_note)
+                    linphi_note = pc.join_notes(linphi_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
+            table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
@@ -691,10 +676,6 @@ class PosMoveRow(object):
     @property
     def has_phi_motion(self):
         return self.data['dP_ideal'] != 0
-
-    @property
-    def has_theta_motion(self):
-        return self.data['dT_ideal'] != 0
 
     @property
     def has_prepause(self):

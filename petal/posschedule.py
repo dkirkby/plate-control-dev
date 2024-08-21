@@ -282,7 +282,7 @@ class PosSchedule(object):
         colliding_posids = [posid for posid in colliding_sweeps]
         for posid in colliding_posids:
             p_state = self.petal.posmodels[posid].state
-            if p_state._val['ZENO_MOTOR_P'] is True or p_state._val['ZENO_MOTOR_T'] is True:
+            if p_state._val['ZENO_MOTOR_P'] is True:
                 zeno_posids.add(posid)
         if zeno_posids:
             colliding = set(colliding_sweeps)

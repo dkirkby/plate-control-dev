@@ -145,9 +145,6 @@ P_zeno_ramp  = 1    # 1.497 deg
 # P_zeno_speed = 33   # 9,900 RPM - see DESI 1710, Motor Speed Parameters spreadsheet
 # P_zeno_ramp  = 12    # 1.995 deg
 P_zeno_jog = 5.0    # degrees, must be greater than ramp and backlash size
-T_zeno_speed = 100  # 30,000 RPM - see DESI 1710, Motor Speed Parameters spreadsheet
-T_zeno_ramp  = 1    # 1.497 deg
-T_zeno_jog = 5.0    # degrees, must be greater than ramp and backlash size
 
 # common print function
 # note the implementation may be replaced at runtime by petal.py, for logging

@@ -24,7 +24,7 @@ import csv
 KPNO_SIM = False
 
 # For using debug_petal dictionary and associated functions
-DEBUG = False
+DEBUG = True
 
 try:
     from DOSlib.positioner_index import PositionerIndex
@@ -254,7 +254,7 @@ class Petal(object):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_lbldev_v2.03'  # MUST be changed manually!
+        version = 'PETAL_lbldev_v2.04'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
@@ -351,8 +351,6 @@ class Petal(object):
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment,
                                              printfunc=self.printfunc)
-#            self.posmodels[posid] = PosModel(state=self.states[posid],
-#                                             petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
