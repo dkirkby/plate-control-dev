@@ -82,16 +82,15 @@ class PosModel(object):
 
     def _spinupdown_distance(self, axisid):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
-        if axisid == pc.P:
-            if self.linphi_params is not None:
-                speed = pc.P_zeno_speed
-                ramp = pc.P_zeno_ramp
-                gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_P']]
-                sud = speed*(speed+1)*ramp/20 * pc.P_zeno_ramp # From DESI-1710 Motor Speed Parameters Spreadsheet
-            elif self.state._val['CURR_SPIN_UP_DOWN'] == 0:
-                sud = 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
-            else:
-                sud = self._spinupdown_dist_per_period[axisid] * self.state._val['SPINUPDOWN_PERIOD']
+        if self.linphi_params is not None and axisid == pc.P:
+            speed = pc.P_zeno_speed
+            ramp = pc.P_zeno_ramp
+            gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
+            sud = speed*(speed+1)*ramp/20 * pc.P_zeno_ramp # From DESI-1710 Motor Speed Parameters Spreadsheet
+        elif self.state._val['CURR_SPIN_UP_DOWN'] == 0:
+            sud = 0  # special case, where user is trying to prevent FIPOS from doing the physical spin-up down
+        else:
+            sud = self._spinupdown_dist_per_period[axisid] * self.state._val['SPINUPDOWN_PERIOD']
         return sud
 
     @property
