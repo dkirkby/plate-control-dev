@@ -51,13 +51,6 @@ class PosMoveTable(object):
                 d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
             d['PCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
             d['PCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
-        if self.posmodel.lintheta_params:
-            if 'zeno' in d:
-                d['zeno'] += 'T'
-            else:
-                d['zeno'] = 'T'    # Denotes a movetable for a linear theta positioner
-            d['TCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_T'))
-            d['TCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_T'))
         return d
 
     def as_dict(self):
