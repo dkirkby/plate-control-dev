@@ -254,7 +254,7 @@ class PosMoveTable(object):
 
     @property
     def has_phi_motion(self):
-        """Boolean saying whether the move table contains zny phi motion at all in any row.
+        """Boolean saying whether the move table contains any phi motion at all in any row.
         """
         for row in self.rows:
             if row.has_phi_motion:

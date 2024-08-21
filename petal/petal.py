@@ -244,7 +244,15 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
-
+    def petal_version(self):
+        """
+        Returns string PETAL version id
+        """
+        version = 'PETAL_kpnolinphinc_v2.01'  # MUST be changed manually!
+        if self.simulator_on:
+            return version+'-Sim'
+        else:
+            return version
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -2484,6 +2492,19 @@ class Petal(object):
                 self.set_posfid_val(posid, 'LOG_NOTE', 'move canceled due to communication error.')
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
+
+    def temporary_disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
+        """Receives a list of positioners that should be disabled, along with the reason.
+        (Optionally) automatically disables positioners to remove them from future send_move_tables attempts.
+        """
+        disabled = set()
+        for posid in posids:
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to {reason}')
+                if accepted:
+                    disabled.add(posid)
+        if disabled:
+            self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to {reason}: {disabled}')
 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
