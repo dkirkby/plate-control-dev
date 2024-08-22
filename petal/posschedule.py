@@ -4,7 +4,7 @@ import posschedstats
 import time
 
 # enables debugging code
-DEBUG = False
+DEBUG = True
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
