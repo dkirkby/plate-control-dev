@@ -376,8 +376,8 @@ class PosSchedule(object):
         while do_schedule:
             colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
                 self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
-            if DEBUG:
-                colliding_sweeps, collision_pairs = self._possibly_induce_scheduling_error(colliding_sweeps, collision_pairs, anticollision)
+#            if DEBUG:
+#                colliding_sweeps, collision_pairs = self._possibly_induce_scheduling_error(colliding_sweeps, collision_pairs, anticollision)
             if not collision_pairs or not anticollision:
                 do_schedule = False
             else:
