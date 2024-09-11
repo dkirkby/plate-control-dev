@@ -330,7 +330,7 @@ class PosScheduleStage(object):
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid, method, do_not_move)
-            proposed_tables = self.rewrite_zeno_move_tables(proposed_tables)
+#           proposed_tables = self.rewrite_zeno_move_tables(proposed_tables)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             should_accept = not(colliding_sweeps) or freezing in {'forced','forced_recursive'}
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated

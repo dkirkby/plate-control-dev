@@ -4,7 +4,7 @@ import posschedstats
 import time
 
 # enables debugging code
-DEBUG = True
+DEBUG = False
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -289,7 +289,7 @@ class PosSchedule(object):
             self.printfunc(self.get_details_str(colliding, label=f'Unresolved zeno collision avoided: removed target(s) for {zeno_posids}'))
             for psid in zeno_posids:
                 self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
-            self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+#           self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
             stats_enabled = self.stats.is_enabled()
             if stats_enabled:
                 self.stats.sub_request_accepted()
@@ -307,7 +307,7 @@ class PosSchedule(object):
                 self.printfunc(self.get_details_str(colliding, label=f'Unresolved collision avoided: removed target(s) for {colliding_posids}'))
                 for psid in colliding_posids:
                     self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
-                self.petal.temporary_disable_positioners_reason(colliding_posids,'collision avoidance failure')  # Disable the involved motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+#               self.petal.temporary_disable_positioners_reason(colliding_posids,'collision avoidance failure')  # Disable the involved motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
                 stats_enabled = self.stats.is_enabled()
                 if stats_enabled:
                     self.stats.sub_request_accepted()
@@ -424,7 +424,8 @@ class PosSchedule(object):
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
-        self.move_tables = final.move_tables
+        move_tables_before_zeno_mods = final.move_tables
+        self.move_tables = final.rewrite_zeno_move_tables(move_tables_before_zeno_mods) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
@@ -651,7 +652,7 @@ class PosSchedule(object):
                                                range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posintTP, dtdp)
-        stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
+#       stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
         # double-negative syntax is to be compatible with various
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
@@ -725,7 +726,7 @@ class PosSchedule(object):
             # 1. Each time we initialize_move_tables, only updating the ones for which a new delta is proposed.
             # 2. No annealing allowed! (would mess up the "skip first x timesteps" during collision checking)
             stage.initialize_move_tables(start_tp, dtdp, update_only=True)
-            stage.rewrite_zeno_move_tables(stage.move_tables)  # i.e. a for loop of the single motor similar function
+#           stage.rewrite_zeno_move_tables(stage.move_tables)  # i.e. a for loop of the single motor similar function
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, skip=skip)
             unresolved = set(colliding_sweeps)
         adjustments_failed = unresolved & enabled & overlapping
@@ -805,7 +806,7 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
+#           stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
                 stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
