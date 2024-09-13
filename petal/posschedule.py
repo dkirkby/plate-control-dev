@@ -2,6 +2,7 @@ import posconstants as pc
 import posschedulestage
 import posschedstats
 import time
+import math
 
 # enables debugging code
 DEBUG = False
@@ -206,7 +207,13 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-
+        if posmodel.linphi_params:
+            targXY = trans.posintTP_to_poslocXY(targt_posintTP)
+            strtXY = trans.posintTP_to_poslocXY(start_posintTP)
+            dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
+            LINPHI_DIST_LIMIT = 10.0 # microns
+            if dist_from_targt < LINPHI_DIST_LIMIT: # 10 microns
+                return self._denied_str(target_str, f"Linear phi already close enough, {dist_from_targt} < {LINPHI_DIST_LIMIT} microns to target")
         # form internal request dict
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
