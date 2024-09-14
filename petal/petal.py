@@ -2729,7 +2729,7 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        if self.verbose:
+        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].linphi_params):
             self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
 
