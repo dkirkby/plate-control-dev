@@ -208,7 +208,7 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-        if posmodel.linphi_params:
+        if posmodel.is_linphi:
             targXY = trans.posintTP_to_poslocXY(targt_posintTP)
             strtXY = trans.posintTP_to_poslocXY(start_posintTP)
             dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
