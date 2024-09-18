@@ -39,6 +39,7 @@ class PosSchedule(object):
                                 power_supply_map = self.petal.power_supply_map,
                                 verbose          = self.verbose,
                                 printfunc        = self.printfunc
+                                petal            = self.petal
                             ) for name in self.stage_order}
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
@@ -211,7 +212,12 @@ class PosSchedule(object):
             targXY = trans.posintTP_to_poslocXY(targt_posintTP)
             strtXY = trans.posintTP_to_poslocXY(start_posintTP)
             dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
-            LINPHI_DIST_LIMIT = 10.0 # microns
+            LINPHI_DIST_LIMIT = 20.0 # microns
+            try:
+                if hasattr(self.petal, 'petal_debug'):
+                    LINPHI_DIST_LIMIT = float(self.petal.petal_debug.get('linphi_dist_limit'))
+            except TypeError:
+                pass
             if dist_from_targt < LINPHI_DIST_LIMIT: # 10 microns
                 return self._denied_str(target_str, f"Linear phi already close enough, {dist_from_targt} < {LINPHI_DIST_LIMIT} microns to target")
         # form internal request dict

@@ -247,7 +247,7 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
-        self.petal_debug = {}
+        self.petal_debug = {'linphi_verbose': 1}
 
 
     def petal_version(self):
