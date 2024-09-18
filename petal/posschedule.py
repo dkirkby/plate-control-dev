@@ -212,7 +212,7 @@ class PosSchedule(object):
             targXY = trans.posintTP_to_poslocXY(targt_posintTP)
             strtXY = trans.posintTP_to_poslocXY(start_posintTP)
             dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
-            LINPHI_DIST_LIMIT = 20.0 # microns
+            LINPHI_DIST_LIMIT = 10.0 # microns
             try:
                 if hasattr(self.petal, 'petal_debug'):
                     LINPHI_DIST_LIMIT = float(self.petal.petal_debug.get('linphi_dist_limit'))
