@@ -43,6 +43,16 @@ class PosMoveTable(object):
         self._error_flag = 'ERROR'
         self._not_yet_calculated = '(not yet calculated)'
 
+    def _set_zeno_dict(self, d):
+        if self.posmodel.linphi_params:
+            if 'zeno' in d:
+                d['zeno'] += 'P'
+            else:
+                d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+            d['PCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
+            d['PCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
+        return d
+
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
         c = self.copy()
@@ -61,12 +71,7 @@ class PosMoveTable(object):
              'total_time':            self.total_time(suppress_automoves=False),
              'is_required':           c._is_required,
              }
-        if c.posmodel.linphi_params:
-            ccw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CCW_P'))
-            cw_scale_a = float(c.posmodel.get_zeno_scale('SZ_CW_P'))
-            d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-            d['PCCWA'] = ccw_scale_a
-            d['PCWA'] = cw_scale_a
+        d = self._set_zeno_dict(d)
         return d
 
     def __repr__(self):
@@ -575,12 +580,7 @@ class PosMoveTable(object):
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-            if self.posmodel.linphi_params:
-                ccw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
-                cw_scale_a = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
-                table['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
-                table['PCCWA'] = ccw_scale_a
-                table['PCWA'] = cw_scale_a
+            table = self._set_zeno_dict(table)
 
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]

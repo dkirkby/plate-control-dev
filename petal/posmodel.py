@@ -58,12 +58,14 @@ class PosModel(object):
         self._abs_shaft_speed_cruise_P = abs(self._motor_speed_cruise[pc.P] / self.axis[pc.P].signed_gear_ratio)
         self._abs_shaft_spinupdown_distance_T = abs(self.axis[pc.T].motor_to_shaft(self._spinupdown_distance(pc.T)))
         if self.linphi_params is not None:
-            self.printfunc(f'_load_cached_params: LinPhi posid = {self.posid}')  # DEBUG
+            if self.DEBUG:
+                self.printfunc(f'_load_cached_params: LinPhi posid = {self.posid}')  # DEBUG
             speed = pc.P_zeno_speed
             ramp = pc.P_zeno_ramp
-            gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_T']]
+            gear_ratio = pc.gear_ratio[self.state._val['GEAR_TYPE_P']]
             self._abs_shaft_spinupdown_distance_P = speed*(speed+1)*ramp/20/gear_ratio # From DESI-1710 Motor Speed Parameters Spreadsheet
-            self.printfunc(f'Spinupdown = {self._abs_shaft_spinupdown_distance_P}')  # DEBUG
+            if self.DEBUG:
+                self.printfunc(f'Phi Spinupdown = {self._abs_shaft_spinupdown_distance_P}')  # DEBUG
         else:
             self._abs_shaft_spinupdown_distance_P = abs(self.axis[pc.P].motor_to_shaft(self._spinupdown_distance(pc.P)))
 
@@ -287,13 +289,15 @@ class PosModel(object):
         if self.axis[axisid].is_locked:
             new_distance = 0.0
             if self.linphi_params is not None and axisid == pc.P and distance != new_distance:
-                self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
+                if self.DEBUG > 1:
+                    self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
             distance = new_distance
         elif limits:
             use_near_full_range = (limits == 'near_full')
             new_distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
             if self.linphi_params is not None and axisid == pc.P and distance != new_distance:
-                self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
+                if self.DEBUG > 1:
+                    self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
             distance = new_distance
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
@@ -327,9 +331,10 @@ class PosModel(object):
                 move_data['move_time'] = 0
             else:
                 move_data['move_time'] = (abs(move_data['motor_step'])*self._stepsize_cruise[axisid] + 4*self._spinupdown_distance(axisid)) / move_data['speed']
-            if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
-                ddist = self.axis[axisid].motor_to_shaft(distance)
-                self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
+            if self.DEBUG > 1:
+                if self.linphi_params is not None and axisid == pc.P and distance != 0.0:
+                    ddist = self.axis[axisid].motor_to_shaft(distance)
+                    self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, Spinupdown = {dist_spinup}, dist_cruise = {dist_cruise}, steps = {move_data["motor_step"]}')  # DEBUG
         return move_data
 
     def postmove_cleanup(self, cleanup_table):

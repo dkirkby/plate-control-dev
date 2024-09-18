@@ -23,6 +23,9 @@ import csv
 # Set KPNO_SIM to True
 KPNO_SIM = False
 
+# For using debug_petal dictionary and associated functions
+DEBUG = True
+
 try:
     from DOSlib.positioner_index import PositionerIndex
     INDEX_AVAILABLE = True
@@ -244,15 +247,39 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
+        self.petal_debug = {'linphi_verbose': 1}
+
+
     def petal_version(self):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnolinphinc_v2.01'  # MUST be changed manually!
+        version = 'PETAL_kpnolinphinc_v2.05'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
             return version
+
+    if DEBUG:
+        def get_petal_debug(self):
+            """
+            Returns petal_debug dictionary
+            """
+            return self.petal_debug
+
+        def set_petal_debug(self, key, value):
+            """
+            set key and value in petal_debug dictionary
+            """
+            self.petal_debug[key] = value
+            return
+
+        def del_petal_debug(self, key):
+            """
+            remove key from petal_debug dictionary
+            """
+            self.petal_debug.pop(key, None)
+            return
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -2692,7 +2719,7 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        if self.verbose:
+        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].linphi_params):
             self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
 

@@ -12,7 +12,7 @@ class PosScheduleStage(object):
         stats            ... instance of posschedstats for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, stats, power_supply_map=None, verbose=False, printfunc=None):
+    def __init__(self, collider, stats, power_supply_map=None, verbose=False, printfunc=None, petal=None):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.start_posintTP = {} # keys: posids, values: initial positions at start of stage
@@ -28,6 +28,7 @@ class PosScheduleStage(object):
         self.sweep_continuity_check_stepsize = 4.0 # deg, see PosSweep.check_continuity function
         self.verbose = verbose
         self.printfunc = printfunc
+        self.petal_debug = petal.petal_debug if hasattr(petal, 'petal_debug') else {}
 
     def initialize_move_tables(self, start_posintTP, dtdp, update_only=False):
         """Generates basic move tables for each positioner, starting at position
@@ -81,9 +82,12 @@ class PosScheduleStage(object):
                 # self.printfunc(f'Rewriting zeno table for {posid}')
                 new_table = self.rewrite_zeno_move_table(table)
                 if new_table is not None:
-                    self._print_table_diff(posid, table.as_dict(), new_table.as_dict())
-#                   self.printfunc(f'old {posid} table: {str(table)}')
-#                   self.printfunc(f'new {posid} table: {str(new_table)}')
+                    vrbose = self.petal_debug.get('linphi_verbose')
+                    try:
+                        if vrbose and int(vrbose) > 1:
+                            self._print_table_diff(posid, table.as_dict(), new_table.as_dict())
+                    except TypeError:
+                        pass
                     proposed_tables[posid] = new_table
         return proposed_tables
 
@@ -94,13 +98,13 @@ class PosScheduleStage(object):
         return linphi_table
 
     def _rewrite_linphi_move_table(self, table, verbose=False):
-        last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
+#       last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
         if table.has_phi_motion:
             new_table = table.copy()
             idx = 0
             l_idx = 0
             if verbose:
-                self.printfunc(f'Proposed table has phi movement') # DEBUG
+                self.printfunc('Proposed table has phi movement') # DEBUG
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 theta_dist = table.get_move(idx, pc.T)
@@ -144,7 +148,7 @@ class PosScheduleStage(object):
                     l_idx += 2
             else:
                 if verbose:
-                    self.printfunc(f'Proposed table has no phi movement') # DEBUG
+                    self.printfunc('Proposed table has no phi movement') # DEBUG
             if idx != l_idx:    # table was modified
                 return new_table
         return None
@@ -330,7 +334,7 @@ class PosScheduleStage(object):
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid, method, do_not_move)
-            proposed_tables = self.rewrite_zeno_move_tables(proposed_tables)
+#           proposed_tables = self.rewrite_zeno_move_tables(proposed_tables)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             should_accept = not(colliding_sweeps) or freezing in {'forced','forced_recursive'}
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated
