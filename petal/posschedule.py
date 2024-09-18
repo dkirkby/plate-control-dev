@@ -38,7 +38,7 @@ class PosSchedule(object):
                                 stats            = self.stats,
                                 power_supply_map = self.petal.power_supply_map,
                                 verbose          = self.verbose,
-                                printfunc        = self.printfunc
+                                printfunc        = self.printfunc,
                                 petal            = self.petal
                             ) for name in self.stage_order}
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
