@@ -44,7 +44,7 @@ class PosMoveTable(object):
         self._not_yet_calculated = '(not yet calculated)'
 
     def _set_zeno_dict(self, d):
-        if self.posmodel.linphi_params:
+        if self.posmodel.is_linphi:
             if 'zeno' in d:
                 d['zeno'] += 'P'
             else:
@@ -452,7 +452,7 @@ class PosMoveTable(object):
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
-                if self.posmodel.linphi_params and i == pc.P:
+                if self.posmodel.is_linphi and i == pc.P:
                     my_allow_cruise = True
                 else:
                     my_allow_cruise = self.allow_cruise
@@ -470,7 +470,7 @@ class PosMoveTable(object):
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in axis_idxs:
-                if self.posmodel.linphi_params and i == pc.P:
+                if self.posmodel.is_linphi and i == pc.P:
                     backlash[i] = 0.0
                     auto_cmd_msg = ''
                     my_allow_cruise = False
@@ -493,7 +493,7 @@ class PosMoveTable(object):
             actual_total = [0, 0]
             err_dist = [0, 0]
             for i in axis_idxs:
-                if self.posmodel.linphi_params and i == pc.P:
+                if self.posmodel.is_linphi and i == pc.P:
                     err_dist[i] = 0.0
                     auto_cmd_warning = ''
                 else:
@@ -628,7 +628,7 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
             linphi_note = ''
-            if self.posmodel.linphi_params:
+            if self.posmodel.is_linphi:
                 for s in [('CCW_SCALE_A','SZ_CCW_P'),('CW_SCALE_A','SZ_CW_P')]:
                     linphi_note = pc.join_notes(linphi_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
             table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)

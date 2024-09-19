@@ -254,7 +254,7 @@ class Petal(object):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnolinphinc_v2.05'  # MUST be changed manually!
+        version = 'PETAL_kpnolinphinc_v2.06'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
@@ -2719,7 +2719,7 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].linphi_params):
+        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].is_linphi):
             self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
 

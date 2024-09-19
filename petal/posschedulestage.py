@@ -78,7 +78,7 @@ class PosScheduleStage(object):
 
     def rewrite_zeno_move_tables(self, proposed_tables):
         for posid, table in proposed_tables.items():
-            if table.posmodel.linphi_params:
+            if table.posmodel.is_linphi:
                 # self.printfunc(f'Rewriting zeno table for {posid}')
                 new_table = self.rewrite_zeno_move_table(table)
                 if new_table is not None:
@@ -93,11 +93,12 @@ class PosScheduleStage(object):
 
     def rewrite_zeno_move_table(self, table):
         linphi_table = None
-        if table.posmodel.linphi_params:
+        if table.posmodel.is_linphi:
             linphi_table = self._rewrite_linphi_move_table(table)
         return linphi_table
 
     def _rewrite_linphi_move_table(self, table, verbose=False):
+#       last_motor_direction is always > 0
 #       last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
         if table.has_phi_motion:
             new_table = table.copy()
@@ -118,7 +119,7 @@ class PosScheduleStage(object):
 #                   scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
 #                   scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
                     #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
-                    if new_direction == table.posmodel.linphi_params['LAST_P_DIR']:
+                    if new_direction == 1:  # table.posmodel.linphi_params['LAST_P_DIR']:
                         if new_direction > 0:   # must go negative, then positive
                             first_move = -pc.P_zeno_jog # / scale_cw
                             second_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
@@ -143,7 +144,8 @@ class PosScheduleStage(object):
                     new_table.insert_new_row(l_idx + 1)
                     new_table.set_move(l_idx + 1, pc.P, second_move)
                     new_table.set_move(l_idx + 1, pc.T, theta_dist)
-                    table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
+# Second move is always >0, so LAST_P_DIR is always 1, never -1
+#                   table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1
                     l_idx += 2
             else:
