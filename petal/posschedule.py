@@ -548,10 +548,16 @@ class PosSchedule(object):
             net_scheduled = [sched_table['net_dT'][-1], sched_table['net_dP'][-1]]
             err[posid] = [abs(net_requested[i] - net_scheduled[i]) for i in [0, 1]]
             err[posid] = [min(e, abs(e - 360)) for e in err[posid]]  # wrapped angle cases
+            if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                self.printfunc(f'posid={posid}, net_requested={net_requested}, net_scheduled={net_scheduled}, err={err[posid]}')
             if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
                 frozen.add(posid)
                 if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
                     self.printfunc(f'posid {posid} is frozen')
+            else:
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is not frozen')
+                
         return frozen
 
     def get_posids_with_expert_tables(self):
