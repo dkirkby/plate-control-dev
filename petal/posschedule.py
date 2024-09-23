@@ -550,6 +550,8 @@ class PosSchedule(object):
             err[posid] = [min(e, abs(e - 360)) for e in err[posid]]  # wrapped angle cases
             if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
                 frozen.add(posid)
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is frozen')
         return frozen
 
     def get_posids_with_expert_tables(self):
