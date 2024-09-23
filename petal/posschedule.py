@@ -529,6 +529,9 @@ class PosSchedule(object):
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
+        SHOW_FROZEN_MT = None
+        if hasattr(self.petal, 'petal_debug'):
+            SHOW_FROZEN_MT = self.petal.petal_debug.get('show_frozen_mt')
         user_requested = set(self.get_requests(include_dummies=False))
         has_table = set(self.move_tables)
         check = has_table & user_requested # ignores expert tables
@@ -537,6 +540,10 @@ class PosSchedule(object):
         for posid in check:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
+            if SHOW_FROZEN_MT:
+                if posid in SHOW_FROZEN_MT:
+                    ht = self.move_tables[posid].for_hardware()
+                    self.printfunc(f"posid={posid}\nhardware_movetable={str(ht)}\nschedule_movetable={str(sched_table)}")
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
             net_scheduled = [sched_table['net_dT'][-1], sched_table['net_dP'][-1]]
             err[posid] = [abs(net_requested[i] - net_scheduled[i]) for i in [0, 1]]
