@@ -162,6 +162,7 @@ didnotmove_check_tol = 0.080 # Margin for how far off tracking needs to be to ch
 
 # some numeric tolerances for scheduling moves
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
+schedule_checking_angular_tol_zeno = 0.1174 # 0.009782 deg/motor_step * 6 rows * 2 zeno jogs/normal row
 near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 max_auto_creep_distance = 10.0 # deg, fallback value to prevent huge / long creep moves in case of error in distance calculation -- only affects auto-generated creep moves
 theta_hardstop_ambig_tol = 8.0 # deg, for determining when within ambiguous zone of theta hardstops
