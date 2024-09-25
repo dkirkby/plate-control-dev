@@ -175,6 +175,7 @@ theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure gettin
 anneal_density = {'filled': 0.5,
                   'ramped': 0.35,
                   }
+max_targets_for_no_anneal = 140 # If the number of targets below or equal to this number, and anticollision is None or 'freeze', there is no need for annealing
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()

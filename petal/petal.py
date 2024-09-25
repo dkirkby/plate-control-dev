@@ -740,6 +740,12 @@ class Petal(object):
             anticollision = self.anticollision_default
             self.printfunc(f'using default anticollision mode --> {self.anticollision_default}')
 
+        # If anticollision mode is None or 'freeze' and number of targets is < limit
+        # then there is no need for annealing.  In particular, this will have significant
+        # gains in the speed at which fp_setup runs with no additional chance of collisions
+        if anticollision in {None, 'freeze'} and len(self.schedule.regular_requests_accepted) <= pc.max_targets_for_no_anneal:
+            should_anneal = False
+
         # This temporary stateful storage is an unfortunate necessity for error
         # handling, when we need to reschedule the move tables. Needed here
         # because the sequence of schedule_moves() --> send_move_tables()
