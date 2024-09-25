@@ -247,8 +247,9 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
-        self.petal_debug = {'linphi_verbose': 1}
-
+        self.petal_debug = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
+                            'cancel_anneal_verbose': True } # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
+                                                            # Set 'collision' to 1-4 for testing collisions code, see posschedule.py
 
     def petal_version(self):
         """
@@ -743,7 +744,10 @@ class Petal(object):
         # If anticollision mode is None or 'freeze' and number of targets is < limit
         # then there is no need for annealing.  In particular, this will have significant
         # gains in the speed at which fp_setup runs with no additional chance of collisions
-        if anticollision in {None, 'freeze'} and len(self.schedule.regular_requests_accepted) <= pc.max_targets_for_no_anneal:
+        num_targets = len(self.schedule.regular_requests_accepted)
+        if anticollision in {None, 'freeze'} and num_targets <= pc.max_targets_for_no_anneal:
+            if self.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={num_targets} <= max of {pc.max_targets_for_no_anneal}')
             should_anneal = False
 
         # This temporary stateful storage is an unfortunate necessity for error
