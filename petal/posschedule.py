@@ -421,6 +421,17 @@ class PosSchedule(object):
                 if rejected:
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
             all_accepted |= accepted
+
+        # If anticollision mode is None or 'freeze' and number of targets is < limit
+        # then there is no need for annealing.  In particular, this will have significant
+        # gains in the speed at which fp_setup runs with no additional chance of collisions
+        num_targets = len(all_accepted)
+        if anticollision in {None, 'freeze'} and num_targets <= pc.max_targets_for_no_anneal:
+            if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={num_targets} <= max of {pc.max_targets_for_no_anneal}')
+            should_anneal = False
+
+
         scheduling_timer_start = time.perf_counter()
         do_schedule = True
 
