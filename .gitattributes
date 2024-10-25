@@ -6,6 +6,7 @@ pecs/disambiguate_theta.py -text
 pecs/dummy_rc_calib.py -text
 pecs/end_park_positioners.py -text
 pecs/expert_set_pos_vals.py -text
+pecs/fp_recovery.py -text
 pecs/fp_setup.py -text
 pecs/fvc_measure.py -text
 pecs/fvc_sim.py -text
