@@ -16,21 +16,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="FP_SETUP: nightly setup for the DESI focal plane.")
 parser.add_argument("-i", "--instance",type=str, help = 'Instance name (desi_<obsday> is default>')
-max_tries = 10
-parser.add_argument('-nt', '--num_tries', type=int, default=2, help=f'int, max number of tries of the disambiguate_theta algorithm (max is {max_tries})')
-parser.add_argument('-oc', '--only_creep', type=str, default='False', help='True --> move ambigous positioners slowly when going toward their possible hard limits, False --> cruise speed, None --> use existing individual positioner values')
-
-
 args = parser.parse_args()
-
-# input validation
-assert 1 <= args.num_tries <= max_tries, f'out of range argument {args.num_tries} for num_tries parameter'
-if pc.is_none(args.only_creep):
-    args.only_creep = None
-elif pc.is_boolean(args.only_creep):
-    args.only_creep = pc.boolean(args.only_creep)
-else:
-    assert False, f'out of range argument {args.only_creep} for only_creep parameter'
 
 inst = args.instance
 # reset Pyro variables
@@ -161,7 +147,7 @@ try:
 
     logger.info('FP_SETUP: running disambiguation loops...')
     enabled_before_disambig = get_pos_set('enabled')
-    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=args.num_tries, only_creep=args.only_creep)
+    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=4)
     ambig = disambig_obj.disambig()
     logger.info('FP_SETUP: Disambiguation loops complete.')
     if ambig:
@@ -213,7 +199,7 @@ except (Exception, KeyboardInterrupt) as e:
     err = e
     logger.error('FP_SETUP crashed! See traceback below:')
     logger.critical(traceback.format_exc())
-    logger.info('Attempting to perform cleanup before hard crashing. Configure the instance before trying again.')
+    logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
     try:
         logger.info('FP_SETUP: Re-disabling initially disabled positioners for safety...')
         ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
