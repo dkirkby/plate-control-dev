@@ -290,7 +290,7 @@ class PosModel(object):
         elif limits:
             use_near_full_range = (limits == 'near_full')
             new_distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
-            if self.is_linphi is not None and axisid == pc.P and distance != new_distance:
+            if self.is_linphi and axisid == pc.P and distance != new_distance:
                 if self.DEBUG > 1:
                     self.printfunc(f'{self.posid} linphi Distance = {distance} changed to {new_distance}')  # DEBUG
             distance = new_distance
@@ -308,7 +308,7 @@ class PosModel(object):
         allow_creep = False if self.is_linphi and axisid == pc.P else True
         dist_spinup = 2 * pc.sign(distance) * self._spinupdown_distance(axisid)  # distance over which accel / decel to and from cruise speed
         if allow_creep and ( not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED'])):
-            if self.is_linphi and axisid == pc.P and abs(distance) > 0.00001:
+            if self.is_linphi and axisid == pc.P and abs(distance) > 0.00001: # in mm, == 10 microns
                 ddist = self.axis[axisid].motor_to_shaft(distance)
                 self.printfunc(f'{self.posid} linphi Distance = {ddist}, MotDist = {distance}, WARNING: creep on linphi')  # DEBUG
             move_data['motor_step']   = int(round(distance / self._stepsize_creep))

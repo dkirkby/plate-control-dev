@@ -118,8 +118,9 @@ else:
 #  2020-06-25 [JHS] For usage of new petalboxes with 20 can channels, an alternate
 #  map will need to be provided here. Selection of which map to use will need to
 #  be given by some configuration argument during petal initialization.
-power_supply_canbus_map = {'V1': {'can10', 'can11', 'can13', 'can22', 'can23'},
-                           'V2': {'can12', 'can14', 'can15', 'can16', 'can17'}}
+#  2024-11-11 [CAD] Since the 10 and 20 channel canids are disjoint sets, can use one map.
+power_supply_canbus_map = {'V1': {'can10', 'can11', 'can13', 'can22', 'can23', 'can30', 'can31', 'can32', 'can33', 'can34', 'can35', 'can39', 'can40', 'can41', 'can42'},
+                           'V2': {'can12', 'can14', 'can15', 'can16', 'can17', 'can36', 'can37', 'can38', 'can43', 'can44', 'can45', 'can46', 'can47', 'can48', 'can49'}}
 
 # Constants
 deg = '\u00b0'
@@ -175,7 +176,7 @@ theta_hardstop_ambig_exit_margin = 5.0 # deg, additional margin to ensure gettin
 anneal_density = {'filled': 0.5,
                   'ramped': 0.35,
                   }
-max_targets_for_no_anneal = 140 # If the number of targets below or equal to this number, and anticollision is None or 'freeze', there is no need for annealing
+max_targets_for_no_anneal = 123 # If the number of targets for each power supply is below or equal to this number, and anticollision is None or 'freeze', there is no need for annealing
 
 # Nominal and tolerance calibration values
 nominals = OrderedDict()

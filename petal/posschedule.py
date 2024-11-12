@@ -426,10 +426,16 @@ class PosSchedule(object):
         # then there is no need for annealing.  In particular, this will have significant
         # gains in the speed at which fp_setup runs with no additional chance of collisions
         num_targets = len(all_accepted)
-        if anticollision in {None, 'freeze'} and num_targets <= pc.max_targets_for_no_anneal:
-            if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
-                self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={num_targets} <= max of {pc.max_targets_for_no_anneal}')
-            should_anneal = False
+        if anticollision in {None, 'freeze'} and num_targets <= 2*pc.max_targets_for_no_anneal:
+            count = {'V1': 0, 'V2':0}
+            for p in all_accepted:
+                for ps in ['V1', 'V2']:
+                    if p in power_supply_map[ps]:
+                        count[ps] += 1
+            if count['V1'] <= pc.max_targets_for_no_anneal and count['V2'] <= pc.max_targets_for_no_anneal:
+                if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                    self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={count} <= max of {pc.max_targets_for_no_anneal}')
+                should_anneal = False
 
 
         scheduling_timer_start = time.perf_counter()
@@ -448,8 +454,7 @@ class PosSchedule(object):
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
-        move_tables_before_zeno_mods = final.move_tables
-        self.move_tables = final.rewrite_zeno_move_tables(move_tables_before_zeno_mods) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
+        self.move_tables = final.rewrite_zeno_move_tables(final.move_tables) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
