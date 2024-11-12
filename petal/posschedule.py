@@ -430,7 +430,7 @@ class PosSchedule(object):
             count = {'V1': 0, 'V2':0}
             for p in all_accepted:
                 for ps in ['V1', 'V2']:
-                    if p in power_supply_map[ps]:
+                    if p in self.petal.power_supply_map[ps]:
                         count[ps] += 1
             if count['V1'] <= pc.max_targets_for_no_anneal and count['V2'] <= pc.max_targets_for_no_anneal:
                 if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
