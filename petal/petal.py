@@ -247,14 +247,14 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
-        self.petal_debug = {'linphi_verbose': 1}
-
+        self.petal_debug = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
+                            'cancel_anneal_verbose': True } # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
 
     def petal_version(self):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnolinphinc-a_v2.07'  # MUST be changed manually!
+        version = 'PETAL_kpnolinphinc-a_v2.08'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:

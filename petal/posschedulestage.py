@@ -100,6 +100,7 @@ class PosScheduleStage(object):
     def _rewrite_linphi_move_table(self, table, verbose=False):
 #       last_motor_direction is always > 0
 #       last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
+        last_motor_direction = 1
         if table.has_phi_motion:
             new_table = table.copy()
             idx = 0
@@ -118,14 +119,15 @@ class PosScheduleStage(object):
                     new_direction = 1 if phi_dist >= 0.0 else -1
 #                   scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
 #                   scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
+#                   We don't need the scales here since Petalcontroller will apply them
                     #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
-                    if new_direction == 1:  # table.posmodel.linphi_params['LAST_P_DIR']:
+                    if last_motor_direction == 1:  # table.posmodel.linphi_params['LAST_P_DIR']:
                         if new_direction > 0:   # must go negative, then positive
                             first_move = -pc.P_zeno_jog # / scale_cw
                             second_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
                         else:                       # must go positive, then negative
-                            first_move = pc.P_zeno_jog # / scale_ccw
-                            second_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            second_move = pc.P_zeno_jog # / scale_ccw
                     else:
                         if new_direction > 0:   # must go positive, then negative
                             first_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
@@ -133,8 +135,8 @@ class PosScheduleStage(object):
                         else:                       # must go positive, then negative
                             first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
                             second_move = pc.P_zeno_jog # / scale_ccw
-#                   Probably need next two lines to prevent banging into hard stops, but if they adjust either move, we'll need
-#                   to adjust the other.
+#                   Would need next two lines to prevent banging into hard stops, but should never get here
+#                   if that were going to happen since additional keepout is > jog size
 #                   first_move_limited = self._range_limited_jog(first_move ... and other args)
 #                   second_move_limited = self._range_limited_jog(second_move ... and other args)
                     if verbose:

@@ -386,6 +386,23 @@ class PosSchedule(object):
                 if rejected:
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
             all_accepted |= accepted
+
+        # If anticollision mode is None or 'freeze' and number of targets is < limit
+        # then there is no need for annealing.  In particular, this will have significant
+        # gains in the speed at which fp_setup runs with no additional chance of collisions
+        num_targets = len(all_accepted)
+        if anticollision in {None, 'freeze'} and num_targets <= 2*pc.max_targets_for_no_anneal:
+            count = {'V1': 0, 'V2':0}
+            for p in all_accepted:
+                for ps in ['V1', 'V2']:
+                    if p in self.petal.power_supply_map[ps]:
+                        count[ps] += 1
+            if count['V1'] <= pc.max_targets_for_no_anneal and count['V2'] <= pc.max_targets_for_no_anneal:
+                if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                    self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={count} <= max of {pc.max_targets_for_no_anneal}')
+                should_anneal = False
+
+
         scheduling_timer_start = time.perf_counter()
         do_schedule = True
 
@@ -402,8 +419,7 @@ class PosSchedule(object):
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
-        move_tables_before_zeno_mods = final.move_tables
-        self.move_tables = final.rewrite_zeno_move_tables(move_tables_before_zeno_mods) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
+        self.move_tables = final.rewrite_zeno_move_tables(final.move_tables) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
@@ -494,6 +510,9 @@ class PosSchedule(object):
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
+        SHOW_FROZEN_MT = None
+        if hasattr(self.petal, 'petal_debug'):
+            SHOW_FROZEN_MT = self.petal.petal_debug.get('show_frozen_mt')
         user_requested = set(self.get_requests(include_dummies=False))
         has_table = set(self.move_tables)
         check = has_table & user_requested # ignores expert tables
@@ -502,12 +521,32 @@ class PosSchedule(object):
         for posid in check:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
+            if SHOW_FROZEN_MT:
+                if posid in SHOW_FROZEN_MT:
+                    ht = self.move_tables[posid].for_hardware()
+                    self.printfunc(f"posid={posid}\nhardware_movetable={str(ht)}\nschedule_movetable={str(sched_table)}")
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
             net_scheduled = [sched_table['net_dT'][-1], sched_table['net_dP'][-1]]
             err[posid] = [abs(net_requested[i] - net_scheduled[i]) for i in [0, 1]]
             err[posid] = [min(e, abs(e - 360)) for e in err[posid]]  # wrapped angle cases
-            if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
+            do_set_frozen = False
+            if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                self.printfunc(f'posid={posid}, net_requested={net_requested}, net_scheduled={net_scheduled}, err={err[posid]}')
+            if self.petal.posmodels[posid].is_linphi:
+                if err[posid][0] > pc.schedule_checking_numeric_angular_tol or\
+                   err[posid][1] > pc.schedule_checking_angular_tol_zeno:
+                       do_set_frozen = True
+            else:
+                if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
+                    do_set_frozen = True
+            if do_set_frozen:
                 frozen.add(posid)
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is frozen')
+            else:
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is not frozen')
+
         return frozen
 
     def get_posids_with_expert_tables(self):
