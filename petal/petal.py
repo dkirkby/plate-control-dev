@@ -104,7 +104,6 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running petalcontroller version: {pc.code_version}')
-        self.printfunc(f'Running plate_control version: {self.petal_version()}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         pc.printfunc = self.printfunc
 
@@ -153,6 +152,7 @@ class Petal(object):
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
+        self.printfunc(f'Running plate_control version: {self.petal_version()}')
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.sync_mode = sync_mode.lower()
         assert sync_mode in ['hard', 'soft'], f'Invalid sync mode: {sync_mode}'
