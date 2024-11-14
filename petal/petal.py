@@ -104,7 +104,7 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running petalcontroller version: {pc.code_version}')
-        self.printfunc(f'Running plate_control version: {self.petal_version}')
+        self.printfunc(f'Running plate_control version: {self.petal_version()}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         pc.printfunc = self.printfunc
 
