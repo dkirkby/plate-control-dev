@@ -175,7 +175,7 @@ class Petal(object):
                     ret = self.comm.pbget('version')
                     if 'FAILED' not in ret:
                         pcver = str(ret)
-                self.printrunc(f'Petalcontroller {self.petalbox_id} running version: {pcver}')
+                self.printfunc(f'Petalcontroller {self.petalbox_id} running version: {pcver}')
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller pbget version: %s' % str(e))
 
