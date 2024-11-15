@@ -103,9 +103,6 @@ class Petal(object):
 
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running plate_control version: {pc.code_version}')
-        self.printfunc(f'Running petal version: {self.petal_version()}')
-        self.printfunc(f'poscollider used: {poscollider.__file__}')
         pc.printfunc = self.printfunc
 
         # petal setup
@@ -160,27 +157,34 @@ class Petal(object):
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0}
 
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
+        self.printfunc(f'Running petal version: {self.petal_version()}')
+        self.printfunc(f'poscollider used: {poscollider.__file__}')
+
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id,
                                             user_interactions_enabled=user_interactions_enabled,
                                             printfunc=self.printfunc)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-            # get ops_state from petalcontroller
-            try:
-                o = self.comm.ops_state()
-                self.ops_state_sv.write(o)
-            except Exception as e:
-                self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
+
+            # get petalcontroller version
             try:
                 pcver = 'unknown'
                 if self.comm.is_connected():
                     ret = self.comm.pbget('version')
                     if 'FAILED' not in ret:
                         pcver = str(ret)
-                    self.printrunc(f'Running petalcontroller version: {pcver}')
+                self.printrunc(f'Petalcontroller {self.petalbox_id} running version: {pcver}')
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller pbget version: %s' % str(e))
+
+            # get ops_state from petalcontroller
+            try:
+                o = self.comm.ops_state()
+                self.ops_state_sv.write(o)
+            except Exception as e:
+                self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
         self.db_commit_on = False
