@@ -103,7 +103,8 @@ class Petal(object):
 
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running petalcontroller version: {pc.code_version}')
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
+        self.printfunc(f'Running petal version: {self.petal_version()}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         pc.printfunc = self.printfunc
 
@@ -152,7 +153,6 @@ class Petal(object):
         self.verbose = verbose # whether to print verbose information at the terminal
         self.save_debug = save_debug
         self.simulator_on = simulator_on
-        self.printfunc(f'Running plate_control version: {self.petal_version()}')
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.sync_mode = sync_mode.lower()
         assert sync_mode in ['hard', 'soft'], f'Invalid sync mode: {sync_mode}'
@@ -172,6 +172,15 @@ class Petal(object):
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
+            try:
+                pcver = 'unknown'
+                if self.comm.is_connected():
+                    ret = self.comm.pbget('version')
+                    if 'FAILED' not in ret:
+                        pcver = str(ret)
+                    self.printrunc(f'Running petalcontroller version: {pcver}')
+            except Exception as e:
+                self.printfunc('init: Exception calling petalcontroller pbget version: %s' % str(e))
 
         # database setup
         self.db_commit_on = False
@@ -255,7 +264,7 @@ class Petal(object):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnolinphinc-a_v2.08'  # MUST be changed manually!
+        version = 'PETAL_kpnolinphinc-a_v2.09'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
