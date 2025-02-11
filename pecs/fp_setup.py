@@ -147,7 +147,7 @@ try:
 
     logger.info('FP_SETUP: running disambiguation loops...')
     enabled_before_disambig = get_pos_set('enabled')
-    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=4)
+    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=2)
     ambig = disambig_obj.disambig()
     logger.info('FP_SETUP: Disambiguation loops complete.')
     if ambig:
