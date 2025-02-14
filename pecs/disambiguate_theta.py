@@ -22,7 +22,7 @@ except:
 # other imports
 import random
 import pandas
-    
+
 # common definitions
 pos_settings_keys = ['ONLY_CREEP', 'CREEP_PERIOD']
 
@@ -74,7 +74,7 @@ class disambig_class():
         self.neighbors = {}
         for these in self.neighbor_data.values():
             self.neighbors.update(these)
-   
+
         # gather initial settings
         pos_settings_by_petal = self.pecs.ptlm.batch_get_posfid_val(uniqueids=self.allowed_to_fix, keys=pos_settings_keys)
         self.orig_pos_settings = {}

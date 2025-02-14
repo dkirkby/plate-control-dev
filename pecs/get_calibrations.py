@@ -199,15 +199,6 @@ if online:
     import signal
     # First check for Pyro Name Server
     import Pyro4
-    # try to join instance
-    inst='desi_'+obs_day()
-    logger.info('Joining instance')
-    try:
-        join_instance(inst, must_be_running=True)
-        logger.info('Joined instance')
-    except Exception as e:
-        logger.info('Failed to join instance. %r' % str(e))
-        sys.exit()
     try:
         Pyro4.locateNS()
         logger.info('found name server')
