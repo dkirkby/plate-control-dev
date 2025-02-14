@@ -9,19 +9,8 @@ DESI-5911.
 import os
 script_name = os.path.basename(__file__)
 
-# command line argument parsing
-import argparse
-parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-max_tries = 10
-parser.add_argument('-nt', '--num_tries', type=int, default=4, help=f'int, max number of tries of the algorithm (max is {max_tries})')
-max_fvc_iter = 10
-parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (max is {max_fvc_iter})')
-parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius')
-parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
-parser.add_argument('-oc', '--only_creep', type=str, default='True', help='True --> move ambigous positioners slowly when going toward their possible hard limits, False --> cruise speed, None --> use existing individual positioner values')
-parser.add_argument('-cp', '--creep_period', type=int, default=0, help='int, overrides positioners\' values for parameter CREEP_PERIOD (1 is fastest possible, as of 2021-09-05 a setting of 2 is typical during observations, enter 0 to use existing individual positioner values')
-uargs = parser.parse_args()
-
+# set up logger
+import simple_logger
 try:
     import posconstants as pc
 except:
@@ -33,19 +22,6 @@ except:
 # other imports
 import random
 import pandas
-
-# input validation
-assert 1 <= uargs.num_tries <= max_tries, f'out of range argument {uargs.num_tries} for num_tries parameter'
-assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
-assert (2 == uargs.creep_period) or (0 == uargs.creep_period), 'Creep period different from 2 (default) not supported!' #Note 0 is no change
-# remove the above assertion when/if functionality to infrom petalcontroller of creep period (and clean up if crashes) is added
-assert 0 <= uargs.creep_period <= 2, f'out of range argument {uargs.creep_period} for creep_period parameter'
-if pc.is_none(uargs.only_creep):
-    uargs.only_creep = None
-elif pc.is_boolean(uargs.only_creep):
-    uargs.only_creep = pc.boolean(uargs.only_creep)
-else:
-    assert False, f'out of range argument {uargs.only_creep} for only_creep parameter'
     
 # common definitions
 pos_settings_keys = ['ONLY_CREEP', 'CREEP_PERIOD']
@@ -55,7 +31,7 @@ class disambig_class():
     KF - 20210212
         Not the best but putting this in a class so it can accept an outside PECS or logger instance.
     '''
-    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4):
+    def __init__(self, pecs=None, logger=None, num_meas=1, match_radius=None, check_unmatched=False, num_tries=4, only_creep=True, creep_period=0):
         if logger is None:
             # set up logger
             import simple_logger
@@ -82,6 +58,7 @@ class disambig_class():
         self.match_radius = match_radius
         self.check_unmatched = check_unmatched
         self.num_meas = num_meas
+        self.settings = {'ONLY_CREEP': only_creep, 'CREEP_PERIOD': creep_period}
         # some boilerplate
         self.common_move_meas_kwargs = {'match_radius': self.match_radius,
                                         'check_unmatched': self.check_unmatched,
@@ -97,7 +74,7 @@ class disambig_class():
         self.neighbors = {}
         for these in self.neighbor_data.values():
             self.neighbors.update(these)
-            
+   
         # gather initial settings
         pos_settings_by_petal = self.pecs.ptlm.batch_get_posfid_val(uniqueids=self.allowed_to_fix, keys=pos_settings_keys)
         self.orig_pos_settings = {}
@@ -198,7 +175,7 @@ class disambig_class():
         new_settings = {}
         settings_note = ''
         for key, skipval in {'ONLY_CREEP': None, 'CREEP_PERIOD': 0}.items():
-            uarg = getattr(uargs, key.lower())
+            uarg = self.settings[key] #getattr(uargs, key.lower())
             if uarg != skipval:
                 for posid in ambig:
                     if posid not in new_settings:  # and by implication, not in old_settings yet, either
@@ -232,8 +209,36 @@ class disambig_class():
         return self.disambig(n_try=n_try - 1)
 
 if __name__ == '__main__':
+    # command line argument parsing
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    max_tries = 10
+    parser.add_argument('-nt', '--num_tries', type=int, default=4, help=f'int, max number of tries of the algorithm (max is {max_tries})')
+    max_fvc_iter = 10
+    parser.add_argument('-nm', '--num_meas', type=int, default=1, help=f'int, number of measurements by the FVC per move (max is {max_fvc_iter})')
+    parser.add_argument('-r', '--match_radius', type=int, default=None, help='int, specify a particular match radius')
+    parser.add_argument('-u', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
+    parser.add_argument('-oc', '--only_creep', type=str, default='True', help='True --> move ambigous positioners slowly when going toward their possible hard limits, False --> cruise speed, None --> use existing individual positioner values')
+    #20220604 - default creep period for this script was 1 (faster) compared to normal 2, this functionality didn't work
+    parser.add_argument('-cp', '--creep_period', type=int, default=0, help='int, overrides positioners\' values for parameter CREEP_PERIOD (1 is fastest possible, as of 2021-09-05 a setting of 2 is typical during observations, enter 0 to use existing individual positioner values')
+    uargs = parser.parse_args()
+
+    # input validation
+    assert 1 <= uargs.num_tries <= max_tries, f'out of range argument {uargs.num_tries} for num_tries parameter'
+    assert 1 <= uargs.num_meas <= max_fvc_iter, f'out of range argument {uargs.num_meas} for num_meas parameter'
+    assert (2 == uargs.creep_period) or (0 == uargs.creep_period), 'Creep period different from 2 (default) not supported!' #Note 0 is no change
+    # remove the above assertion when/if functionality to infrom petalcontroller of creep period (and clean up if crashes) is added
+    assert 0 <= uargs.creep_period <= 2, f'out of range argument {uargs.creep_period} for creep_period parameter'
+    if pc.is_none(uargs.only_creep):
+        uargs.only_creep = None
+    elif pc.is_boolean(uargs.only_creep):
+        uargs.only_creep = pc.boolean(uargs.only_creep)
+    else:
+        assert False, f'out of range argument {uargs.only_creep} for only_creep parameter'
+
     disambig_obj = disambig_class(pecs=None, logger=None, num_meas=uargs.num_meas, num_tries=uargs.num_tries,
-                                  match_radius=uargs.match_radius, check_unmatched=uargs.check_unmatched)
+                                  match_radius=uargs.match_radius, check_unmatched=uargs.check_unmatched,
+                                  only_creep=uargs.only_creep, creep_period=uargs.creep_period)
     ambig = disambig_obj.disambig()
     disambig_obj.logger.info('Disambiguation loops complete.')
     if ambig:

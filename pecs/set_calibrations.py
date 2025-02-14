@@ -15,7 +15,8 @@ valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'DEVICE_CLASSIFIED_NONFUNCTIONAL','CLASSIFIED_AS_RETRACTED',
               'POS_T', 'POS_P', 'LOC_T', 'LOC_P',
               'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_PHI_RADIAL',
-              'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR',}
+              'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR',
+              'ZENO_MOTOR_P', 'ZENO_MOTOR_T', 'SZ_CW_P', 'SZ_CCW_P',  'SZ_CW_T', 'SZ_CCW_T'}
 fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR',
                 'NUM_POINTS_IN_FIT_STATIC', 'NUM_POINTS_IN_FIT_DYNAMIC',
                 'NUM_OUTLIERS_EXCLUDED_STATIC', 'NUM_OUTLIERS_EXCLUDED_DYNAMIC'}
@@ -25,7 +26,8 @@ boolean_keys = set(commit_keys.values()) | {'DEVICE_CLASSIFIED_NONFUNCTIONAL', '
 float_keys = (valid_keys | fit_err_keys) - boolean_keys
 no_nominal_val = {'DEVICE_CLASSIFIED_NONFUNCTIONAL', 'CLASSIFIED_AS_RETRACTED', 'POS_P', 'POS_T',
                   'KEEPOUT_EXPANSION_THETA_RADIAL', 'KEEPOUT_EXPANSION_PHI_RADIAL',
-                  'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR'}
+                  'KEEPOUT_EXPANSION_THETA_ANGULAR', 'KEEPOUT_EXPANSION_PHI_ANGULAR',
+                  'ZENO_MOTOR_P', 'ZENO_MOTOR_T', 'SZ_CW_P', 'SZ_CCW_P',  'SZ_CW_T', 'SZ_CCW_T'}
 def dbkey_for_key(key):
     '''Maps special cases of keys that may have different terminology in input file
     online database.'''
@@ -67,11 +69,11 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
-    
+
 # yes, as of 2020-06-17, I'm saving it in two places
 # to be absolutely sure we have a record
 # can cut back to one, once we are confident of logs getting properly saved at KPNO
-log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
+log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]
 log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
 log_paths = [os.path.join(d, log_name) for d in log_dirs]
 logger, _, _ = simple_logger.start_logger(log_paths)
@@ -86,10 +88,12 @@ input2 = simple_logger.input2
 # deal with astropy's idiotic handling of booleans as strings
 for key in boolean_keys & set(table.columns):
     table[key] = [pc.boolean(x) for x in table[key]]
-    
+
 # deal with astropy's annoying restrictions on integer values
+truefalse = {'TRUE': True, 'FALSE': False}
+
 for key in float_keys & set(table.columns):
-    table[key] = [float(x) for x in table[key]]
+    table[key] = [float(x) if x not in truefalse else truefalse[x] for x in table[key]]
 
 # validate the table format
 assert2('POS_ID' in table.columns, 'No POS_ID column found in input table')
@@ -113,9 +117,9 @@ requested_posids = set()
 for key in keys:
     column = table[key]
     commit_key = commit_keys[key]
-    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
+    commit_type_ok = table[commit_key].dtype in [int, bool]  #[np.int, np.bool]
     assert2(commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean')
-    data_type_ok = column.dtype in [np.int, np.float, np.bool]
+    data_type_ok = column.dtype in [int, float, bool]     #[np.int, np.float, np.bool]
     assert2(data_type_ok, f'{key} data type must be numeric or boolean')
     commit_requested = table[commit_key]
     def assert_ok(is_valid_array, err_desc):
@@ -215,7 +219,7 @@ for row in table:
             pecs.ptlm.set_posfid_val(posid, 'CALIB_NOTE', note, participating_petals=role)
         logger.info(f'{posid}: {stored}')
         any_stored = True
-        
+
 # commit to online database
 if any_stored:
     logger.info('Committing the data set to online database.')
