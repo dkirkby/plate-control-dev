@@ -1,4 +1,5 @@
 * text=auto !eol
+bin/end_park_positioners -text
 pecs/1p_calib.py -text
 pecs/disambiguate_theta.py -text
 pecs/dummy_rc_calib.py -text
