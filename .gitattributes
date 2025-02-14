@@ -1,5 +1,4 @@
 * text=auto !eol
-bin/petalcontroller -text
 pecs/1p_calib.py -text
 pecs/disambiguate_theta.py -text
 pecs/dummy_rc_calib.py -text
