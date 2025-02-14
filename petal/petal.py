@@ -17,10 +17,14 @@ import os
 import random
 import numpy as np
 from astropy.table import Table as AstropyTable
+import csv
 
 # For using simulated petals at KPNO (PETAL90x)
 # Set KPNO_SIM to True
 KPNO_SIM = False
+
+# For using debug_petal dictionary and associated functions
+DEBUG = True
 
 try:
     from DOSlib.positioner_index import PositionerIndex
@@ -92,15 +96,13 @@ class Petal(object):
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, save_debug=True,
+                 printfunc=print, verbose=False, save_debug=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False,
                  phi_limit_on=True, sync_mode='hard', anneal_mode='filled', n_strikes=2):
 
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running plate_control version: {pc.code_version}')
-        self.printfunc(f'poscollider used: {poscollider.__file__}')
         pc.printfunc = self.printfunc
 
         # petal setup
@@ -155,12 +157,28 @@ class Petal(object):
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
         self.sim_fail_freq = {'send_tables': 0.0}
 
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
+        self.printfunc(f'Running petal version: {self.petal_version()}')
+        self.printfunc(f'poscollider used: {poscollider.__file__}')
+
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id,
                                             user_interactions_enabled=user_interactions_enabled,
                                             printfunc=self.printfunc)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
+
+            # get petalcontroller version
+            try:
+                pcver = 'unknown'
+                if self.comm.is_connected():
+                    ret = self.comm.pbget('version')
+                    if 'FAILED' not in ret:
+                        pcver = str(ret)
+                self.printfunc(f'Petalcontroller {self.petalbox_id} running version: {pcver}')
+            except Exception as e:
+                self.printfunc('init: Exception calling petalcontroller pbget version: %s' % str(e))
+
             # get ops_state from petalcontroller
             try:
                 o = self.comm.ops_state()
@@ -243,7 +261,39 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
+        self.petal_debug = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
+                            'cancel_anneal_verbose': True } # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
 
+    def petal_version(self):
+        """
+        Returns string PETAL version id
+        """
+        version = 'PETAL_kpnolinphinc-a_v2.09'  # MUST be changed manually!
+        if self.simulator_on:
+            return version+'-Sim'
+        else:
+            return version
+
+    if DEBUG:
+        def get_petal_debug(self):
+            """
+            Returns petal_debug dictionary
+            """
+            return self.petal_debug
+
+        def set_petal_debug(self, key, value):
+            """
+            set key and value in petal_debug dictionary
+            """
+            self.petal_debug[key] = value
+            return
+
+        def del_petal_debug(self, key):
+            """
+            remove key from petal_debug dictionary
+            """
+            self.petal_debug.pop(key, None)
+            return
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -313,7 +363,8 @@ class Petal(object):
                 alt_move_adder=self._add_to_altered_states,
                 alt_calib_adder=self._add_to_altered_calib_states)
             self.posmodels[posid] = PosModel(state=self.states[posid],
-                                             petal_alignment=self.alignment)
+                                             petal_alignment=self.alignment,
+                                             printfunc=self.printfunc)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
             if KPNO_SIM:
                 pos = posindex.find_by_arbitrary_keys(DEVICE_ID=posid)
@@ -747,9 +798,13 @@ class Petal(object):
             if self.verbose:
                 self.printfunc('Simulator skips sending move tables to positioners.')
         else:
+            self.printfunc('send_move_tables: calling _wait_while moving')
             self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
+            self.printfunc('send_move_tables: _wait_while moving done')
             response = self.comm.send_tables(hw_tables)
+            self.printfunc('send_move_tables: _send_tables done')
         failed_posids, n_retries = self._handle_any_failed_send_of_move_tables(response, n_retries, previous_failed=previous_failed)
+        self.printfunc('send_move_tables: _handle_any_failed_send_move_tables done')
         if n_retries == 0 or not failed_posids:
             frozen = self.schedule.get_frozen_posids()
             for posid in frozen:
@@ -760,8 +815,7 @@ class Petal(object):
             self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc(f'min move table time = {min(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
-        if self.save_debug:
-            self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
+        self._write_schedule_debug_data_to_disk(hw_tables, failed_posids)
         return failed_posids, n_retries
 
     def set_motor_parameters(self, wait_on=False):
@@ -796,6 +850,9 @@ class Petal(object):
                 busid = posmodel.busid
                 p = {key:posmodel.state._val[key] for key in parameter_keys}
                 currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+#               speedparams = tuple([p[key] for key in ['LIN_T','LIN_P']])
+#               msg = 'speed parameters: ' + str(speedparams)   # zeno
+#               self.printfunc(msg)                             # zeno
                 currents_by_busid[busid][canid] = [currents, currents]
                 periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
                 if self.verbose:
@@ -843,6 +900,7 @@ class Petal(object):
         INPUTS:  None
         """
         failed_posids, n_retries = self.send_move_tables()
+        self.printfunc('send_and_execute_moves: send_move_tables done')
         self.execute_moves()
         return failed_posids, n_retries
 
@@ -926,7 +984,8 @@ class Petal(object):
         next_allowed_move_time = time.time() - delay + 0.001
         for n in range(n_repeats):
             for target in targets:
-                assert len(target) == 2 and all([isinstance(val, (int, float, np.integer, np.float)) for val in target]), f'dance: invalid target {target}'
+                #assert len(target) == 2 and all([isinstance(val, (int, float, np.integer, np.float)) for val in target]), f'dance: invalid target {target}'
+                assert len(target) == 2 and all([isinstance(val, (int, float)) for val in target]), f'dance: invalid target {target}'                
                 count += 1
                 sleep_time = next_allowed_move_time - time.time()
                 if sleep_time > 0:
@@ -1546,10 +1605,14 @@ class Petal(object):
         if key in ['posintTP', 'poslocTP', 'intTlocP', 'locTintP']:
             (intT, intP) = self.posmodels[posid].expected_current_posintTP
             (locT, locP) = self.posmodels[posid].expected_current_poslocTP
-        if key == 'posintTP':
+            if key == 'posintTP':
                 return (intT, intP)
-        elif key == 'poslocTP':
-            return self.posmodels[posid].expected_current_poslocTP
+            elif key == 'poslocTP':
+                return (locT, locP)
+            elif key == 'intTlocP':
+                return (intT, locP)
+            elif key == 'locTintP':
+                return (locT, intP)
         pos = self.posmodels[posid].expected_current_position
         if isinstance(key, list):
             positions = []
@@ -1898,7 +1961,7 @@ class Petal(object):
         '''
         import operator
         position_keys = set(pc.single_coords)
-        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED', 'zeno_motor_p', 'sz_cw_p', 'sz_ccw_p', 'zeno_motor_t', 'sz_cw_t', 'sz_ccw_t'}
         state_keys -= pc.fiducial_calib_keys  # fiducial data not currently supported
         constants_keys = set(pc.constants_keys)
         model_keys = set(pc.posmodel_keys)
@@ -1987,7 +2050,7 @@ class Petal(object):
             out = f'total entries found = {len(found)}\n{out}'
         return out
 
-    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer='default', fmt='png', arcP=False):
+    def quick_plot(self, posids='all', include_neighbors=True, path=None, viewer=None, fmt='png', arcP=False):
         '''Graphical view of the current expected positions of one or many positioners.
 
         INPUTS:  posids ... single posid or collection of posids to be plotted (defaults to all)
@@ -2471,6 +2534,19 @@ class Petal(object):
         if disabled:
             self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to communication error: {disabled}')
 
+    def temporary_disable_positioners_reason(self, posids, reason, auto_disabling_on=True):
+        """Receives a list of positioners that should be disabled, along with the reason.
+        (Optionally) automatically disables positioners to remove them from future send_move_tables attempts.
+        """
+        disabled = set()
+        for posid in posids:
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True, comment='auto-disabled due to {reason}')
+                if accepted:
+                    disabled.add(posid)
+        if disabled:
+            self.printfunc(f'WARNING: {len(disabled)} positioners disabled due to {reason}: {disabled}')
+
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
         held until we could get the state committed to the log / db.
@@ -2657,7 +2733,7 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        if self.verbose:
+        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].is_linphi):
             self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
 

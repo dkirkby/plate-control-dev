@@ -34,14 +34,24 @@ class PosMoveTable(object):
         self.init_poslocTP = self.posmodel.trans.posintTP_to_poslocTP(self.init_posintTP)  # initial theta, phi position (in petal CS)
         self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
-        self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+        self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self._is_required = True
         self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
         self._orig_command = ''
         self._warning_flag = 'WARNING'
         self._error_flag = 'ERROR'
         self._not_yet_calculated = '(not yet calculated)'
+
+    def _set_zeno_dict(self, d):
+        if self.posmodel.is_linphi:
+            if 'zeno' in d:
+                d['zeno'] += 'P'
+            else:
+                d['zeno'] = 'P'    # Denotes a movetable for a linear phi positioner
+            d['PCCWA'] = float(self.posmodel.get_zeno_scale('SZ_CCW_P'))
+            d['PCWA'] = float(self.posmodel.get_zeno_scale('SZ_CW_P'))
+        return d
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -61,6 +71,7 @@ class PosMoveTable(object):
              'total_time':            self.total_time(suppress_automoves=False),
              'is_required':           c._is_required,
              }
+        d = self._set_zeno_dict(d)
         return d
 
     def __repr__(self):
@@ -247,6 +258,15 @@ class PosMoveTable(object):
         return True
 
     @property
+    def has_phi_motion(self):
+        """Boolean saying whether the move table contains any phi motion at all in any row.
+        """
+        for row in self.rows:
+            if row.has_phi_motion:
+                return True
+        return False
+
+    @property
     def log_note(self):
         '''Returns a copy of property log_note.'''
         return self._log_note
@@ -280,6 +300,15 @@ class PosMoveTable(object):
         '''Returns total time to execute the table.'''
         times_table = self.timing(suppress_automoves=suppress_automoves)
         return times_table['net_time'][-1]
+
+    def get_move(self, rowidx, axisid):
+        ''' Returns distance for specified axis in row of move table '''
+        dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
+        if rowidx >= len(self.rows):
+            return None
+        if axisid not in dist_label:
+            return None
+        return self.rows[rowidx].data[dist_label[axisid]]
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -423,9 +452,13 @@ class PosMoveTable(object):
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'], row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
+                if self.posmodel.is_linphi and i == pc.P:
+                    my_allow_cruise = True
+                else:
+                    my_allow_cruise = self.allow_cruise
                 move = self.posmodel.true_move(axisid=i,
                                                distance=ideal_dist[i],
-                                               allow_cruise=self.allow_cruise,
+                                               allow_cruise=my_allow_cruise,
                                                limits=normal_row_limits,
                                                init_posintTP=latest_TP)
                 true_moves[i].append(move)
@@ -437,14 +470,21 @@ class PosMoveTable(object):
                             self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in axis_idxs:
-                backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
+                if self.posmodel.is_linphi and i == pc.P:
+                    backlash[i] = 0.0
+                    auto_cmd_msg = ''
+                    my_allow_cruise = False
+                else:
+                    backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
+                    auto_cmd_msg = '(auto backlash backup)'
+                    my_allow_cruise = self.allow_cruise
                 move = self.posmodel.true_move(axisid=i,
                                                distance=backlash[i],
-                                               allow_cruise=self.allow_cruise,
+                                               allow_cruise=my_allow_cruise,
                                                limits=extra_row_limits,
                                                init_posintTP=latest_TP)
                 new_moves[i].append(move)
-                new_moves[i][-1]['auto_cmd'] = '(auto backlash backup)'
+                new_moves[i][-1]['auto_cmd'] = auto_cmd_msg
                 latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
             ideal_total = [0, 0]
@@ -453,16 +493,20 @@ class PosMoveTable(object):
             actual_total = [0, 0]
             err_dist = [0, 0]
             for i in axis_idxs:
-                actual_total[i] = latest_TP[i] - self.init_posintTP[i]
-                if not self.posmodel.axis[i].is_locked:
-                    err_dist[i] = ideal_total[i] - actual_total[i]
-                if abs(err_dist[i]) > pc.max_auto_creep_distance:
-                    auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
-                                       f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
-                                        'which indicates likely upstream problem in the move schedule!'
-                    err_dist[i] = pc.sign(err_dist[i]) * pc.max_auto_creep_distance
-                else:
+                if self.posmodel.is_linphi and i == pc.P:
+                    err_dist[i] = 0.0
                     auto_cmd_warning = ''
+                else:
+                    actual_total[i] = latest_TP[i] - self.init_posintTP[i]
+                    if not self.posmodel.axis[i].is_locked:
+                        err_dist[i] = ideal_total[i] - actual_total[i]
+                    if abs(err_dist[i]) > pc.max_auto_creep_distance:
+                        auto_cmd_warning = f' - {self._warning_flag}: auto creep distance={err_dist[i]:.3f} deg was ' + \
+                                           f'truncated to pc.max_auto_creep_distance={pc.max_auto_creep_distance}, ' + \
+                                            'which indicates likely upstream problem in the move schedule!'
+                        err_dist[i] = pc.sign(err_dist[i]) * pc.max_auto_creep_distance
+                    else:
+                        auto_cmd_warning = ''
                 move = self.posmodel.true_move(axisid=i,
                                                distance=err_dist[i],
                                                allow_cruise=False,
@@ -494,6 +538,7 @@ class PosMoveTable(object):
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
         table = {}
+        lock_note = ''
         if output_type in {'collider', 'schedule', 'full', 'cleanup', 'angles'}:
             table['dT'] = [true_moves[pc.T][i]['distance'] for i in row_range]
             table['dP'] = [true_moves[pc.P][i]['distance'] for i in row_range]
@@ -516,7 +561,6 @@ class PosMoveTable(object):
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],
                                       true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type in {'full', 'cleanup', 'hardware'}:
-            lock_note = ''
             locked_axes = [name for num, name in {pc.T: 'T', pc.P: 'P'}.items() if self.posmodel.axis[num].is_locked]
             for axis in locked_axes:
                 dkey = f'motor_steps_{axis}' if output_type == 'hardware' else f'd{axis}'
@@ -530,11 +574,13 @@ class PosMoveTable(object):
                     ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
                     zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
                     if any(zeroed_deltas):
-                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables        
+                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables
+
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
+            table = self._set_zeno_dict(table)
 
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
@@ -581,7 +627,11 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'][i] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'][i] != 0)
             table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
-            table['log_note'] = pc.join_notes(self.log_note, lock_note)
+            linphi_note = ''
+            if self.posmodel.is_linphi:
+                for s in [('CCW_SCALE_A','SZ_CCW_P'),('CW_SCALE_A','SZ_CW_P')]:
+                    linphi_note = pc.join_notes(linphi_note, f'p{s[0]}={self.posmodel.get_zeno_scale(s[1])}')
+            table['log_note'] = pc.join_notes(self.log_note, lock_note, linphi_note)
         if output_type in {'full', 'angles'}:
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i] for i in row_range]
@@ -615,6 +665,10 @@ class PosMoveRow(object):
     @property
     def has_motion(self):
         return self.data['dP_ideal'] != 0 or self.data['dT_ideal'] != 0
+
+    @property
+    def has_phi_motion(self):
+        return self.data['dP_ideal'] != 0
 
     @property
     def has_prepause(self):

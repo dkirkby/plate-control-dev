@@ -12,7 +12,7 @@ class PosScheduleStage(object):
         stats            ... instance of posschedstats for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, stats, power_supply_map=None, verbose=False, printfunc=None):
+    def __init__(self, collider, stats, power_supply_map=None, verbose=False, printfunc=None, petal=None):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.start_posintTP = {} # keys: posids, values: initial positions at start of stage
@@ -28,6 +28,7 @@ class PosScheduleStage(object):
         self.sweep_continuity_check_stepsize = 4.0 # deg, see PosSweep.check_continuity function
         self.verbose = verbose
         self.printfunc = printfunc
+        self.petal_debug = petal.petal_debug if hasattr(petal, 'petal_debug') else {}
 
     def initialize_move_tables(self, start_posintTP, dtdp, update_only=False):
         """Generates basic move tables for each positioner, starting at position
@@ -59,6 +60,102 @@ class PosScheduleStage(object):
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
             self.start_posintTP[posid] = tuple(start_posintTP[posid])
+
+    def _print_table_diff(self, posid, old_table, new_table):
+        """
+        Print only the differences between two move tables
+        """
+        o_table = {}
+        n_table = {}
+        for k, v in old_table.items():
+            if k in new_table:
+                if v != new_table[k]:
+                    o_table[k] = v
+                    n_table[k] = new_table[k]
+        if o_table:
+            self.printfunc(f'zeno movetable change\nold {posid} table: {str(o_table)}\nnew {posid} table: {str(n_table)}')
+        return
+
+    def rewrite_zeno_move_tables(self, proposed_tables):
+        for posid, table in proposed_tables.items():
+            if table.posmodel.is_linphi:
+                # self.printfunc(f'Rewriting zeno table for {posid}')
+                new_table = self.rewrite_zeno_move_table(table)
+                if new_table is not None:
+                    vrbose = self.petal_debug.get('linphi_verbose')
+                    try:
+                        if vrbose and int(vrbose) > 1:
+                            self._print_table_diff(posid, table.as_dict(), new_table.as_dict())
+                    except TypeError:
+                        pass
+                    proposed_tables[posid] = new_table
+        return proposed_tables
+
+    def rewrite_zeno_move_table(self, table):
+        linphi_table = None
+        if table.posmodel.is_linphi:
+            linphi_table = self._rewrite_linphi_move_table(table)
+        return linphi_table
+
+    def _rewrite_linphi_move_table(self, table, verbose=False):
+#       last_motor_direction is always > 0
+#       last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
+        last_motor_direction = 1
+        if table.has_phi_motion:
+            new_table = table.copy()
+            idx = 0
+            l_idx = 0
+            if verbose:
+                self.printfunc('Proposed table has phi movement') # DEBUG
+            for row in table.rows:
+                phi_dist = table.get_move(idx, pc.P)
+                theta_dist = table.get_move(idx, pc.T)
+                if phi_dist == 0:
+                    if verbose:
+                        self.printfunc(f'no phi movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
+                    idx += 1
+                    l_idx += 1
+                else:
+                    new_direction = 1 if phi_dist >= 0.0 else -1
+#                   scale_ccw = float(table.posmodel.linphi_params['CCW_SCALE_A'])
+#                   scale_cw = float(table.posmodel.linphi_params['CW_SCALE_A'])
+#                   We don't need the scales here since Petalcontroller will apply them
+                    #NOTE: The first and second moves should have abs(move) >= pc.P_zeno_jog
+                    if last_motor_direction == 1:  # table.posmodel.linphi_params['LAST_P_DIR']:
+                        if new_direction > 0:   # must go negative, then positive
+                            first_move = -pc.P_zeno_jog # / scale_cw
+                            second_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
+                        else:                       # must go positive, then negative
+                            first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            second_move = pc.P_zeno_jog # / scale_ccw
+                    else:
+                        if new_direction > 0:   # must go positive, then negative
+                            first_move = (pc.P_zeno_jog + phi_dist) # / scale_ccw
+                            second_move = -pc.P_zeno_jog # / scale_cw
+                        else:                       # must go positive, then negative
+                            first_move = (-pc.P_zeno_jog + phi_dist) # / scale_cw
+                            second_move = pc.P_zeno_jog # / scale_ccw
+#                   Would need next two lines to prevent banging into hard stops, but should never get here
+#                   if that were going to happen since additional keepout is > jog size
+#                   first_move_limited = self._range_limited_jog(first_move ... and other args)
+#                   second_move_limited = self._range_limited_jog(second_move ... and other args)
+                    if verbose:
+                        self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
+                    new_table.set_move(l_idx, pc.P, first_move)
+                    new_table.set_move(l_idx, pc.T, 0.0)
+                    new_table.insert_new_row(l_idx + 1)
+                    new_table.set_move(l_idx + 1, pc.P, second_move)
+                    new_table.set_move(l_idx + 1, pc.T, theta_dist)
+# Second move is always >0, so LAST_P_DIR is always 1, never -1
+#                   table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
+                    idx += 1
+                    l_idx += 2
+            else:
+                if verbose:
+                    self.printfunc('Proposed table has no phi movement') # DEBUG
+            if idx != l_idx:    # table was modified
+                return new_table
+        return None
 
     def is_not_empty(self):
         """Returns boolean whether the stage is empty of move_tables.
@@ -241,6 +338,7 @@ class PosScheduleStage(object):
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid, method, do_not_move)
+#           proposed_tables = self.rewrite_zeno_move_tables(proposed_tables)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             should_accept = not(colliding_sweeps) or freezing in {'forced','forced_recursive'}
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated

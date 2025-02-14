@@ -283,7 +283,7 @@ class PetalComm(object):
         Configure petalcontroller settings
         """
         try:
-            return self._call_device('configure', *args, **kwargs)
+            return self._call_device('configure', *args, lockedtimeout=40.0, **kwargs)
         except Exception as e:
             return 'FAILED: Can not configure petalcontroller: %s' % str(e)
 

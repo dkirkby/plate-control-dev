@@ -2,6 +2,10 @@ import posconstants as pc
 import posschedulestage
 import posschedstats
 import time
+import math
+
+# enables debugging code
+DEBUG = False
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -34,7 +38,8 @@ class PosSchedule(object):
                                 stats            = self.stats,
                                 power_supply_map = self.petal.power_supply_map,
                                 verbose          = self.verbose,
-                                printfunc        = self.printfunc
+                                printfunc        = self.printfunc,
+                                petal            = self.petal
                             ) for name in self.stage_order}
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
@@ -59,6 +64,16 @@ class PosSchedule(object):
         if posid in self._requests and not self._requests[posid]['is_dummy']:
             return True
         return False
+
+    def _reinit_stages(self):
+        self.stages = {name:posschedulestage.PosScheduleStage(
+                                collider         = self.collider,
+                                stats            = self.stats,
+                                power_supply_map = self.petal.power_supply_map,
+                                verbose          = self.verbose,
+                                printfunc        = self.printfunc
+                            ) for name in self.stage_order}
+        return
 
     def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=True):
         """Adds a request to the schedule for a given positioner to move to the
@@ -193,7 +208,18 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-
+        if posmodel.is_linphi:
+            targXY = trans.posintTP_to_poslocXY(targt_posintTP)
+            strtXY = trans.posintTP_to_poslocXY(start_posintTP)
+            dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
+            LINPHI_DIST_LIMIT = 10.0 # microns
+            try:
+                if hasattr(self.petal, 'petal_debug'):
+                    LINPHI_DIST_LIMIT = float(self.petal.petal_debug.get('linphi_dist_limit'))
+            except TypeError:
+                pass
+            if dist_from_targt < LINPHI_DIST_LIMIT: # 10 microns
+                return self._denied_str(target_str, f"Linear phi already close enough, {dist_from_targt} < {LINPHI_DIST_LIMIT} microns to target")
         # form internal request dict
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
@@ -210,6 +236,96 @@ class PosSchedule(object):
         if stats_enabled:
             self.stats.add_request_accepted()
         return None
+
+    def _schedule_moves(self, anticollision, should_anneal, scheduling_timer_start):
+        if self.expert_mode_is_on():
+            self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
+        else:
+            self._fill_enabled_but_nonmoving_with_dummy_requests()
+            if anticollision == 'adjust':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
+            elif anticollision == 'adjust_requested_only':
+                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
+            else:
+                self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
+        self._combine_stages_into_final()
+        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
+        finalcheck_timer_start = time.perf_counter()
+        final = self.stages['final']
+        if anticollision:
+            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
+        else:
+            c, _, p = self._check_final_stage(msg_prefix='Final')
+        colliding_sweeps, collision_pairs = c, p # for readability
+        if anticollision:
+            if not colliding_sweeps:
+                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
+            else:
+                adjusted = set()
+                frozen = set()
+                for posid in colliding_sweeps:
+                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
+                    adjusted.update(these_adjusted)
+                    frozen.update(these_frozen)
+                prefix = 'Following from \'penultimate\' check:'
+                self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
+                self.printfunc(f'{prefix} frozen posids --> {frozen}')
+                c, _, p = self._check_final_stage(msg_prefix='Final',
+                                                  msg_suffix=' (should always be zero)',
+                                                  assert_no_unresolved=False)   # Cheanged to False 07/15/2024 cad - now handled by self.schedule_moves()
+                colliding_sweeps, collision_pairs = c, p # for readability
+        return colliding_sweeps, collision_pairs, finalcheck_timer_start, final
+
+    def _handle_schedule_moves_collision(self, colliding_sweeps, collision_pairs):
+        """
+        This function handles the case when, after all the collision mitigation strategies have run, there are still collisions
+        in the planned moves.
+
+        If some of the colliding posids are from zeno devices, replace the target for those device(s) with a dummy,
+        and also temporarily disable that device, then when this function exits, the plan will be re-run (takes 2-4 sec at KPNO).
+
+        If none of the colliding posids are from zeno devices, then resolve_non_zeno determines what happens.
+
+        If resolve_non_zeno is False, then this code does what it originally did, which is to print error messages, then cause an exception.
+
+        If resolve_non_zeno is True, then all colliding devices will have targets replaced with dummies and they will be temporarily disabled.
+        Again, after this function exits, the planning for the remaining devices will be re-run.
+        """
+        zeno_posids = set()
+        colliding_posids = [posid for posid in colliding_sweeps]
+        for posid in colliding_posids:
+            p_state = self.petal.posmodels[posid].state
+            if p_state._val['ZENO_MOTOR_P'] is True:
+                zeno_posids.add(posid)
+        if zeno_posids:
+            colliding = set(colliding_sweeps)
+            self.printfunc(self.get_details_str(colliding, label=f'Unresolved zeno collision avoided: removed target(s) for {zeno_posids}'))
+            for psid in zeno_posids:
+                self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
+#           self.petal.temporary_disable_positioners_reason(zeno_posids,'collision avoidance failure')  # Disable the involved zeno motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+            stats_enabled = self.stats.is_enabled()
+            if stats_enabled:
+                self.stats.sub_request_accepted()
+            self._reinit_stages() # clear out old move tables - starting over
+        else:
+            colliding = set(colliding_sweeps)
+            self.printfunc(self.get_details_str(colliding, label='colliding'))
+            resolve_non_zeno = True
+            if not resolve_non_zeno:  # blow up PETAL on purpose to call attention to it
+                err_str = f'{len(colliding)} collisions were NOT resolved! This indicates a bug that needs to be fixed. See details above.'
+                self.printfunc(err_str)
+                # self.petal.enter_pdb()  # 2023-07-11 [CAD] This line causes a fault (no function enter_pdb)
+                assert False, err_str  # 2020-11-16 [JHS] put a PDB entry point in rather than assert, so I can inspect memory next time this happens online
+            else: # temporarily disable the offending robots and press on
+                self.printfunc(self.get_details_str(colliding, label=f'Unresolved collision avoided: removed target(s) for {colliding_posids}'))
+                for psid in colliding_posids:
+                    self._make_dummy_request(psid, lognote='target removed due to collision avoidance failure')
+#               self.petal.temporary_disable_positioners_reason(colliding_posids,'collision avoidance failure')  # Disable the involved motors so they won't be used until fp_setup is run, likely saves move planning time on subsequent moves
+                stats_enabled = self.stats.is_enabled()
+                if stats_enabled:
+                    self.stats.sub_request_accepted()
+                self._reinit_stages() # clear out old move tables - starting over
+        return
 
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -252,6 +368,7 @@ class PosSchedule(object):
         The boolean flag should_anneal controls whether or not to spread out
         the move density in time.
         """
+
         self._schedule_moves_initialize_logging(anticollision)
         if not self._requests and not self.expert_mode_is_on():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
@@ -269,47 +386,40 @@ class PosSchedule(object):
                 if rejected:
                     self.printfunc(f'pos with rejected {kind} request(s): {rejected}')
             all_accepted |= accepted
+
+        # If anticollision mode is None or 'freeze' and number of targets is < limit
+        # then there is no need for annealing.  In particular, this will have significant
+        # gains in the speed at which fp_setup runs with no additional chance of collisions
+        num_targets = len(all_accepted)
+        if anticollision in {None, 'freeze'} and num_targets <= 2*pc.max_targets_for_no_anneal:
+            count = {'V1': 0, 'V2':0}
+            for p in all_accepted:
+                for ps in ['V1', 'V2']:
+                    if p in self.petal.power_supply_map[ps]:
+                        count[ps] += 1
+            if count['V1'] <= pc.max_targets_for_no_anneal and count['V2'] <= pc.max_targets_for_no_anneal:
+                if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                    self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={count} <= max of {pc.max_targets_for_no_anneal}')
+                should_anneal = False
+
+
         scheduling_timer_start = time.perf_counter()
-        if self.expert_mode_is_on():
-            self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
-        else:
-            self._fill_enabled_but_nonmoving_with_dummy_requests()
-            if anticollision == 'adjust':
-                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=False)
-            elif anticollision == 'adjust_requested_only':
-                self._schedule_requests_with_path_adjustments(should_anneal=should_anneal, adjust_requested_only=True)
+        do_schedule = True
+
+        while do_schedule:
+            colliding_sweeps, collision_pairs, finalcheck_timer_start, final = \
+                self._schedule_moves(anticollision, should_anneal, scheduling_timer_start)
+#            if DEBUG:
+#                colliding_sweeps, collision_pairs = self._possibly_induce_scheduling_error(colliding_sweeps, collision_pairs, anticollision)
+            if not collision_pairs or not anticollision:
+                do_schedule = False
             else:
-                self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
-        self._combine_stages_into_final()
-        self.printfunc(f'Scheduling calculation done in {time.perf_counter()-scheduling_timer_start:.3f} sec')
-        finalcheck_timer_start = time.perf_counter()
-        final = self.stages['final']
-        if anticollision:
-            c, _, p = self._check_final_stage(msg_prefix='Penultimate')
-        else:
-            c, _, p = self._check_final_stage(msg_prefix='Final')
-        colliding_sweeps, collision_pairs = c, p # for readability
-        if anticollision:
-            if not colliding_sweeps:
-                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
-            else:
-                adjusted = set()
-                frozen = set()
-                for posid in colliding_sweeps:
-                    these_adjusted, these_frozen = final.adjust_path(posid, freezing='forced_recursive')
-                    adjusted.update(these_adjusted)
-                    frozen.update(these_frozen)
-                prefix = 'Following from \'penultimate\' check:'
-                self.printfunc(f'{prefix} adjusted posids --> {adjusted}')
-                self.printfunc(f'{prefix} frozen posids --> {frozen}')
-                c, _, p = self._check_final_stage(msg_prefix='Final',
-                                                  msg_suffix=' (should always be zero)',
-                                                  assert_no_unresolved=True)
-                colliding_sweeps, collision_pairs = c, p # for readability
+                self._handle_schedule_moves_collision(colliding_sweeps, collision_pairs)
+
         self.printfunc(f'Final collision checks done in {time.perf_counter()-finalcheck_timer_start:.3f} sec')
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
-        self.move_tables = final.move_tables
+        self.move_tables = final.rewrite_zeno_move_tables(final.move_tables) # Apply Zeno mods AFTER normal scheduling and anticollision checks -- only possible iff extra moves are well within keepouts
         empties = {posid for posid, table in self.move_tables.items() if not table}
         motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
@@ -400,6 +510,9 @@ class PosSchedule(object):
         Intended to be called *after* doing schedule_moves().
         '''
         frozen = set()
+        SHOW_FROZEN_MT = None
+        if hasattr(self.petal, 'petal_debug'):
+            SHOW_FROZEN_MT = self.petal.petal_debug.get('show_frozen_mt')
         user_requested = set(self.get_requests(include_dummies=False))
         has_table = set(self.move_tables)
         check = has_table & user_requested # ignores expert tables
@@ -408,12 +521,32 @@ class PosSchedule(object):
         for posid in check:
             request = self._requests[posid]
             sched_table = self.move_tables[posid].for_schedule()
+            if SHOW_FROZEN_MT:
+                if posid in SHOW_FROZEN_MT:
+                    ht = self.move_tables[posid].for_hardware()
+                    self.printfunc(f"posid={posid}\nhardware_movetable={str(ht)}\nschedule_movetable={str(sched_table)}")
             net_requested = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in [0,1]]
             net_scheduled = [sched_table['net_dT'][-1], sched_table['net_dP'][-1]]
             err[posid] = [abs(net_requested[i] - net_scheduled[i]) for i in [0, 1]]
             err[posid] = [min(e, abs(e - 360)) for e in err[posid]]  # wrapped angle cases
-            if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
+            do_set_frozen = False
+            if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                self.printfunc(f'posid={posid}, net_requested={net_requested}, net_scheduled={net_scheduled}, err={err[posid]}')
+            if self.petal.posmodels[posid].is_linphi:
+                if err[posid][0] > pc.schedule_checking_numeric_angular_tol or\
+                   err[posid][1] > pc.schedule_checking_angular_tol_zeno:
+                       do_set_frozen = True
+            else:
+                if max(err[posid]) > pc.schedule_checking_numeric_angular_tol:
+                    do_set_frozen = True
+            if do_set_frozen:
                 frozen.add(posid)
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is frozen')
+            else:
+                if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
+                    self.printfunc(f'posid {posid} is not frozen')
+
         return frozen
 
     def get_posids_with_expert_tables(self):
@@ -466,6 +599,7 @@ class PosSchedule(object):
         checking effects of annealing. Assumes that sweeps have been calculated
         already and stored (c.f. store_collision_finding_results).'''
         import matplotlib.pyplot as plt
+        plt.switch_backend('Agg')
         import poscollider
         import os
         plt.ioff()
@@ -536,6 +670,7 @@ class PosSchedule(object):
                                                range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posintTP, dtdp)
+#       stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
         # double-negative syntax is to be compatible with various
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
@@ -609,6 +744,7 @@ class PosSchedule(object):
             # 1. Each time we initialize_move_tables, only updating the ones for which a new delta is proposed.
             # 2. No annealing allowed! (would mess up the "skip first x timesteps" during collision checking)
             stage.initialize_move_tables(start_tp, dtdp, update_only=True)
+#           stage.rewrite_zeno_move_tables(stage.move_tables)  # i.e. a for loop of the single motor similar function
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, skip=skip)
             unresolved = set(colliding_sweeps)
         adjustments_failed = unresolved & enabled & overlapping
@@ -688,6 +824,7 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
+#           stage.move_tables = stage.rewrite_zeno_move_tables(stage.move_tables)
             not_the_last_stage = name != self.RRE_stage_order[-1]
             if should_anneal:
                 stage.anneal_tables(suppress_automoves=not_the_last_stage, mode=self.petal.anneal_mode)
@@ -731,25 +868,28 @@ class PosSchedule(object):
                     colliding_sweeps = {posid:stage.sweeps[posid] for posid in sorted_colliding}
                     self.stats.add_unresolved_colliding_at_stage(name, sorted_colliding, colliding_tables, colliding_sweeps)
 
+    def _make_dummy_request(self, posid, lognote='generated by path adjustment scheduler for enabled but untargeted positioner'):
+        posmodel = self.petal.posmodels[posid]
+        current_posintTP = posmodel.expected_current_posintTP
+        new_request = {'start_posintTP': current_posintTP,
+                       'targt_posintTP': current_posintTP,
+                       'posmodel': posmodel,
+                       'posid': posid,
+                       'command': '(autogenerated)',
+                       'cmd_val1': 0,
+                       'cmd_val2': 0,
+                       'log_note': lognote,
+                       'target_str': '',
+                       'is_dummy': True,
+                       }
+        self._requests[posid] = new_request
+
     def _fill_enabled_but_nonmoving_with_dummy_requests(self):
         enabled = set(self.petal.all_enabled_posids())
         requested = set(self._requests.keys())
         enabled_but_not_requested = enabled - requested
         for posid in enabled_but_not_requested:
-            posmodel = self.petal.posmodels[posid]
-            current_posintTP = posmodel.expected_current_posintTP
-            new_request = {'start_posintTP': current_posintTP,
-                           'targt_posintTP': current_posintTP,
-                           'posmodel': posmodel,
-                           'posid': posid,
-                           'command': '(autogenerated)',
-                           'cmd_val1': 0,
-                           'cmd_val2': 0,
-                           'log_note': 'generated by path adjustment scheduler for enabled but untargeted positioner',
-                           'target_str': '',
-                           'is_dummy': True,
-                           }
-            self._requests[posid] = new_request
+            self._make_dummy_request(posid)
 
     def _deny_request_because_disabled(self, posmodel):
         """Checks enabled status and includes setting flag.
