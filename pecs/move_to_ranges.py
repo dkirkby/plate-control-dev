@@ -40,10 +40,12 @@ with open(rc, newline='') as f:
     try:
         for row in rcsv:
 #           print(row)
-#           NOTE: [upper_limit, lower_limit]
+#           NOTE order of list: [upper_limit, lower_limit]
             for lmt in ['Theta_Upper_Limit','Theta_Lower_Limit','Phi_Upper_Limit','Phi_Lower_Limit']:
                 if str(row[lmt]).upper() == 'NONE':
                     row[lmt] = None
+                else:
+                    row[lmt] = float(row[lmt])
             d_pos_limits[row['POSID']] = {'T': [row['Theta_Upper_Limit'], row['Theta_Lower_Limit']], 'P': [row['Phi_Upper_Limit'], row['Phi_Lower_Limit']]}
     except csv.Error as e:
         sys.exit('file {}, line {}: {}'.format(rc, rcsv.line_num, e))
