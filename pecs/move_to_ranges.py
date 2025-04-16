@@ -89,14 +89,14 @@ for i in range(uargs.iterations):
     start = cs.ptlm.get_positions(return_coord=command, drop_devid=False)
     selected = start[start['DEVICE_ID'].isin(out_of_limits)].drop(columns='FLAGS')
     for posid, axis_limits in d_pos_limits.items():
-        cond_a = (selected['DEVICE_ID'] == posid)
+        cond_a = selected['DEVICE_ID'] == posid
         for axis, limits in axis_limits.items():
             if set(limits) != {None}:
                 if limits[0] is not None:
-                    cond_b = (selected[columns[axis] > limits[0])
+                    cond_b = selected[columns[axis]] > limits[0]
                     above_mask = selected[cond_a & cond_b]
                     if limits[1] is not None:
-                        cond_c = (selected[columns[axis] < limits[1])
+                        cond_c = selected[columns[axis]] < limits[1]
                         below_mask = selected[cond_a & cond_c]
                         # Have limits on both ends - move to middle
                         target_for_those_above = (limits[0] + limits[1])/2
@@ -110,7 +110,7 @@ for i in range(uargs.iterations):
                         selected.loc[above_mask, columns[axis]] = target_for_those_above
                 else:
                     # Only have lower limit (since we know both aren't None)
-                    cond_c = (selected[columns[axis] < limits[1])
+                    cond_c = selected[columns[axis]] < limits[1]
                     below_mask = selected[cond_a & cond_c]
                     target_for_those_below = limits[1] + float(uargs.angle_padding)
                     selected.loc[below_mask, columns[axis]] = target_for_those_below
