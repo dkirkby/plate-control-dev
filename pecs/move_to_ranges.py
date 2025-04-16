@@ -88,6 +88,8 @@ for i in range(uargs.iterations):
         break
     start = cs.ptlm.get_positions(return_coord=command, drop_devid=False)
     selected = start[start['DEVICE_ID'].isin(out_of_limits)].drop(columns='FLAGS')
+    print('selected\n',selected.to_string())    # DEBUG
+    print('d_pos_limits', "\n".join(f"{k}\t{v}" for k, v in d_pos_limits.items()))  # DEBUG
     for posid, axis_limits in d_pos_limits.items():
         cond_a = selected['DEVICE_ID'] == posid
         for axis, limits in axis_limits.items():
