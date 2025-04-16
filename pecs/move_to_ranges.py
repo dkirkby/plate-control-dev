@@ -39,7 +39,7 @@ with open(rc, newline='') as f:
     rcsv = csv.DictReader(f)
     try:
         for row in rcsv:
-#           print(row)
+#           print(row)  # DEBUG
 #           NOTE order of list: [upper_limit, lower_limit]
             for lmt in ['Theta_Upper_Limit','Theta_Lower_Limit','Phi_Upper_Limit','Phi_Lower_Limit']:
                 if str(row[lmt]).upper() == 'NONE':
@@ -88,34 +88,40 @@ for i in range(uargs.iterations):
         break
     start = cs.ptlm.get_positions(return_coord=command, drop_devid=False)
     selected = start[start['DEVICE_ID'].isin(out_of_limits)].drop(columns='FLAGS')
-    print('selected\n',selected.to_string())    # DEBUG
-    print('d_pos_limits', "\n".join(f"{k}\t{v}" for k, v in d_pos_limits.items()))  # DEBUG
+#   print('selected\n',selected.to_string())    # DEBUG
+#   print('d_pos_limits\n', "\n".join(f"{k}\t{v}" for k, v in d_pos_limits.items()))  # DEBUG
     for posid, axis_limits in d_pos_limits.items():
         cond_a = selected['DEVICE_ID'] == posid
         for axis, limits in axis_limits.items():
+#           print(f'axis = {axis}, column = {columns[axis]}, limits = {str(limits)}')   # DEBUG
             if set(limits) != {None}:
                 if limits[0] is not None:
                     cond_b = selected[columns[axis]] > limits[0]
-                    above_mask = selected[cond_a & cond_b]
+                    above_df = selected[cond_a & cond_b]
                     if limits[1] is not None:
                         cond_c = selected[columns[axis]] < limits[1]
-                        below_mask = selected[cond_a & cond_c]
+                        below_df = selected[cond_a & cond_c]
                         # Have limits on both ends - move to middle
                         target_for_those_above = (limits[0] + limits[1])/2
                         target_for_those_below = (limits[0] + limits[1])/2
                         # Note these change selected!
-                        selected.loc[above_mask, columns[axis]] = target_for_those_above
-                        selected.loc[below_mask, columns[axis]] = target_for_those_below
+#                       print(f'above_df = {str(above_df)}\n, below_df = {str(below_df)}\n')    # DEBUG
+                        if not above_df.empty:
+                            selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
+                        if not below_df.empty:
+                            selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
                     else:
                         # Only have upper limit - target past it
                         target_for_those_above = limits[0] - float(uargs.angle_padding)
-                        selected.loc[above_mask, columns[axis]] = target_for_those_above
+                        if not above_df.empty:
+                            selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                 else:
                     # Only have lower limit (since we know both aren't None)
                     cond_c = selected[columns[axis]] < limits[1]
-                    below_mask = selected[cond_a & cond_c]
+                    below_df = selected[cond_a & cond_c]
                     target_for_those_below = limits[1] + float(uargs.angle_padding)
-                    selected.loc[below_mask, columns[axis]] = target_for_those_below
+                    if not below_df.empty:
+                        selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits; move_to_ranges.py'
     # Now selected is a proper move request
