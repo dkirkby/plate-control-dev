@@ -41,13 +41,17 @@ with open(rc, newline='') as f:
         for row in rcsv:
 #           print(row)
 #           NOTE: [upper_limit, lower_limit]
+            for lmt in ['Theta_Upper_Limit','Theta_Lower_Limit','Phi_Upper_Limit','Phi_Lower_Limit']:
+                if str(row[lmt]).upper() == 'NONE':
+                    row[lmt] = None
             d_pos_limits[row['POSID']] = {'T': [row['Theta_Upper_Limit'], row['Theta_Lower_Limit']], 'P': [row['Phi_Upper_Limit'], row['Phi_Lower_Limit']]}
     except csv.Error as e:
         sys.exit('file {}, line {}: {}'.format(rc, rcsv.line_num, e))
 
 posids_to_check = [k for k in d_pos_limits.keys()]
 
-cs = PECS(interactive=False, posids=posids_to_check)
+# cs = PECS(interactive=False, posids=posids_to_check)
+cs = PECS(interactive=True)
 
 # axis_limits = {'T': [tu, tl], 'P': [pu, pl]}
 columns = {'T': 'X1', 'P': 'X2'}
