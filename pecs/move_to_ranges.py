@@ -93,9 +93,11 @@ for i in range(uargs.iterations):
         for axis, limits in axis_limits.items():
             if set(limits) != {None}:
                 if limits[0] is not None:
-                    above_mask = selected[cond_a & (columns[axis] > limits[0])]
+                    cond_b = (selected[columns[axis] > limits[0])
+                    above_mask = selected[cond_a & cond_b]
                     if limits[1] is not None:
-                        below_mask = selected[cond_a & (columns[axis] < limits[1])]
+                        cond_c = (selected[columns[axis] < limits[1])
+                        below_mask = selected[cond_a & cond_c]
                         # Have limits on both ends - move to middle
                         target_for_those_above = (limits[0] + limits[1])/2
                         target_for_those_below = (limits[0] + limits[1])/2
@@ -104,13 +106,14 @@ for i in range(uargs.iterations):
                         selected.loc[below_mask, columns[axis]] = target_for_those_below
                     else:
                         # Only have upper limit - target past it
-                        target_for_those_above = limits[0] - uargs.angle_padding
+                        target_for_those_above = limits[0] - float(uargs.angle_padding)
                         selected.loc[above_mask, columns[axis]] = target_for_those_above
                 else:
                     # Only have lower limit (since we know both aren't None)
-                    below_mask = selected[cond_a & (columns[axis] < limits[1])]
-                    target_for_those_below = limits[1] + uargs.angle_padding
-                    selected.loc[above_mask, columns[axis]] = target_for_those_above
+                    cond_c = (selected[columns[axis] < limits[1])
+                    below_mask = selected[cond_a & cond_c]
+                    target_for_those_below = limits[1] + float(uargs.angle_padding)
+                    selected.loc[below_mask, columns[axis]] = target_for_those_below
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits; move_to_ranges.py'
     # Now selected is a proper move request
