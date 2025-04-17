@@ -11,22 +11,27 @@ import csv
 import argparse
 from pecs import PECS
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-rc', '--ranges_csv', type=str, default=None, help='Name of csv file containing posids, theta ranges, and phi ranges')
 max_iter = 10
-parser.add_argument('-iter', '--iterations', type=int, default=2, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
 park_options = ['posintTP', 'poslocTP', 'None', 'False']
 default_park = park_options[0]
-parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}.')
 modes = ['posintTP', 'poslocTP']
+default_padding = 5.0
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-rc', '--ranges_csv', type=str, default=None, help='Name of csv file containing posids, theta ranges, and phi ranges')
+parser.add_argument('-iter', '--iterations', type=int, default=2, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
+parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}.')
 parser.add_argument('-m', '--mode', type=str, default=modes[0], help=f'str, controls which tp coordinate type checks are done. Options: {modes}. Defaults to {modes[0]}.')
-default_padding = 10.0
+parser.add_argument('-p', '--angle_padding', type=float, default=default_padding, help=f'Float, angle padding by which to exceed limits when only one limit is specified. Defaults to {default_padding}.')
 parser.add_argument('-d', '--disable', action='store_true', help='Argue to disable positioners that remain out of range at the end of iterations.')
 parser.add_argument('-a', '--anticollision', type=str, default='freeze', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "freeze"')
 parser.add_argument('-v', '--verbose', action='store_true', help='Argue to print extra messages about the axes to be moved.')
 uargs = parser.parse_args()
+
 if uargs.anticollision == 'None':
-    uargs.anticollision = None
+    uargs.anticollision = None  # fix None string
+
+# basic checks on arguments
 assert uargs.anticollision in {'adjust', 'adjust_requested_only', 'freeze', None}, f'bad argument {uargs.anticollision} for anticollision parameter'
 assert uargs.iterations < max_iter, f'cannot exceed {max_iter} iterations.'
 command = uargs.mode
@@ -59,7 +64,31 @@ posids_to_check = list(d_pos_limits)
 cs = PECS(interactive=True)
 
 # axis_limits = {'T': [tu, tl], 'P': [pu, pl]}
-columns = {'T': 'X1', 'P': 'X2'}
+columns = {'T': 'X1', 'P': 'X2'}    # translate to the column name used in the dataframe
+zeno_key = {'T': 'ZENO_MOTOR_T', 'P': 'ZENO_MOTOR_P'}   # names of zeno flags for TP axes
+zeno_tol = 0.1174 # from posconstants.py schedule_checking_angular_tol_zeno
+normal_tol = 0.01 # from posconstants.py schedule_checking_numeric_angular_tol
+# t_motors_are_zeno = cs.ptlm.batch_get_posfid_val(uniqueids=posids_to_check, keys=[zeno_key['T']])
+# p_motors_are_zeno = cs.ptlm.batch_get_posfid_val(uniqueids=posids_to_check, keys=[zeno_key['P']])
+motors_are_zeno = cs.ptlm.batch_get_posfid_val(uniqueids=posids_to_check, keys=[zeno_key['T'], zeno_key['P']])
+# print(f't_motors_are_zeno = {t_motors_are_zeno}')
+# print(f'p_motors_are_zeno = {p_motors_are_zeno}')
+print(f'motors_are_zeno = {motors_are_zeno}')
+
+def axis_is_zeno(posid, axis):
+    ''' True if the specified axis is Zeno '''
+    retval = False
+    for ptl in motors_are_zeno:
+        if posid in motors_are_zeno[ptl]:
+            if zeno_key[axis] in motors_are_zeno[ptl][posid]:
+                retval = motors_are_zeno[ptl][posid][zeno_key[axis]] is True
+                break
+    return retval
+
+def axis_tolerance(posid, axis):
+    ''' Returns the angular tolerance to use for the specified axis '''
+    tol = zeno_tol if axis_is_zeno(posid, axis) else normal_tol
+    return tol
 
 def check_if_out_of_limits():
     ''' Check if any axes are out of limits for all positioners in the csv file '''
@@ -70,15 +99,16 @@ def check_if_out_of_limits():
         c_cond_a = pos['DEVICE_ID'] == c_posid
         for c_axis, c_limits in c_axis_limits.items():
             if c_limits[0] is not None:
-                c_cond_b = pos[columns[c_axis]] > c_limits[0]
+                u_limit = c_limits[0] + axis_tolerance(c_posid, c_axis)
+                c_cond_b = pos[columns[c_axis]] > u_limit
                 violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
             if c_limits[1] is not None:
-                c_cond_b = pos[columns[c_axis]] < c_limits[1]
+                l_limit = c_limits[1] - axis_tolerance(c_posid, c_axis)
+                c_cond_b = pos[columns[c_axis]] < l_limit
                 violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
     if not violating_pos:
         return False
     return violating_pos
-
 
 if uargs.prepark:
     cs.park_and_measure('all', test_tp=True)
@@ -99,10 +129,12 @@ for i in range(uargs.iterations):
 #           print(f'axis = {axis}, column = {columns[axis]}, limits = {str(limits)}')   # DEBUG
             if set(limits) != {None}:
                 if limits[0] is not None:
-                    cond_b = selected[columns[axis]] > limits[0]
+                    u_limit = limits[0] + axis_tolerance(posid, axis)
+                    cond_b = selected[columns[axis]] > u_limit
                     above_df = selected[cond_a & cond_b]
                     if limits[1] is not None:
-                        cond_c = selected[columns[axis]] < limits[1]
+                        l_limit = limits[1] - axis_tolerance(posid, axis)
+                        cond_c = selected[columns[axis]] < l_limit
                         below_df = selected[cond_a & cond_c]
                         # Have limits on both ends - move to middle
                         target_for_those_above = (limits[0] + limits[1])/2
@@ -111,18 +143,21 @@ for i in range(uargs.iterations):
 #                       print(f'above_df = {str(above_df)}\n, below_df = {str(below_df)}\n')    # DEBUG
                         if not above_df.empty:
                             if uargs.verbose:
-                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_b, columns[axis]]} to {target_for_those_above}')
+                                val = round((selected.loc[cond_a & cond_b, columns[axis]]).iloc[0], 4)
+                                print(f'Will move {posid} {axis} from {val} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                         if not below_df.empty:
                             if uargs.verbose:
-                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_c, columns[axis]]} to {target_for_those_below}')
+                                val = round((selected.loc[cond_a & cond_c, columns[axis]]).iloc[0], 4)
+                                print(f'Will move {posid} {axis} from {val} to {target_for_those_below}')
                             selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
                     else:
                         # Only have upper limit - target past it
                         target_for_those_above = limits[0] - float(uargs.angle_padding)
                         if not above_df.empty:
                             if uargs.verbose:
-                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_b, columns[axis]]} to {target_for_those_above}')
+                                val = round((selected.loc[cond_a & cond_b, columns[axis]]).iloc[0], 4)
+                                print(f'Will move {posid} {axis} from {val} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                 else:
                     # Only have lower limit (since we know both aren't None)
@@ -131,7 +166,8 @@ for i in range(uargs.iterations):
                     target_for_those_below = limits[1] + float(uargs.angle_padding)
                     if not below_df.empty:
                         if uargs.verbose:
-                            print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_c, columns[axis]]} to {target_for_those_below}')
+                            val = round((selected.loc[cond_a & cond_c, columns[axis]]).iloc[0], 4)
+                            print(f'Will move {posid} {axis} from {val} to {target_for_those_below}')
                         selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits; move_to_ranges.py'
