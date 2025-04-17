@@ -20,7 +20,7 @@ default_padding = 5.0
 parser = argparse.ArgumentParser()
 parser.add_argument('-rc', '--ranges_csv', type=str, default=None, help='Name of csv file containing posids, theta ranges, and phi ranges')
 parser.add_argument('-iter', '--iterations', type=int, default=2, help=f'Number of iterations to try to get positioners within desired rang before giving up. Must be less than {max_iter}.')
-parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}.')
+parser.add_argument('-prep', '--prepark', type=str, default=default_park, help=f'str, controls initial parking move, prior to running does not count as an iteration. Valid options are: {park_options}, default is {default_park}. NOTE: all positioners may be parked, not just those in the CSV file!')
 parser.add_argument('-m', '--mode', type=str, default=modes[0], help=f'str, controls which tp coordinate type checks are done. Options: {modes}. Defaults to {modes[0]}.')
 parser.add_argument('-p', '--angle_padding', type=float, default=default_padding, help=f'Float, angle padding by which to exceed limits when only one limit is specified. Defaults to {default_padding}.')
 parser.add_argument('-d', '--disable', action='store_true', help='Argue to disable positioners that remain out of range at the end of iterations.')
@@ -54,6 +54,18 @@ with open(rc, newline='', encoding="utf-8") as f:
                     row[lmt] = None
                 else:
                     row[lmt] = float(row[lmt])
+            if row['Theta_Upper_Limit'] is not None and row['Theta_Lower_Limit'] is not None and row['Theta_Upper_Limit'] < row['Theta_Lower_Limit']:
+                t_ul = row['Theta_Upper_Limit']
+                row['Theta_Upper_Limit'] = row['Theta_Lower_Limit']
+                row['Theta_Lower_Limit'] = t_ul
+                if uargs.verbose:
+                    print(f"Theta limits reversed for {row['POSID']}, corrected.")
+            if row['Phi_Upper_Limit'] is not None and row['Phi_Lower_Limit'] is not None and row['Phi_Upper_Limit'] < row['Phi_Lower_Limit']:
+                t_ul = row['Phi_Upper_Limit']
+                row['Phi_Upper_Limit'] = row['Phi_Lower_Limit']
+                row['Phi_Lower_Limit'] = t_ul
+                if uargs.verbose:
+                    print(f"Phi limits reversed for {row['POSID']}, corrected.")
             d_pos_limits[row['POSID']] = {'T': [row['Theta_Upper_Limit'], row['Theta_Lower_Limit']], 'P': [row['Phi_Upper_Limit'], row['Phi_Lower_Limit']]}
     except csv.Error as e:
         sys.exit(f'file {rc}, line {rcsv.line_num}: {e}')
@@ -98,14 +110,32 @@ def check_if_out_of_limits():
     for c_posid, c_axis_limits in d_pos_limits.items():
         c_cond_a = pos['DEVICE_ID'] == c_posid
         for c_axis, c_limits in c_axis_limits.items():
+            c_tol = axis_tolerance(c_posid, c_axis)
+            violation = False
             if c_limits[0] is not None:
-                u_limit = c_limits[0] + axis_tolerance(c_posid, c_axis)
-                c_cond_b = pos[columns[c_axis]] > u_limit
-                violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
+                c_u_limit = c_limits[0] + c_tol
+                c_cond_b = pos[columns[c_axis]] > c_u_limit
+                c_above_df = pos[c_cond_a & c_cond_b]
+                if not c_above_df.empty:
+                    c_val = round((pos.loc[c_cond_a & c_cond_b, columns[c_axis]]).iloc[0], 4)
+                    if c_val > c_u_limit:
+                        violation = True
+                        if uargs.verbose:
+                            print(f'ulimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, upper_limits: {c_limits[0]}, {c_u_limit}')
+#                   violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
             if c_limits[1] is not None:
-                l_limit = c_limits[1] - axis_tolerance(c_posid, c_axis)
-                c_cond_b = pos[columns[c_axis]] < l_limit
-                violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
+                c_l_limit = c_limits[1] - c_tol
+                c_cond_c = pos[columns[c_axis]] < c_l_limit
+                c_below_df = pos[c_cond_a & c_cond_c]
+                if not c_below_df.empty:
+                    c_val = round((pos.loc[c_cond_a & c_cond_c, columns[c_axis]]).iloc[0], 4)
+                    if c_val < c_l_limit:
+                        violation = True
+                        if uargs.verbose:
+                            print(f'llimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, lower_limits: {c_limits[1]}, {c_l_limit}')
+#                   violating_pos |= set(pos[c_cond_a & c_cond_c]['DEVICE_ID'])
+            if violation:
+                violating_pos |= set([c_posid])
     if not violating_pos:
         return False
     return violating_pos
@@ -126,14 +156,15 @@ for i in range(uargs.iterations):
     for posid, axis_limits in d_pos_limits.items():
         cond_a = selected['DEVICE_ID'] == posid
         for axis, limits in axis_limits.items():
+            tol = axis_tolerance(posid, axis)
 #           print(f'axis = {axis}, column = {columns[axis]}, limits = {str(limits)}')   # DEBUG
             if set(limits) != {None}:
                 if limits[0] is not None:
-                    u_limit = limits[0] + axis_tolerance(posid, axis)
+                    u_limit = limits[0] + tol
                     cond_b = selected[columns[axis]] > u_limit
                     above_df = selected[cond_a & cond_b]
                     if limits[1] is not None:
-                        l_limit = limits[1] - axis_tolerance(posid, axis)
+                        l_limit = limits[1] - tol
                         cond_c = selected[columns[axis]] < l_limit
                         below_df = selected[cond_a & cond_c]
                         # Have limits on both ends - move to middle
@@ -143,6 +174,7 @@ for i in range(uargs.iterations):
 #                       print(f'above_df = {str(above_df)}\n, below_df = {str(below_df)}\n')    # DEBUG
                         if not above_df.empty:
                             if uargs.verbose:
+                                print(f'posid={posid}, axis={axis}, tolerance={tol}, Limits low to high: {l_limit}, {limits[1]}, {limits[0]}, {u_limit}')
                                 val = round((selected.loc[cond_a & cond_b, columns[axis]]).iloc[0], 4)
                                 print(f'Will move {posid} {axis} from {val} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
@@ -152,7 +184,7 @@ for i in range(uargs.iterations):
                                 print(f'Will move {posid} {axis} from {val} to {target_for_those_below}')
                             selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
                     else:
-                        # Only have upper limit - target past it
+                        # Only have upper limit - target less than limit by angle_padding
                         target_for_those_above = limits[0] - float(uargs.angle_padding)
                         if not above_df.empty:
                             if uargs.verbose:
@@ -160,8 +192,8 @@ for i in range(uargs.iterations):
                                 print(f'Will move {posid} {axis} from {val} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                 else:
-                    # Only have lower limit (since we know both aren't None)
-                    cond_c = selected[columns[axis]] < limits[1]
+                    # Only have lower limit (since we know both aren't None); target above it by angle_padding
+                    cond_c = selected[columns[axis]] < l_limit
                     below_df = selected[cond_a & cond_c]
                     target_for_those_below = limits[1] + float(uargs.angle_padding)
                     if not below_df.empty:
