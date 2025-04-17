@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable=fixme, line-too-long, C0103, W0703
 """
 move_to_ranges moves positioners to ranges specified in the input csv file which must contain the header
 POSID, Theta_Lower_Limit, Theta_Upper_Limit, Phi_Lower_Limit, Phi_Upper_Limit
 """
 
+import sys
+import csv
 import argparse
+from pecs import PECS
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-rc', '--ranges_csv', type=str, default=None, help='Name of csv file containing posids, theta ranges, and phi ranges')
 max_iter = 10
@@ -18,6 +23,7 @@ parser.add_argument('-m', '--mode', type=str, default=modes[0], help=f'str, cont
 default_padding = 10.0
 parser.add_argument('-d', '--disable', action='store_true', help='Argue to disable positioners that remain out of range at the end of iterations.')
 parser.add_argument('-a', '--anticollision', type=str, default='freeze', help='anticollision mode, can be "adjust", "adjust_requested_only", "freeze" or None. Default is "freeze"')
+parser.add_argument('-v', '--verbose', action='store_true', help='Argue to print extra messages about the axes to be moved.')
 uargs = parser.parse_args()
 if uargs.anticollision == 'None':
     uargs.anticollision = None
@@ -28,14 +34,11 @@ assert command in modes, f'Invalid mode type {command}. Must be in {modes}.'
 assert uargs.prepark in park_options, f'invalid park option, must be one of {park_options}'
 uargs.prepark = None if uargs.prepark in ['None', 'False'] else uargs.prepark
 rc = uargs.ranges_csv
-assert rc != None, 'Must specify csv file with positioners and ranges'
+assert rc is not None, 'Must specify csv file with positioners and ranges'
 
 d_pos_limits = {}
 
-from pecs import PECS
-import csv, sys
-
-with open(rc, newline='') as f:
+with open(rc, newline='', encoding="utf-8") as f:
     rcsv = csv.DictReader(f)
     try:
         for row in rcsv:
@@ -48,9 +51,9 @@ with open(rc, newline='') as f:
                     row[lmt] = float(row[lmt])
             d_pos_limits[row['POSID']] = {'T': [row['Theta_Upper_Limit'], row['Theta_Lower_Limit']], 'P': [row['Phi_Upper_Limit'], row['Phi_Lower_Limit']]}
     except csv.Error as e:
-        sys.exit('file {}, line {}: {}'.format(rc, rcsv.line_num, e))
+        sys.exit(f'file {rc}, line {rcsv.line_num}: {e}')
 
-posids_to_check = [k for k in d_pos_limits.keys()]
+posids_to_check = list(d_pos_limits)
 
 # cs = PECS(interactive=False, posids=posids_to_check)
 cs = PECS(interactive=True)
@@ -59,22 +62,22 @@ cs = PECS(interactive=True)
 columns = {'T': 'X1', 'P': 'X2'}
 
 def check_if_out_of_limits():
+    ''' Check if any axes are out of limits for all positioners in the csv file '''
     all_pos = cs.ptlm.get_positions(return_coord=command, drop_devid=False)
     pos = all_pos[all_pos['DEVICE_ID'].isin(cs.posids)]
     violating_pos = set()
-    for posid, axis_limits in d_pos_limits.items():
-        cond_a = pos['DEVICE_ID'] == posid
-        for axis, limits in axis_limits.items():
-            if limits[0] is not None:
-                cond_b = pos[columns[axis]] > limits[0]
-                violating_pos |= set(pos[cond_a & cond_b]['DEVICE_ID'])
-            if limits[1] is not None:
-                cond_b = pos[columns[axis]] < limits[1]
-                violating_pos |= set(pos[cond_a & cond_b]['DEVICE_ID'])
+    for c_posid, c_axis_limits in d_pos_limits.items():
+        c_cond_a = pos['DEVICE_ID'] == c_posid
+        for c_axis, c_limits in c_axis_limits.items():
+            if c_limits[0] is not None:
+                c_cond_b = pos[columns[c_axis]] > c_limits[0]
+                violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
+            if c_limits[1] is not None:
+                c_cond_b = pos[columns[c_axis]] < c_limits[1]
+                violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
     if not violating_pos:
         return False
-    else:
-        return violating_pos
+    return violating_pos
 
 
 if uargs.prepark:
@@ -107,13 +110,19 @@ for i in range(uargs.iterations):
                         # Note these change selected!
 #                       print(f'above_df = {str(above_df)}\n, below_df = {str(below_df)}\n')    # DEBUG
                         if not above_df.empty:
+                            if uargs.verbose:
+                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_b, columns[axis]]} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                         if not below_df.empty:
+                            if uargs.verbose:
+                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_c, columns[axis]]} to {target_for_those_below}')
                             selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
                     else:
                         # Only have upper limit - target past it
                         target_for_those_above = limits[0] - float(uargs.angle_padding)
                         if not above_df.empty:
+                            if uargs.verbose:
+                                print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_b, columns[axis]]} to {target_for_those_above}')
                             selected.loc[cond_a & cond_b, columns[axis]] = target_for_those_above
                 else:
                     # Only have lower limit (since we know both aren't None)
@@ -121,6 +130,8 @@ for i in range(uargs.iterations):
                     below_df = selected[cond_a & cond_c]
                     target_for_those_below = limits[1] + float(uargs.angle_padding)
                     if not below_df.empty:
+                        if uargs.verbose:
+                            print(f'Will move {posid} {axis} from {selected.loc[cond_a & cond_c, columns[axis]]} to {target_for_those_below}')
                         selected.loc[cond_a & cond_c, columns[axis]] = target_for_those_below
     selected['COMMAND'] = command
     selected['LOG_NOTE'] = 'Moving to specified limits; move_to_ranges.py'
