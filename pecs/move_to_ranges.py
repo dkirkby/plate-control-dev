@@ -87,20 +87,20 @@ motors_are_zeno = cs.ptlm.batch_get_posfid_val(uniqueids=posids_to_check, keys=[
 # print(f'p_motors_are_zeno = {p_motors_are_zeno}')
 print(f'motors_are_zeno = {motors_are_zeno}')
 
-def axis_is_zeno(posid, axis):
+def axis_is_zeno(aposid, aaxis):
     ''' True if the specified axis is Zeno '''
     retval = False
     for ptl in motors_are_zeno:
-        if posid in motors_are_zeno[ptl]:
-            if zeno_key[axis] in motors_are_zeno[ptl][posid]:
-                retval = motors_are_zeno[ptl][posid][zeno_key[axis]] is True
+        if aposid in motors_are_zeno[ptl]:
+            if zeno_key[aaxis] in motors_are_zeno[ptl][aposid]:
+                retval = motors_are_zeno[ptl][aposid][zeno_key[aaxis]] is True
                 break
     return retval
 
-def axis_tolerance(posid, axis):
+def axis_tolerance(aposid, aaxis):
     ''' Returns the angular tolerance to use for the specified axis '''
-    tol = zeno_tol if axis_is_zeno(posid, axis) else normal_tol
-    return tol
+    atol = zeno_tol if axis_is_zeno(aposid, aaxis) else normal_tol
+    return atol
 
 def check_if_out_of_limits():
     ''' Check if any axes are out of limits for all positioners in the csv file '''
@@ -111,30 +111,29 @@ def check_if_out_of_limits():
         c_cond_a = pos['DEVICE_ID'] == c_posid
         for c_axis, c_limits in c_axis_limits.items():
             c_tol = axis_tolerance(c_posid, c_axis)
-            violation = False
+            u_violation = False
+            l_violation = False
             if c_limits[0] is not None:
-                c_u_limit = c_limits[0] + c_tol
-                c_cond_b = pos[columns[c_axis]] > c_u_limit
-                c_above_df = pos[c_cond_a & c_cond_b]
-                if not c_above_df.empty:
-                    c_val = round((pos.loc[c_cond_a & c_cond_b, columns[c_axis]]).iloc[0], 4)
-                    if c_val > c_u_limit:
-                        violation = True
-                        if uargs.verbose:
-                            print(f'ulimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, upper_limits: {c_limits[0]}, {c_u_limit}')
-#                   violating_pos |= set(pos[c_cond_a & c_cond_b]['DEVICE_ID'])
+                c_limit = c_limits[0] + c_tol
+                c_cond_l = pos[columns[c_axis]] > c_limit
+                c_df = pos[c_cond_a & c_cond_l]
+                if not c_df.empty:
+                    c_val = round((pos.loc[c_cond_a & c_cond_l, columns[c_axis]]).iloc[0], 4)
+                    if c_val > c_limit:
+                        u_violation = True
+                    if u_violation and uargs.verbose:
+                        print(f'ulimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, upper_limits: {c_limits[0]}, {c_limit}')
             if c_limits[1] is not None:
-                c_l_limit = c_limits[1] - c_tol
-                c_cond_c = pos[columns[c_axis]] < c_l_limit
-                c_below_df = pos[c_cond_a & c_cond_c]
-                if not c_below_df.empty:
-                    c_val = round((pos.loc[c_cond_a & c_cond_c, columns[c_axis]]).iloc[0], 4)
-                    if c_val < c_l_limit:
-                        violation = True
-                        if uargs.verbose:
-                            print(f'llimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, lower_limits: {c_limits[1]}, {c_l_limit}')
-#                   violating_pos |= set(pos[c_cond_a & c_cond_c]['DEVICE_ID'])
-            if violation:
+                c_limit = c_limits[1] - c_tol
+                c_cond_l = pos[columns[c_axis]] < c_limit
+                c_df = pos[c_cond_a & c_cond_l]
+                if not c_df.empty:
+                    c_val = round((pos.loc[c_cond_a & c_cond_l, columns[c_axis]]).iloc[0], 4)
+                    if c_val < c_limit:
+                        l_violation = True
+                    if l_violation and uargs.verbose:
+                        print(f'llimit violation posid={c_posid}, axis={c_axis}, position={c_val}, tolerance={c_tol}, lower_limits: {c_limit}, {c_limits[1]}')
+            if u_violation or l_violation:
                 violating_pos |= set([c_posid])
     if not violating_pos:
         return False
