@@ -14,14 +14,16 @@ from DOSlib.util import obs_day
 from DOSlib.join_instance import join_instance
 from argparse import ArgumentParser
 
-default_numtries = 2
+default_num_tries = 2
 
 parser = ArgumentParser(description="FP_SETUP: nightly setup for the DESI focal plane.")
 parser.add_argument("-i", "--instance",type=str, help = 'Instance name (desi_<obsday> is default>')
-parser.add_argument("-n", "--num_tries",type=int, default=default_numtries, help = f'Number of tries for disambiguate_theta, default is {str(default_numtries)}')
+parser.add_argument("-n", "--num_tries",type=int, default=default_num_tries, help = f'Number of tries for disambiguate_theta, default is {str(default_num_tries)}')
 args = parser.parse_args()
 
 inst = args.instance
+num_tries = args.num_tries
+
 # reset Pyro variables
 os.environ['PYRO_NS_HOST'] = ''
 os.environ['PYRO_NS_PORT'] = ''
@@ -203,7 +205,7 @@ except (Exception, KeyboardInterrupt) as e:
     err = e
     logger.error('FP_SETUP crashed! See traceback below:')
     logger.critical(traceback.format_exc())
-    logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
+    logger.info('Attempting to perform cleanup before hard crashing. Configure the instance before trying again.')
     try:
         logger.info('FP_SETUP: Re-disabling initially disabled positioners for safety...')
         ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
