@@ -48,6 +48,7 @@ cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=sim
 cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP starting...')
 logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
 
+cs.fvc_feedback_timeout = 120.0 #2 minutes!
 if datetime.today().weekday() == 6: #this is sunday
     cs.fvc_feedback_timeout = 120.0 #2 minutes!
 
