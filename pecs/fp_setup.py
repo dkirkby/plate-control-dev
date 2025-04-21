@@ -14,11 +14,16 @@ from DOSlib.util import obs_day
 from DOSlib.join_instance import join_instance
 from argparse import ArgumentParser
 
+default_num_tries = 2
+
 parser = ArgumentParser(description="FP_SETUP: nightly setup for the DESI focal plane.")
 parser.add_argument("-i", "--instance",type=str, help = 'Instance name (desi_<obsday> is default>')
+parser.add_argument("-n", "--num_tries",type=int, default=default_num_tries, help = f'Number of tries for disambiguate_theta, default is {str(default_num_tries)}')
 args = parser.parse_args()
 
 inst = args.instance
+num_tries = args.num_tries
+
 # reset Pyro variables
 os.environ['PYRO_NS_HOST'] = ''
 os.environ['PYRO_NS_PORT'] = ''
@@ -48,8 +53,9 @@ cs = PECS(interactive=False, test_name=f'FP_setup', logger=logger, inputfunc=sim
 cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP starting...')
 logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
 
-if datetime.today().weekday() == 6: #this is sunday
-    cs.fvc_feedback_timeout = 120.0 #2 minutes!
+cs.fvc_feedback_timeout = 120.0 #2 minutes everyday
+# if datetime.today().weekday() == 6: #this is sunday
+#     cs.fvc_feedback_timeout = 120.0 #2 minutes!
 
 #from 1p_calib import onepoint # doesn't work
 import importlib
@@ -147,7 +153,7 @@ try:
 
     logger.info('FP_SETUP: running disambiguation loops...')
     enabled_before_disambig = get_pos_set('enabled')
-    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=2)
+    disambig_obj = disambig_class(pecs=cs, logger=logger, num_meas=1, check_unmatched=True, num_tries=num_tries)
     ambig = disambig_obj.disambig()
     logger.info('FP_SETUP: Disambiguation loops complete.')
     if ambig:
@@ -199,7 +205,7 @@ except (Exception, KeyboardInterrupt) as e:
     err = e
     logger.error('FP_SETUP crashed! See traceback below:')
     logger.critical(traceback.format_exc())
-    logger.info('Attempting to preform cleanup before hard crashing. Configure the instance before trying again.')
+    logger.info('Attempting to perform cleanup before hard crashing. Configure the instance before trying again.')
     try:
         logger.info('FP_SETUP: Re-disabling initially disabled positioners for safety...')
         ret = cs.ptlm.disable_positioners(ids=initial_disabled, comment='FP_SETUP - crashed in execution, resetting disabled devices')
