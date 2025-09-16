@@ -108,7 +108,7 @@ keepout_T_note = f'central body (theta) polygon {flat_note}'
 keepout_P_note = f'eccentric body (phi) keepout polygon {flat_note}'
 general_collider_keys = {'timestep': '[sec] quantization when sweeping polygons through rotation schedules, to check for collisions',
                          'Eo_phi': '[deg] poslocP angle (poslocP = POS_P + OFFSET_P) above which phi is defined to be within envelope "Eo" (i.e. retracted)',
-                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle', 
+                         'Eo_radius_with_margin': '[mm] when a positioner is CLASSIFED_AS_RETRACTED, neighbor polygons not allowed to enter this circle',
                          }
 collider_general_poly_keys = {'general_keepout_T': f'basic {keepout_T_note}',
                               'general_keepout_P': f'basic {keepout_P_note}',
@@ -236,7 +236,7 @@ else:
                           printfunc=logger.info,
                           )
         ptls[petal_id] = ptl
-        
+
 def getattr2(ptl, module_name, attr):
     '''Wrapper around getattr. Specifically for getting a property from submodules
     petal. Because when online this is behind the DOS proxy wall and so requires
@@ -247,7 +247,7 @@ def getattr2(ptl, module_name, attr):
         return ptl.app_get(s)
     module = getattr(ptl, module_name) if module_name else ptl
     return getattr(module, attr)
-    
+
 
 # Most of the remainder is enclosed in a try so that we can shut down PetalApps
 # at the end, even if a crash occurs before that.
@@ -275,7 +275,7 @@ try:
     meta = {}
     meta['DATE_RETRIEVED'] = pc.timestamp_str()
     meta['COMMENT'] = uargs.comment
-    for key in ['DATE_RETRIEVED', 'COMMENT']:        
+    for key in ['DATE_RETRIEVED', 'COMMENT']:
         logger.info(f'metadata {key} = {meta[key]}')
     meta['PETAL_ATTRIBUTES'] = other_petal_keys
     meta['PETAL_ALIGNMENTS'] = {}
@@ -287,7 +287,7 @@ try:
         assert2(not(any(missing)), f'some keys are not available for petal {ptl.petal_id}: {missing}')
         posids_ordered = sorted(ptl.app_get('posids'))
         logger.info(f'Now gathering data for {len(posids_ordered)} positioners on petal id {petal_id}...')
-        
+
         # queryable values
         keys = set(query_keys) | set(collider_query_keys)
         logger.info(f' ...collecting calib data for {len(keys)} queryable fields...')
@@ -302,7 +302,7 @@ try:
                     this_dict = {posid: {pc.case.names[enum] for enum in neighbors} for posid, neighbors in this_dict.items()}
             this_list = [this_dict[p] for p in posids_ordered]
             data[key].extend(this_list)
-            
+
         # polygons from collider
         logger.info(' ...collecting polygon data...')
         polys = ptl.get_collider_polygons()
@@ -315,7 +315,7 @@ try:
                 this_dict = polys[key]
                 this_list = [str(this_dict[p]) for p in posids_ordered]
                 data[data_key].extend(this_list)
-    
+
         # transformed values
         logger.info(' ...collecting calculated values...')
         offset_keys = ['OFFSET_X', 'OFFSET_Y']
@@ -329,42 +329,42 @@ try:
             data[f'OFFSET_X_{suffix}'].extend(x_out)
             data[f'OFFSET_Y_{suffix}'].extend(y_out)
 
-        logger.info(' ...collecting petal-wide values...')        
+        logger.info(' ...collecting petal-wide values...')
         # [JHS] As of 2020-11-02, these general collider parameters should be equivalent for
         # any petal. Here, I simply use the last ptl instance from the for loop above.
         meta['COLLIDER_ATTRIBUTES'] = general_collider_keys
         for key in general_collider_keys:
             meta[key] = getattr2(ptl, 'collider', key)
-        
+
         # petal-wide values
         for key, attr in pos_petal_attr_map.items():
             value = getattr2(ptl, None, attr)
             data[key].extend([value] * len(posids_ordered))
         meta['PETAL_ALIGNMENTS'][petal_id] = getattr2(ptl, 'trans', 'petal_alignment')
-                    
+
     logger.info('All data gathered, generating table format...')
     t = Table(data)
     t.meta = meta
-    
+
     # add units and descriptions
     for key in t.columns:
         t[key].description = all_pos_keys[key]
         if key in units:
             t[key].unit = units[key]
-        
+
     # save data to disk
     save_dir = os.path.realpath(uargs.outdir)
     save_name = pc.filename_timestamp_str() + '_fp_calibs.ecsv'
     save_path = os.path.join(save_dir, save_name)
     t.write(save_path)
     logger.info(f'Data saved to: {save_path}')
-    
+
     # save a reference to this file in a standard place
     ref_path = pc.fp_calibs_path_cache
     with open(ref_path, mode='w') as file:
         file.write(save_path)
     logger.info(f'File path cached at standard location: {ref_path}')
-    
+
 except Exception as e:
     exception_during_run = e
     logger.error('get_calibrations crashed! See traceback below:')

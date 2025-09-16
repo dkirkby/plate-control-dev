@@ -5,7 +5,7 @@ import numpy as np
 
 def plot(path_no_ext, posid, data, center, theta_range, r1, r2, title_txt):
     """See xy_accuracy_test.py for format of data dictionary.
-    """    
+    """
     plt.ioff() # interactive plotting off
     n_submoves = len(data['meas_obsXY'])
     n_targets = len(data['targ_obsXY'])
@@ -34,9 +34,9 @@ def plot(path_no_ext, posid, data, center, theta_range, r1, r2, title_txt):
         summary_txt += '      rms: ' + format(np.sqrt(np.mean(np.array(data['err2D'][s])**2))*1000,'6.1f') + ' um\n'
         summary_txt += '      avg: ' + format(np.mean(data['err2D'][s])*1000,'6.1f') + ' um\n'
         summary_txt += '      min: ' + format(np.min(data['err2D'][s])*1000,'6.1f') + ' um\n'
-        plt.plot(targ_x,targ_y,'ro',label='target points',markersize=4,markeredgecolor='r',markerfacecolor='None')        
+        plt.plot(targ_x,targ_y,'ro',label='target points',markersize=4,markeredgecolor='r',markerfacecolor='None')
         plt.plot(meas_x,meas_y,'k+',label='measured data',markersize=6,markeredgewidth='1')
-        plt.plot(annulus_outer_x,annulus_outer_y,'b-',linewidth=0.5,label='patrol envelope')    
+        plt.plot(annulus_outer_x,annulus_outer_y,'b-',linewidth=0.5,label='patrol envelope')
         plt.plot(annulus_inner_x,annulus_inner_y,'b-',linewidth=0.5)
         plt.plot(min_line_x,min_line_y,'g-',linewidth=0.5,label='theta min')
         plt.plot(max_line_x,max_line_y,'g--',linewidth=0.8,label='theta max')

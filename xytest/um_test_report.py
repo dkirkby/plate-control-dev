@@ -7,7 +7,7 @@ exception reports to teststand_operatorlist.
 
 Designed specifically for the UM test stand using umdesi.teststand@gmail.com
 address for sending emails. Currently only implemented into UM_accuracy_test.py
-''' 
+'''
 
 
 import numpy as np
@@ -68,7 +68,7 @@ def status(max0, max1, max2, max3, rms3):
 		return ' PASS \n'
 	else:
 		return condition + reason
-		
+
 def pass_fail(max0,max1,max2,max3,rms3):
 	if (max0 > 100) or (max1 > 100) or (max2 > 100) or (max3 > 12) or (rms3 > 5):
 		return 'FAIL'
@@ -103,19 +103,19 @@ def email_report(text, timestamp, posids,to='limited'):
 				try:
 					fp = open(file, 'rb')
 					img = MIMEImage(fp.read())
-					img.add_header('Content-Disposition', 'attachment', filename=(posid + '_' + timestamp + '_' + image)) 
+					img.add_header('Content-Disposition', 'attachment', filename=(posid + '_' + timestamp + '_' + image))
 					fp.close()
 					message.attach(img)
 				except:
 					print('Failed to attach file:',file)
 		content = MIMEText(text)
-		message.attach(content)    
+		message.attach(content)
 		server.sendmail('umdesi.teststand@gmail.com', recipients, message.as_string())
 		server.close()
 	except:
 		print('Failed to email message')
 
-	
+
 def email_error(traceback, timestamp): #TODO add helpful interpretation of tracebacks
 	try:
 		server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -133,7 +133,7 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
 		print('Failed to email message')
 
 def do_test_report(posids, all_data_by_posid, log_timestamp, pos_notes, time, to='full'):
-	#Gather Data    
+	#Gather Data
 	summary_posids = {}
 	for posid in posids:
 		lst = []
@@ -145,7 +145,7 @@ def do_test_report(posids, all_data_by_posid, log_timestamp, pos_notes, time, to
 			rms0 = np.sqrt(np.mean(np.array(data)**2)) * um_scale
 			lst.append({'max':max0,'min':min0,'avg':avg0,'rms':rms0})
 		summary_posids[posid] = lst
-	 
+
 	#Write email
 	email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n'+ 'Execute time: ' + str(time) + ' hours\n\n' + 'Positioner status:\n'
 	for posid in posids:
@@ -156,5 +156,5 @@ def do_test_report(posids, all_data_by_posid, log_timestamp, pos_notes, time, to
 		for i in range(len(move_list)):
 			email += move_list[i] + ' (max,min,avg,rms): ' + fmt(data[i]['max']) + ', ' + fmt(data[i]['min']) + ', ' + fmt(data[i]['avg']) + ', ' + fmt(data[i]['rms']) + ' (um)\n'
 	email += '\n\n'
-	email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'   
+	email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'
 	email_report(email, log_timestamp, posids,to)

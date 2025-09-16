@@ -77,7 +77,7 @@ else:
 if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
     fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],printfunc=logwrite,platemaker_instrument=hwsetup['pm_instrument'],fvc_role=hwsetup['fvc_role'])
 else:
-    fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],printfunc=logwrite,save_sbig_fits=hwsetup['save_sbig_fits'])    
+    fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],printfunc=logwrite,save_sbig_fits=hwsetup['save_sbig_fits'])
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 fvc.translation = hwsetup['translation']
@@ -97,7 +97,7 @@ if petal_proxy:
     ptl = Petal(hwsetup['ptl_id'])
 else:
     #shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
+    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[],
                       simulator_on = sim,
                       user_interactions_enabled = True,
                       db_commit_on = db_commit_on,
@@ -140,7 +140,7 @@ message='A list of all the positioner and fiducials has been printed to the stdo
 message_local='Please check the above list of all the positioners and fiducials carefully.\nAre they all correct?\n'
 if not tkinter.messagebox.askyesno(title='IDs correct?',message=message):
     tkinter.messagebox.showinfo(title='Quitting',message='Ok, will quit now so the IDs can be fixed.')
-    gui_root.withdraw()    
+    gui_root.withdraw()
     sys.exit(0)
 
 # determine if we need to identify fiducials and positioners this run

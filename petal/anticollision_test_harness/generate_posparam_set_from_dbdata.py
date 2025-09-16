@@ -5,16 +5,16 @@ Created on Tue Feb 11 16:01:48 2020
 
 Customized script for merging data into posparam format. Data is presumed
 pulled from online databases:
-    
+
     "calib" --> http://web.replicator.dev-cattle.stable.spin.nersc.org:60040/DESIPositioners/Positioner_calibration.html
     "moves" --> http://web.replicator.dev-cattle.stable.spin.nersc.org:60040/DESIPositioners/Positioner_moves.html
-    
+
 Alternate DB server, for petals 0 and 1 at LBNL: http://beyonce.lbl.gov:8080
 
 Data is assumed saved as csv using the browser tool.
 
 Sample SQL queries:
-    
+
     "calib" --> select petal_id,pos_id,time_recorded,device_loc,length_r1,length_r2,offset_x,offset_y,offset_t,offset_p,physical_range_t,physical_range_p,gear_calib_t,gear_calib_p,keepout_expansion_phi_radial,keepout_expansion_phi_angular,keepout_expansion_theta_radial,keepout_expansion_theta_angular,classified_as_retracted from posmovedb.positioner_calibration_p3 PM where EXISTS (select * from posmovedb.positioner_calibration_index_p3 where id = PM.pos_id and last_index=PM.pos_calib_index)
     "moves" --> select petal_id,pos_id,time_recorded,ctrl_enabled from posmovedb.positioner_moves_p3 PM where exists (select * from posmovedb.positioner_moves_index_p3 where id = PM.pos_id and last_index=PM.pos_move_index)
 
@@ -64,9 +64,8 @@ def grab(dataframe, columns_upperlower):
             for C,c in columns_upperlower.items():
                 result[C][posid] = dataframe[c][i]
             remaining.remove(posid)
-            
+
 grab(calib, columns_calib_upperlower)
 grab(moves, columns_moves_upperlower)
 
 result.to_csv(output_file, index_label='POS_ID')
-      

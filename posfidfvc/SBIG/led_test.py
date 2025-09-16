@@ -71,4 +71,4 @@ if __name__ == '__main__':
 			print(" brightness x y FWHM Peak LD  ",brightness,xCenSub, yCenSub, peaks, FWHMSub)
 		except:
 			print("ouch")
-			pass	
+			pass

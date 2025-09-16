@@ -3,7 +3,7 @@ import random
 from DOSlib.positioner_index import PositionerIndex
 
 class FVC_proxy_sim:
-    
+
     def __init__(self, max_err = 0.01, error_rate=0.01):
         self.max_err = max_err
         self.error_rate = error_rate #Unused, later to have a chance to "not" match a spot
@@ -34,15 +34,15 @@ class FVC_proxy_sim:
         (Illuminator functionality and fiducial control are outside of the scope of measure())
 
         seqid = unique sequence id (optional, if none is given it will be generated internally)
-        expected_positions = List of dictionaries for each actuator. 
+        expected_positions = List of dictionaries for each actuator.
                         Dictionary format:  {"id" : device_id, "q" : float, "s" : float, "flags" : uint}
-                                   flags    2 : pinhole center 
-                                            4 : fiber center 
-                                            8 : fiducial center 
-                                           32 : bad fiber or fiducial 
+                                   flags    2 : pinhole center
+                                            4 : fiber center
+                                            8 : fiducial center
+                                           32 : bad fiber or fiducial
                                     q,s : set to the best guess or zero if the FVC should not match this fiber but just return the position; set the flags to 4+32
                         Notes: additional columns required by the FVC (mag, mess_err) will be added internally and initialized to default values.
-                               the indices returns for unmatched fibers will be taken from the list of unmatched fiber indixes but they are scrambled 
+                               the indices returns for unmatched fibers will be taken from the list of unmatched fiber indixes but they are scrambled
                                and the position reported is NOT guaranteed to be to position for the fiber actuator with this index.
         match_radius is the radius in fvc pixels the match_center routine using when attempting to match spots to targets.
 
@@ -93,7 +93,7 @@ class FVC_proxy_sim:
             row['flags'] |= 1 #set matched
             measured_position = {'id':row['id'], 'q':row['q']+dq,'s':row['s']+ds,'dq':dq,'ds':ds,'flags':row['flags'],'fwhm':random.random(),'mag':random.random(),'peak':random.random()}
             measured_positions.append(measured_position)
-        return measured_positions 
+        return measured_positions
 
     def locate(self, *args, **kwargs):
         """

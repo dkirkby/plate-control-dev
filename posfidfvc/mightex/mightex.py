@@ -216,7 +216,7 @@ class Mightex_LED_Controller:
             return [-2,-2]
 
     # Set the level of the LED current in milliAmps
-    # Optionally, specify the Mode 
+    # Optionally, specify the Mode
     # If the Mode is not specified, none will be set (NOTE: no changes to the
     # LED intensity are made until you set Mode 1, even if already in Mode 1)
     def __lowsetLevel__(self,led_milliamps=0,mode=-1,new_max_led_milliamps=-1):
@@ -247,7 +247,7 @@ class Mightex_LED_Controller:
             return 0
 
     # Set the level of the LED current in milliAmps
-    # Optionally, specify the Mode 
+    # Optionally, specify the Mode
     # If the Mode is not specified, none will be set (NOTE: no changes to the
     # LED intensity are made until you set Mode 1, even if already in Mode 1)
     def setLevel(self,led_milliamps=0,mode=-1):
@@ -277,7 +277,7 @@ class Mightex_LED_Controller:
                 if(1==self.__lowsetLevel__(my_led_milliamps,-1,my_max_milliamps)):
                     [junk1,junk2]=self.getLevels()
                     self.mlc_autopilot_iterations=0
-                    while((self.mlc_autopilot_max_iterations > self.mlc_autopilot_iterations) and 
+                    while((self.mlc_autopilot_max_iterations > self.mlc_autopilot_iterations) and
                           (abs(int(led_milliamps)-int(self.mlc_device_mA_Setting)) >
                            self.mlc_autopilot_tolerance)):
                         # out of tolerance, so try reducing max value to the LED current,

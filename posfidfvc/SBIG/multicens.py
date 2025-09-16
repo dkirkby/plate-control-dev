@@ -21,12 +21,12 @@ def remove_hot_pixels(image,nsigma=5):
 	hp_img = np.copy(image)
 	hp_img = hp_img.astype(np.uint32)
 	low_values_indices = hp_img < hot_thresh  # Where values are low
-	
+
 	hp_img[low_values_indices] = 0
 	ind = zip(*np.where(hp_img > hot_thresh))
 	xlimit=len(hp_img[0])
 	ylimit=len(hp_img)
-		
+
 	for i in ind:
 		if i[0] == 0 or i[0]==ylimit-1 or i[1]==0 or i[1]==xlimit-1:
 			print('Edge hot spot')
@@ -35,12 +35,12 @@ def remove_hot_pixels(image,nsigma=5):
 			neighborsum=hp_img[i[0]+1,i[1]] + hp_img[i[0]-1,i[1]] + hp_img[i[0],i[1]-1] + hp_img[i[0],i[1]+1]
 			if neighborsum == 0:
 				image[i[0],i[1]] = (image[i[0]+1,i[1]]+image[i[0]-1,i[1]]+image[i[0],i[1]-1]+image[i[0],i[1]+1])/4.
-	del hp_img        
-	return image 
+	del hp_img
+	return image
 
 def centroid(im, mask=None, w=None, x=None, y=None):
 	"""Compute the centroid of an image with a specified binary mask projected upon it.
-	
+
 	INPUT:
 	  im -- image array
 	  mask -- binary mask, 0 in ignored regions and 1 in desired regions
@@ -63,10 +63,10 @@ def centroid(im, mask=None, w=None, x=None, y=None):
 		yy = arange(im.shape[0])
 		x,y = meshgrid(xx,yy)
 	if w==None:
-		zz=im*mask    
+		zz=im*mask
 	else:
-		zz=im*mask*w        
-	z=zz.sum()    
+		zz=im*mask*w
+	z=zz.sum()
 	x0 = (x*zz).sum()/z
 	y0 = (y*zz).sum()/z
 
@@ -100,7 +100,7 @@ def im2bw(image,level):
 def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=True, save_dir='', size_fitbox=10):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
-# Input 
+# Input
 #       img: image as numpy array
 #       V: verbose mode
 #       regarding size_fitbox: it's a gaussian fitter box, this value is 1/2 length of side in pixels,
@@ -129,7 +129,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 			os.remove(filename)
 		except:
 			pass
-		hdu=pyfits.PrimaryHDU(bw)    
+		hdu=pyfits.PrimaryHDU(bw)
 		hdu.writeto(filename)
 	else:
 		filename = []
@@ -145,10 +145,10 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 		print('Retrying centroiding using fractional level (' + str(level_fraction_of_peak) + ' * peak) instead of otsu method')
 		return multiCens(img,n_centroids_to_keep,verbose,write_fits,no_otsu=True)
 
-	# now loop over the found spots and calculate rough centroids        
+	# now loop over the found spots and calculate rough centroids
 	FWHMSub = []
 	xCenSub = []
-	yCenSub = []        
+	yCenSub = []
 	peaks = []
 	max_sample_files_to_save = 20
 
@@ -160,7 +160,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 		xcen,ycen=centroid(img, mask=selected, w=None, x=None, y=None)
 		nbox = size_fitbox
 		px=int(round(xcen))
-		py=int(round(ycen))        
+		py=int(round(ycen))
 		data = img[py-nbox:py+nbox,px-nbox:px+nbox]
 		params = fitgaussian(data)
 		xCenSub.append(float(px)-float(nbox)+params[3])
@@ -168,12 +168,12 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 		FWHMSub.append(2.355*max(params[4],params[5]))
 		peak = params[1]
 		peaks.append(peak)
-	"""    
+	"""
 	nbox = size_fitbox
 	for i,x in enumerate(centers):
 		x=x[0]
 		px=int(round(x[1]))
-		py=int(round(x[0]))     
+		py=int(round(x[0]))
 		data = img[py-nbox:py+nbox,px-nbox:px+nbox]
 		params = fitgaussian(data)
 		fwhm=abs(2.355*max(params[4],params[5]))
@@ -203,5 +203,5 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 				sample = pyfits.PrimaryHDU(img)
 				sample.writeto(savefile)
 				print('wrote a sample image file to ' + savefile)
-			
+
 	return xCenSub, yCenSub, peaks, FWHMSub, filename

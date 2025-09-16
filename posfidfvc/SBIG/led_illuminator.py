@@ -18,7 +18,7 @@ class LedIlluminator(object):
 			x=int(x)
 			y=int(y)
 		except:
-			return 'FAIL'	
+			return 'FAIL'
 		try:
 			ibright=int(bright)
 			if ibright>=0 and ibright <256:
@@ -35,7 +35,7 @@ class LedIlluminator(object):
 			y=int(y)
 			d=int(d)
 		except:
-			return 'FAIL'	
+			return 'FAIL'
 		try:
 			ibright=int(bright)
 			if ibright>=0 and ibright <256:
@@ -53,7 +53,7 @@ class LedIlluminator(object):
 			x=int(x)
 			y=int(y)
 		except:
-			return 'FAIL'	
+			return 'FAIL'
 		try:
 			ibright=int(bright)
 			if ibright>=0 and ibright <256:
@@ -72,7 +72,7 @@ class LedIlluminator(object):
 			x=[int(e) for e in x]
 			y=[int(e) for e in y]
 		except:
-			return 'FAIL'	
+			return 'FAIL'
 		try:
 			bright=[int(b) for b in bright]
 #			if ibright>=0 and ibright <256:
@@ -81,7 +81,7 @@ class LedIlluminator(object):
 			status='SUCCESS'
 		except:
 			status='FAIL'
-		return status	
+		return status
 	def set_array(self,bright):
 		try:
 			ibright=int(bright)

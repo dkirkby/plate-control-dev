@@ -29,11 +29,11 @@ assert PECS_CONFIG_FILE
 class PECS:
     '''if there is already a PECS instance from which you want to re-use
        the proxies, simply pass in pecs.fvc and pecs.ptls
-       
+
         All available petal role names:     self.ptlm.Petals.keys()
         All selected petals:                self.ptlm.participating_petals
         Selected PCIDs:                     self.pcids from pecs_*.cfg
-        
+
         For different hardware setups, you need to intialize including the
         correct config file for that local setup. This will be stored in
         fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
@@ -142,7 +142,7 @@ class PECS:
 
     def _get_expid(self):
         '''
-        Setup entry in exposureDB to get and exposure ID. 
+        Setup entry in exposureDB to get and exposure ID.
         '''
         self.exp = Exposure(readonly=False)
         self.exp.sequence = 'Focalplane'
@@ -261,7 +261,7 @@ class PECS:
     def fvc_measure(self, exppos=None, match_radius=None, matched_only=True,
                     check_unmatched=False, test_tp=False, num_meas=1):
         '''Measure positioner locations.
-        
+
         INPUTS:  exppos ... expected positions in some format (?), though if None
                             the code will just use the current expected positions
                             (almost always what you want)
@@ -271,7 +271,7 @@ class PECS:
                  test_tp ... passed to PetalApp.handle_fvc_feedback()
                  num_meas ... how many FVC images to take (the results will be
                                                            median-ed in XY space)
-        
+
         OUTPUTS: exppos ... expected positions in some format (?)
                  meapos ... measured results. pandas dataframe with columns:
                             ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR', 'Q', 'S']
@@ -313,9 +313,9 @@ class PECS:
                                             matched_only=matched_only,
                                             all_fiducials=self.all_fiducials,centers=centers)
                 self.print('Finished FVC.measure')
-                
+
                 # Positions is either a pandas dataframe or else a dictionary (from np.rec_array).
-                # Is may empty when no posiitoners are present. Sometimes I've also seen a list...                
+                # Is may empty when no posiitoners are present. Sometimes I've also seen a list...
                 assert len(positions) > 0, 'Return from fvc.measure is empty! Check that positioners are back illuminated!'
             except:
                 self.print('FVC measure failed! Check if fibers are visable in the image!')
@@ -387,36 +387,36 @@ class PECS:
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request.
-        
+
         INPUTS:  request        ... pandas dataframe that includes columns:
                                     ['DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE']
                                 ... if request == None, the "prepare_move" call is suppressed.
                                     This is for special cases where move requests have already
                                     been independently registered and scheduled by direct calls
                                     to petal(s).
-                                    
+
                  match_radius   ... passed to fvc_measure()
-                 
+
                  check_umatched ... passed to PetalApp.handle_fvc_feedback()
-                 
+
                  test_tp        ... passed to PetalApp.handle_fvc_feedback()
-                 
+
                  anticollison   ... mode like 'default', 'freeze', 'adjust', 'adjust_requested_only' or None
-                 
+
                  num_meas       ... how many FVC images to take (the results will be median-ed)
-                         
+
         OUTPUTS: result ... pandas dataframe that includes columns:
                             ['DQ', 'DS', 'FLAGS', 'FWHM', 'MAG', 'MEAS_ERR',
                              'mea_Q', 'mea_S', 'COMMAND', 'MOVE_VAL1',
                              'MOVE_VAL2', 'LOG_NOTE', 'BUS_ID', 'DEVICE_LOC',
                              'PETAL_LOC', 'STATUS', 'posintT', 'posintP']
-                            
+
                             And also, ['Q0', 'Q1', 'Q2', etc ...]
                             for the sub-measurements, depending on the value of
                             argument num_meas. See fvc_measure() for details on
                             this. These sub-meas columns I am not bothering to
                             rename with the 'mea_' prefix.
-                            
+
                             The dataframe has index column 'DEVICE_ID'
         '''
         self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
@@ -440,12 +440,12 @@ class PECS:
             self.ptlm.prepare_move(request, anticollision=anticollision)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': self.execute_move_timeout})
         exppos, meapos, matched, _ = self.fvc_measure(
-            exppos=None, matched_only=True, match_radius=match_radius, 
+            exppos=None, matched_only=True, match_radius=match_radius,
             check_unmatched=check_unmatched, test_tp=test_tp, num_meas=num_meas)
         result = self._merge_match_and_rename_fvc_data(request, meapos, matched, exppos)
         self.ptlm.clear_exposure_info()
         return result
-    
+
     def rehome_and_measure(self, posids, axis='both', debounce=True, log_note='',
                            match_radius=None, check_unmatched=False, test_tp=False,
                            anticollision='freeze'):
@@ -461,10 +461,10 @@ class PECS:
         self.print(f'Rehoming positioners, axis={axis}, anticollision={anticollision}' +
                    f', debounce={debounce}, exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(ids=posids, axis=axis, debounce=debounce,
-                                                log_note=log_note, match_radius=match_radius, 
+                                                log_note=log_note, match_radius=match_radius,
                                                 check_unmatched=check_unmatched,
                                                 test_tp=test_tp, anticollision=anticollision)
-    
+
     def park_and_measure(self, posids, mode='normal', coords='poslocTP', log_note='',
                          match_radius=None, check_unmatched=False, test_tp=False, theta=0):
         '''Wrapper for sending park_positioners command and then measuring result.
@@ -476,11 +476,11 @@ class PECS:
                    f', exposure={self.exp.id}, iteration={self.iteration}')
         return self._rehome_or_park_and_measure(move='park', ids=posids, mode=mode,
                                                 coords=coords, log_note=log_note,
-                                                match_radius=match_radius, 
+                                                match_radius=match_radius,
                                                 check_unmatched=check_unmatched,
                                                 test_tp=test_tp, theta=0,
                                                 expid=self.exp.id, iteration=self.iteration)
-        
+
     def _rehome_or_park_and_measure(self, move='rehome', **kwargs):
         '''Common operations for both "rehome_and_measure" and "park_and_measure".
 
@@ -506,7 +506,7 @@ class PECS:
         else:
             move_kwargs['control']['timeout'] = self.execute_move_timeout
         funcs[move](**move_kwargs)
-        
+
         # 2020-07-21 [JHS] dissimilar results than move_measure func, since no "request" data structure here
         meas_kwargs = {key:kwargs[key] for key in meas_args}
         meas_kwargs.update({'exppos': None, 'matched_only': True})
@@ -548,7 +548,7 @@ class PECS:
                     retcode = specman._send_command('illuminate', action='on', participating_spectrographs=specs)
                     self.print(f'SPECMAN.illuminate returned code: {retcode}')
                 except Exception as e:
-                    print(f'Exception when trying to turn on illumination, {e}') 
+                    print(f'Exception when trying to turn on illumination, {e}')
 
     def turn_off_fids(self):
         do_off = self._parse_yn(self.input('Turn off fiducials (y/n): ')) if self.interactive else True
@@ -571,7 +571,7 @@ class PECS:
                     retcode = specman._send_command('illuminate', action='off', participating_spectrographs=specs)
                     self.print(f'SPECMAN.illuminate returned code: {retcode}')
                 except Exception as e:
-                    print(f'Exception when trying to turn off illumination, {e}') 
+                    print(f'Exception when trying to turn off illumination, {e}')
 
 
     def fvc_collect(self):
@@ -636,15 +636,15 @@ class PECS:
         log_note = pc.join_notes(log_note, f'expid={self.exp.id}')
         log_note = pc.join_notes(log_note, f'use_desimeter={self.use_desimeter}')
         return log_note
-                
+
     def get_enabled_posids(self, posids='sub', include_posinfo=False):
         '''Returns list of the enabled posids.
-        
+
         INPUTS:
             posids ... 'sub' --> return enabled subset of PECS' self.posids property
                    ... 'all' --> return all currently enabled posids
                    ... some iterable --> return just the enabled subset of iterable
-        
+
             include_posinfo ... boolean, whether to return a second item with
                                 additional "posinfo" data
         '''
@@ -665,18 +665,18 @@ class PECS:
         if include_posinfo:
             return posids, posinfo
         return posids
-    
+
     def summarize_submeasurements(self, meapos):
         '''Collects submeasurements (like from fvc_measure with num_meas > 1)
         by positioner ID into suitable strings for logging purposes.
-        
+
         INPUTS:   meapos ... dataframe including columns ['Q0', 'S0', 'Q1', 'S1', ...]
                              and index 'DEVICE_ID'
 
         OUTPUTS:  Dictionary with keys = posids and values = strings.
                   Only includes entries for posids as defined by calling
                   get_enabled_posids(posids, False)
-        
+
         In cases where only the 0-th terms are found (i.e. we had num_meas==1)
         the strings in the return dict will be empty, ''.
         '''
@@ -705,7 +705,7 @@ class PECS:
             s = s[:-2] + '}'
             out[posid] = s
         return out
-    
+
     def quick_query(self, key=None, op='', value='', posids='all', mode='iterable', participating_petals=None):
         '''Returns a collection containing values for all petals of a quick_query()
         call. See documentation for petal.quick_query() for details.
@@ -738,7 +738,7 @@ class PECS:
         else:
             assert False, f'unrecognized return type {type(check_val)} from quick_query()'
         return combined
-        
+
     def quick_query_df(self, key, posids='all', participating_petals=None):
         '''Wrapper for quick_query which returns a pandas DataFrame, whose
         index is 'DEVICE_ID' and data column is key.
@@ -752,12 +752,12 @@ class PECS:
         df = pd.DataFrame(listed)
         df = df.set_index('DEVICE_ID')
         return df
-    
+
     def _merge_match_and_rename_fvc_data(self, request, meapos, matched, exppos):
         '''Returns results of fvc measurement after checking for target matches
         and doing some pandas juggling, very specifc to the other data interchange
         formats in pecs etc.
-        
+
         request ... pandas dataframe with index column DEVICE_ID and request data
         meapos ... pandas dataframe with index column DEVICE_ID and fvc data
         matched ... set of posids
@@ -769,14 +769,14 @@ class PECS:
         merged = matched_df.merge(request, on='DEVICE_ID')
         if not(merged.index.name == 'DEVICE_ID'):
             merged = merged.set_index('DEVICE_ID')
-        
+
         # columns get renamed
         merged.rename(columns={'X1': 'MOVE_VAL1', 'X2': 'MOVE_VAL2',
                                'Q': 'mea_Q', 'S': 'mea_S', 'FLAG': 'FLAGS'},
                       inplace=True)
         mask = merged['FLAGS'].notnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(merged.loc[mask, 'FLAGS'])
-        
+
         # get expected (tracked) posintTP angles --- these are now *after* any
         # updating by test_and_update_tp, so may not match the original tracked
         # values --- hence the special suffix
@@ -787,9 +787,9 @@ class PECS:
             exppos = exppos.join(this_data, on='DEVICE_ID', rsuffix=suffix)
         posint_keys = [key for key in exppos.columns if 'posint' in key]
         result = merged.merge(exppos[posint_keys], on='DEVICE_ID')
-        
+
         return result
-    
+
     def _batch_transform(self, frame, cs1, cs2, participating_petals=None):
         '''Calculate values in cs2 for a frame that has columns for coordinate
         system cs1. E.g. cs1='QS', cs2='obsXY'. Index is 'DEVICE_ID'. Then return

@@ -22,7 +22,7 @@ except:
 # other imports
 import random
 import pandas
-    
+
 # common definitions
 pos_settings_keys = ['ONLY_CREEP', 'CREEP_PERIOD']
 
@@ -74,7 +74,7 @@ class disambig_class():
         self.neighbors = {}
         for these in self.neighbor_data.values():
             self.neighbors.update(these)
-   
+
         # gather initial settings
         pos_settings_by_petal = self.pecs.ptlm.batch_get_posfid_val(uniqueids=self.allowed_to_fix, keys=pos_settings_keys)
         self.orig_pos_settings = {}
@@ -84,8 +84,8 @@ class disambig_class():
     # algorithm
     def disambig(self, n_try=None):
         '''See DESI-5911 for diagram and plain-language explanation of the basic algorithm.
-        
-        INPUTS:  
+
+        INPUTS:
             n_try ... Integer, indicates number of times to repeat. Repetition is done by
                       recursing this function. If n_try == 0 --> break. The direction
                       of trial moves is flipped with each repeat, so one would almost always
@@ -93,7 +93,7 @@ class disambig_class():
                       away from the presumed hardstop, odd values go toward it. The idea of
                       allowing more than 2 repeats is to deal with cases where a robot needs
                       its neighbors to be disambiguated before it can be safely moved itself.
-        
+
         OUTPUTS:
             Set of posids that are still in ambiguous zone. Disabled positioners are
             *excluded* from this set, regardless of what zone they are in.
@@ -122,13 +122,13 @@ class disambig_class():
             return ambig
         self.logger.info(f'Disambiguation attempt {self.num_tries - n_try + 1} of {self.num_tries}')
         self.logger.info(f'Will attempt to resolve {len(ambig)} posid(s): {ambig}')
-        
+
         # targets for unambiguous pos
         active_posids = ambig | self.unambig
         locT_current = self.pecs.quick_query(key='poslocT', posids=active_posids)
         locT_targets = {posid: locT_current[posid] for posid in self.unambig}
         locP_target = 150.0
-        
+
         # where possible, target unambiguous posids "opposite" ambiguous neighbors,
         # to maximize clearance
         for posid in self.unambig:
@@ -137,7 +137,7 @@ class disambig_class():
             if these_ambig:
                 selected = random.choice(list(these_ambig))
                 locT_targets[posid] = locT_current[selected]  # this is a good config to minimize collision opportunity
-            
+
         # move unambiguous positioners to targets
         sorted_unambig = sorted(self.unambig)
         anticollision = 'adjust_requested_only'
@@ -168,7 +168,7 @@ class disambig_class():
         self.pecs.ptlm.request_direct_dtdp(dtdp_requests, return_posids_only=True)
         self.pecs.ptlm.schedule_moves(anticollision=anticollision)
         self.pecs.move_measure(request=None, anticollision=anticollision, **self.common_move_meas_kwargs)
-        
+
         # theta test moves on ambiguous positioners
         anticollision = 'freeze'
         old_settings = {}

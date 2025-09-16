@@ -81,12 +81,12 @@ class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
     Typical operations you can do on a list work here (indexing, slices, del, etc).
     However, all elements must have type Move (see class lower in this module).
-    
+
         short_name   ... string, brief name for the test
         long_name    ... string, optional longer descriptive name for the test
         details      ... string, optional additional string to explain the test's purpose, etc
         pos_settings ... optional dict of positioner settings to apply during the sequence
-        
+
     After initialization, populate the sequence using the "add_move" function.
     '''
     def __init__(self, short_name, long_name='', details='', pos_settings=None):
@@ -98,14 +98,14 @@ class Sequence(object):
         pos_settings = {} if pos_settings is None else pos_settings
         self.pos_settings = pos_settings
         self._max_print_lines = np.inf
-    
+
     save_as_metadata = ['short_name', 'long_name', 'details', 'creation_date', 'pos_settings']
 
     @property
     def normalized_short_name(self):
         '''A particular format, used for example when saving files to disk.'''
         return self.short_name.replace(' ','_').upper()
-    
+
     @staticmethod
     def read(path):
         '''Reads in and validates format for a saved Sequence from a file. E.g.
@@ -137,7 +137,7 @@ class Sequence(object):
             move = Move(**kwargs)
             seq.append(move)
         return seq
-    
+
     def save(self, directory='.', basename=''):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
         Returns the path of the saved file.
@@ -148,7 +148,7 @@ class Sequence(object):
         path = os.path.join(directory, basename + '.ecsv')
         table.write(path, overwrite=True, delimiter=',')
         return path
-    
+
     def to_table(self):
         '''Generates an astropy table which completely summarizes the sequence.
         '''
@@ -162,7 +162,7 @@ class Sequence(object):
         table = vstack(tables)
         table.meta = {key: getattr(self, key) for key in Sequence.save_as_metadata}
         return table
-    
+
     def get_posids(self):
         '''Returns set of all posid strings specified in the sequence.
         '''
@@ -172,18 +172,18 @@ class Sequence(object):
         if 'any' in posids:
             posids.remove('any')
         return posids
-    
+
     @property
     def pos_settings(self):
         '''Copy of internal dict, containing all pos settings. Will be some
         subset of key/value pairs like those in pos_defaults.'''
         return self._pos_settings.copy()
-    
+
     @pos_settings.setter
     def pos_settings(self, settings):
         '''Settings dict, may contain any subset of pos_defaults keys.'''
         self._pos_settings = self._validate_pos_settings(settings)
-    
+
     def merge(self, other):
         '''Return a new sequnce, which merges this one with another. A number of
         restrictions apply. The two sequences must be:
@@ -217,7 +217,7 @@ class Sequence(object):
                         )
             new.append(move)
         return new
-    
+
     def str(self, max_lines=np.inf):
         '''Returns same as __str__ except limits printed table length to max_lines.'''
         old_max_print_lines = self._max_print_lines
@@ -225,7 +225,7 @@ class Sequence(object):
         s = self.__str__()
         self._max_print_lines = old_max_print_lines
         return s
-    
+
     def __str__(self):
         s = self._meta_str()
         s += '\n'
@@ -250,13 +250,13 @@ class Sequence(object):
             s += f'\n{lines[1]}\n{lines[0]}\n'
             s += f'\n{self._meta_str()}'
         return s
-    
+
     def __repr__(self):
         s = object.__repr__(self)
         s += '\n'
         s += self._meta_str()
         return s
-        
+
     def _meta_str(self):
         '''Returns a few lines of descriptive meta data.'''
         s = f'{self.normalized_short_name}'
@@ -270,11 +270,11 @@ class Sequence(object):
         s += f'\nNumber of rows = {len(self.to_table())}'
         s += f'\nNumber of moves = {len(self)}'
         return s
-    
+
     def _validate_move(self, move):
         assert isinstance(move, Move), f'{move} must be an instance of Move class'
         move.register_sequence_name_getter(lambda: self.normalized_short_name)
-    
+
     def _validate_table(table):
         '''Validates an astropy table representing a sequence. Returns a new
         table, which may be slightly modified. For example, adding any new columns
@@ -317,7 +317,7 @@ class Sequence(object):
         if move_idx_key not in new.columns:
             new[move_idx_key] = range(len(new))
         return new
-    
+
     @staticmethod
     def _validate_pos_settings(settings):
         '''Returns a new, validated pos_settings dict, with possible type casts
@@ -335,12 +335,12 @@ class Sequence(object):
                 new[key] = int(value)
             assert isinstance(new[key], expected_type)
         return new
-    
+
     # Standard sequence functions
     def __iter__(self):
         self.__idx = 0
         return self
-        
+
     def __next__(self):
         if self.__idx < len(self):
             move = self.moves[self.__idx]
@@ -348,61 +348,61 @@ class Sequence(object):
             return move
         else:
             raise StopIteration
-    
+
     def __len__(self):
         return len(self.moves)
-    
+
     def __getitem__(self, key):
         return self.moves[key]
-        
+
     def __setitem__(self, key, value):
         self._validate_move(value)
         self.moves[key] = value
 
     def __delitem__(self, key):
         del self.moves[key]
-        
+
     def __contains__(self, value):
         return value in self.moves
-    
+
     def index(self, value):
         for i in range(len(self)):
             if self[i] == value:
                 return i
         raise ValueError(f'{object.__repr__(self)} is not in sequence')
-    
+
     def count(self, value):
         matches = [True for x in self if value == x]
         return len(matches)
-    
+
     def append(self, value):
         self._validate_move(value)
         self.moves.append(value)
 
-    
+
 class Move(object):
     '''Encapsulates the command data for a simultaneous movement of one or more
     fiber positioners.
-    
+
         command      ... move command string as described in petal.request_targets()
         target0      ... 1st target coordinate(s) or delta(s), as described in petal.request_targets()
         target1      ... 2nd target coordinate(s) or delta(s), as described in petal.request_targets()
         posids       ... optional sequence of which positioner ids should be commanded
         log_note     ... optional string (uniformly applied) or sequence of strings (per device) to store alongside log data in this move
         allow_corr   ... optional boolean, whether correction moves are allowed to be performed after the primary ("blind") move
-        
+
     Multiple positioners, same targets:
         By default, posids='any', which means that the move command should be applied
         to any positioners selected at runtime (presumably by the PECS initialization
         process). In this case, all positioners get the same target0 and target1. The
         command string must be one of local_commands, as defined in this module.
-        
+
     Multiple positioners, multiple targets:
         By arguing ordered sequences for target0, target1, and posids, the user
         can specify different targets for different positioners. The command will be
         the same in all cases, and must be one of general_commands, as defined in this
         module.
-        
+
     Homing commands:
         Set target0 = 1 if you want to home theta axis, target1 = 1 to home phi axis,
         or set both to home both axes.
@@ -414,7 +414,7 @@ class Move(object):
                 assert is_number(x), f'target {x} is not a number'
             self.target0 = [target0]
             self.target1 = [target1]
-            self.posids = [posids]           
+            self.posids = [posids]
         else:
             assert command in general_commands, f'command {command} not recognized, see general_commands collection'
             assert (len(target0) == len(target1) == len(posids)), 'args target0, target1, and posid are not of equal length'
@@ -430,21 +430,21 @@ class Move(object):
         self.command = command
         self.allow_corr = bool(allow_corr)
         self._sequence_name_getter = None
-    
+
     # properties of Move with single values vs multiple values
     single_keys = {'command', 'allow_corr'}
     multi_keys = {'target0', 'target1', 'posids', 'log_note'}
-    
+
     def register_sequence_name_getter(self, function):
         '''Register function that can get name of the sequence that contains this move.'''
         self._sequence_name_getter = function
-    
+
     @property
     def is_uniform(self):
         '''Boolean whether the same uniform move command and target is to be done on
         any positioner.'''
         return self.posids == ['any'] or len(self.posids) <= 1
-    
+
     @property
     def log_note(self):
         '''Log note strings, including sequence name if available.'''
@@ -467,7 +467,7 @@ class Move(object):
             note = pc.join_notes(*new_parts)
             notes.append(note)
         return notes
-    
+
     @log_note.setter
     def log_note(self, note):
         '''Set with a single string (will be uniformly applied in case of multiple targets)
@@ -478,7 +478,7 @@ class Move(object):
             assert isinstance(note, (list, tuple)), f'invalid collection type {type(note)} for log note'
             assert len(note) == len(self.posids)
             self._log_note = [str(x) for x in note]
-    
+
     def get_log_notes(self, posids='any'):
         '''Returns list of log note values for the collection posids, in
         the same order as posids.'''
@@ -489,16 +489,16 @@ class Move(object):
             posids = self.posids
         elif self.is_uniform:
             return [notes[0]] * len(posids)
-        return [notes[self.posids.index(posid)] for posid in posids]        
-    
+        return [notes[self.posids.index(posid)] for posid in posids]
+
     def __len__(self):
         return len(self.posids)
-    
+
     @property
     def has_multiple_targets(self):
         '''Boolean whether this move has mulitple targets.'''
         return len(self) > 1
-    
+
     def is_defined_for_all_positioners(self, posids):
         '''Returns boolean whether the move has valid command definitions for
         the argued collection of posids.
@@ -509,16 +509,16 @@ class Move(object):
         if any(missing):
             return False
         return True
-    
+
     def to_dict(self, sparse=False, posids='any'):
         '''Returns a dict, which is ready for direct conversion to an astropy
         table or pandas dataframe. Keys = column names and values = equal-length
         lists of column data.
-        
+
         INPUTS:  sparse ... Optional boolean, if True, will make a more sparse
                             representation (non-arrays not expanded). This form
                             is not suitable for direct conversion to table.
-                            
+
                  posids ... Optional set, tuple, or list of posids. Any
                             arrays in the returned dictionary will only contain
                             entries corresponding to these positioners.
@@ -546,15 +546,15 @@ class Move(object):
                 if len(set(data[key])) == 1:
                     data[key] = data[key][0]
         return data
-    
+
     def make_request(self, posids, log_note=''):
         '''Make a move request data structure, ready for sending to the online control system.
         Any positioners known to this move instance, but not included in posids, will be
         skipped.
-        
+
         INPUT:  posids ... collection of positioner ids
                 log_note ... optional string, will be appended to any existing log note
-        
+
         OUTPUT: pandas dataframe with columns 'DEVICE_ID', 'COMMAND', 'X1', 'X2', 'LOG_NOTE'
         '''
         assert self.command not in homing_commands, 'Cannot make a request for homing. Try make_homing_kwargs() instead.'
@@ -582,14 +582,14 @@ class Move(object):
                         }
         request = pandas.DataFrame(request_data)
         return request
-        
+
     def make_homing_kwargs(self, posids, log_note=''):
         '''Make a kwargs dictionary for homing moves, ready for sending to the online
         control system.
-        
+
         INPUT:  posids ... positioners to home
                 log_note ... optional string, will be appended to any existing log note
-        
+
         OUTPUT: kwargs dictionary
         '''
         assert self.command in homing_commands, 'Cannot make homing kwargs for non-homing. Try make_request() instead.'
@@ -606,12 +606,12 @@ class Move(object):
                   'log_note': log_note,
                   }
         return kwargs
-        
+
     def __str__(self):
         s = object.__repr__(self)
         s += '\n'
         s += str(self.to_dict(sparse=True))
         return s
-    
+
     def __repr__(self):
         return self.__str__()

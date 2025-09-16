@@ -1,5 +1,5 @@
 # basic script to take an image with the STF8300
-# MS, University of Michigan 
+# MS, University of Michigan
 import time
 import warnings
 import numpy as np
@@ -26,9 +26,9 @@ cam.verbose=True
 try:
 	cam.close_camera() # in case driver was previously left in "open" state
 except:
-	pass	
+	pass
 
-cam.open_camera()   
+cam.open_camera()
 cam.set_exposure_time(200)
 cam.set_dark(take_darks)
 #cam.start_exposure

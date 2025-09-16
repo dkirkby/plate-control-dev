@@ -3,7 +3,7 @@ Options:
 	-a		Show information for all Mightex devices
                         (note, no settings will be read,
 			and no commands will be sent to the controller)
-	-c		Show Maximum and Set Current (milliAmp) 
+	-c		Show Maximum and Set Current (milliAmp)
 	-C "Max Set"	Set Maximum and Set Current (milliAmp) values
 			(note: current settings over 999 will be limited to 999
 	-d		Show device_path to be used
@@ -16,7 +16,7 @@ Options:
 	-i		Send DEVICEINFO command
 	-m		Show active mode (0==Off, 1=Normal)
 	-M mode_num	Set mode to mode_num
-	-n		Show comma-separated list of serial number(s) of 
+	-n		Show comma-separated list of serial number(s) of
                         attached Mightex device(s)
 	-N serial_no	Use the device with the specified serial number (if it exists)
 	-r		Show revision number of mightex_cmd

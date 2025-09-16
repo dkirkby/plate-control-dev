@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 # Script to calibrate FVC using the DOSlib.proxies module
-# This script assumes that  the FVC, PETAL and ILLUMINATOR are running (either devices or roles - if roles, 
+# This script assumes that  the FVC, PETAL and ILLUMINATOR are running (either devices or roles - if roles,
 # join_instance <name> must be called before running this script.
 import os,sys,time
 sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/petal/'))
@@ -45,7 +45,7 @@ exptime = hwsetup['exposure_time'] #2.0  exptime for fvchandler is hard-coded as
 
 sim = hwsetup['fvc_type'] == 'simulator'
 
-#Set Petal 
+#Set Petal
 myPetal=Petal('2')
 ptl = petal.Petal(petal_id = pid,posids=[],fidids=[],
                   simulator_on = sim,

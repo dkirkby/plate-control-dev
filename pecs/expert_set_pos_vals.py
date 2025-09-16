@@ -71,11 +71,11 @@ assert len(columns_to_update) != 0, 'No columns to update'
 print(f'Accepted columns: {columns_to_update}')
 if disallowed:
     print(f'Columns {disallowed} will *not* be changed. Only {allowed_keys} are allowed.'
-          f'This is our current policy (as of {allowed_date}) in order to restrict ' 
-          f'the power/risk of this script. The more general, "proper" method of ' 
-          f'updating calibration settings is via set_calibrations.py. Procedures ' 
-          f'are provided in DESI-5732. Additionally, certain limited parameters ' 
-          f'may be safely set at the PETAL console. Enter command "readme" there ' 
+          f'This is our current policy (as of {allowed_date}) in order to restrict '
+          f'the power/risk of this script. The more general, "proper" method of '
+          f'updating calibration settings is via set_calibrations.py. Procedures '
+          f'are provided in DESI-5732. Additionally, certain limited parameters '
+          f'may be safely set at the PETAL console. Enter command "readme" there '
           f'for more information.')
 
 posids = set(data['POS_ID'])

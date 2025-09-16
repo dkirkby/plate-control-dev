@@ -265,21 +265,21 @@ class PosState(object):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values. (You should NEVER EVER write
         directly to the state._val dictionary!)
-        
+
         Returns a boolean stating whether the store operation was accepted. This
         will be False in cases where:
-            
+
             - invalid key
             - value outside an allowed range
             - value is identical to existing value
-            
+
         Special handling is applied to the note fields, 'LOG_NOTE' and 'CALIB_NOTE'.
         For these, the argued value string is appended to the existing note, rather
         than replacing it. (This simplifies syntax for the numerous cases where multiple
         notes are getting added at differing steps in the code. One can clear a note
         with the special functions clear_log_notes and clear_calib notes. A blank note
         string is ignored.)
-        
+
         Normally, if a value is changed, then the state will register itself
         with petal as having been altered. That way petal knows to push its
         data to posmovedb upon the next commit(). This registration can be
@@ -378,7 +378,7 @@ class PosState(object):
     @log_basename.setter
     def log_basename(self, name):
         self._val['CURRENT_LOG_BASENAME'] = name
-        
+
     def _append_log_note(self, note, is_calib_note=False):
         '''Adds a log note to the existing note data that will be written to
         log upon commit or writetodb. Arg calib operates on CALIB_NOTE field
@@ -389,22 +389,22 @@ class PosState(object):
             self._val[key] = str(note)
         else:
             self._val[key] = pc.join_notes(self._val[key], note)
-            
+
     def clear_log_notes(self):
         '''Re-initializes the stored log notes. Can be used as an initiializer
         if no LOG_NOTE field yet established.'''
         self._val['LOG_NOTE'] = ''
-        
+
     def clear_calib_notes(self):
         '''Like clear_log_notes, but for CALIB_NOTE field.'''
         self._val['CALIB_NOTE'] = ''
-                
+
     def clear_late_commit_entries(self):
         '''Clears the "late commit" data fields.'''
         for key, value in pc.late_commit_defaults.items():
             if key in self._val:
                 self._val[key] = value
-                
+
     def _set_altered_state_adders(self, func_move=None, func_calib=None):
         '''Set function handles for registering when state changes. The intent
         here is that PosState can add itself to Petal's altered_state and
@@ -415,12 +415,12 @@ class PosState(object):
         else:
             self._register_altered_move = lambda: None
             self._register_altered_calib = lambda: None
-            
+
     def set_posmodel_cache_refresher(self, func):
         '''Set function handle for refreshing posmodel cache when a relevant
         state value changes.'''
         self._refresh_posmodel = func
-            
+
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
         to have a regular method for incrementing the suffix on log filenames.
@@ -463,7 +463,7 @@ class PosState(object):
                 del self._val[old_key]
                 new_key = legacy_key_replacements[old_key]
                 self._val[new_key] = temp_val
-                
+
         # also insert any missing entirely new keys
         if self.type == 'pos':
             possible_new_keys_and_defaults = {'LAST_MEAS_FWHM': None,
@@ -491,7 +491,7 @@ class PosState(object):
         for key in possible_new_keys_and_defaults:
             if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]
-                
+
     def _clear_last_meas_entries(self):
         '''Clears specific values from legacy "LAST_MEAS_*" fields. Intended
         to be run upon initialization, to halt useless forward propagation of

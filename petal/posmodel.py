@@ -26,7 +26,7 @@ class PosModel(object):
         self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
         self.refresh_cache()
-        
+
     def _load_cached_params(self):
         '''Do this *after* refreshing the caches in the axis instances.'''
         self._abs_shaft_speed_cruise_T = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
@@ -76,17 +76,17 @@ class PosModel(object):
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
         return self.state._val['CTRL_ENABLED']
-    
+
     @property
     def axis_locks(self):
         """Returns 1x2 tuple of booleans, stating whether the (theta, phi) axes are locked."""
         return (self.axis[pc.T].is_locked, self.axis[pc.P].is_locked)
-    
+
     @property
     def classified_as_retracted(self):
         """Returns whether the positioner has been classified as retracted or not."""
         return self.state._val['CLASSIFIED_AS_RETRACTED']
-    
+
     @property
     def expected_current_posintTP(self):
         """Returns the internally-tracked expected position of the
@@ -189,7 +189,7 @@ class PosModel(object):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
         """
         return self._abs_shaft_speed_cruise_P
-    
+
     @property
     def abs_shaft_spinupdown_distance_T(self):
         '''Acceleration / deceleration distance on theta axis, when spinning up to / down from cruise speed.'''
@@ -199,7 +199,7 @@ class PosModel(object):
     def abs_shaft_spinupdown_distance_P(self):
         '''Acceleration / deceleration distance on phi axis, when spinning up to / down from cruise speed.'''
         return self._abs_shaft_spinupdown_distance_P
-    
+
     @property
     def theta_hardstop_ambiguous_zone(self):
         '''Returns a 1x2 tuple of (AMBIG_MIN, AMBIG_MAX), describing the range in which a measured
@@ -207,12 +207,12 @@ class PosModel(object):
         the situation must be resolved by some physical motion). The output values are always returned
         as positive numbers within the range [0, 360]. So like (+170, +190).'''
         full_range = self.full_range_posintT
-        ambig_min = (full_range[0] - pc.theta_hardstop_ambig_tol) % 360 
-        ambig_max = (full_range[1] + pc.theta_hardstop_ambig_tol) % 360 
+        ambig_min = (full_range[0] - pc.theta_hardstop_ambig_tol) % 360
+        ambig_max = (full_range[1] + pc.theta_hardstop_ambig_tol) % 360
         for key in {'ambig_min', 'ambig_max'}:
             assert 0 <= eval(key) <= 360, f'{self.posid} ambig_min={eval(key)} is not within [0,360]. full_range={full_range}'
         return (ambig_min, ambig_max)
-    
+
     @property
     def in_theta_hardstop_ambiguous_zone(self):
         '''Returns boolean whether positioner is currently in the ambiguous either-side-of-the-hardstop
@@ -236,7 +236,7 @@ class PosModel(object):
         The argument 'init_posintTP' is used to account for expected
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
-        
+
         The argument 'limits' may take values:
             'debounced'
             'near_full'
@@ -317,7 +317,7 @@ class Axis(object):
         self.posmodel = posmodel
         self.axisid = axisid
         self._load_cached_params()
-        
+
     def _load_cached_params(self):
         # order of operations here matters
         self.antibacklash_final_move_dir = self._calc_antibacklash_final_move_dir()
@@ -378,7 +378,7 @@ class Axis(object):
         """Min accessible position, as defined by debounced_range.
         """
         return self.get_minpos()  # this redirect is for legacy compatibility with external code
-        
+
     def get_minpos(self, use_near_full_range=False):
         """Function to return accessible position. By default this is within
         debounced_range. An option exists to get the min as defined by
@@ -389,17 +389,17 @@ class Axis(object):
             return min(d)
         else:
             return self.get_maxpos(use_near_full_range) - (d[1] - d[0])
-        
+
     @property
     def full_range(self):
         '''Returns 1x2 list, [min,max] values for full travel range.'''
         return self._full_range.copy()
-    
+
     @property
     def debounced_range(self):
         '''Returns 1x2 list, [min,max] values for debounced travel range.'''
         return self._debounced_range.copy()
-    
+
     @property
     def near_full_range(self):
         '''Returns 1x2 list, [min,max] values for a travel range between "full"
@@ -407,7 +407,7 @@ class Axis(object):
         this is used for robustness when working with travel distances that have
         been discretized according to motor steps.
         '''
-        return self._near_full_range.copy()    
+        return self._near_full_range.copy()
 
     @property
     def last_primary_hardstop_dir(self):
@@ -474,10 +474,10 @@ class Axis(object):
 
     def truncate_to_limits(self, distance, start_pos=None, use_near_full_range=False):
         """Return distance after truncating it (if necessary) to the software limits.
-        
+
         An expected starting position can optionally be argued. If None, then the
-        internally-tracked position is used as the starting point. 
-        
+        internally-tracked position is used as the starting point.
+
         Can also optionally argue with use_near_full_range=True. This uses a slightly
         wider definiton for the max and min accessible limits at which to truncate.
         See the maxpos and minpos methods, as well as debounced_range vs near_full_range.
@@ -597,4 +597,3 @@ class Axis(object):
             return [+self.posmodel.state._val['BACKLASH'],0]
         else:
             return [0,-self.posmodel.state._val['BACKLASH']]
-        

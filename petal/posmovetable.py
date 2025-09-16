@@ -62,13 +62,13 @@ class PosMoveTable(object):
              'is_required':           c._is_required,
              }
         return d
-    
+
     def __repr__(self):
         return str(self.as_dict())
 
     def __str__(self):
         return str(self.as_dict())
-        
+
     def display(self, printfunc=print, show_posid=True):
         '''Pretty-prints the table.  To return a string, instead of printing
         immediately, argue printfunc=None.
@@ -112,7 +112,7 @@ class PosMoveTable(object):
             printfunc(output)
         else:
             return output
-        
+
     def display_for(self, output_type='hardware', printfunc=print):
         '''Pretty-prints the version that gets sent to hardware. To return a
         string, instead of printing immediately, argue printfunc=None.
@@ -158,7 +158,7 @@ class PosMoveTable(object):
             printfunc(output)
         else:
             return output
-        
+
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
         new.rows = [row.copy() for row in self.rows]
@@ -176,7 +176,7 @@ class PosMoveTable(object):
         moves is included in the geometric envelope of the positioner.
         """
         if suppress_automoves:
-            return self._format_while_suppressing_automoves('schedule')            
+            return self._format_while_suppressing_automoves('schedule')
         return self._for_output_type('schedule')
 
     def for_collider(self, suppress_automoves=True):
@@ -199,7 +199,7 @@ class PosMoveTable(object):
         position tracking after the physical move has been performed.
         """
         return self._for_output_type('cleanup')
-    
+
     def angles(self):
         """Reduced version of the table giving just the theta and phi angles and
         deltas.
@@ -215,9 +215,9 @@ class PosMoveTable(object):
         '''Version of the table with just the time data.
         '''
         if suppress_automoves:
-            return self._format_while_suppressing_automoves('timing')            
-        return self._for_output_type('timing') 
-    
+            return self._format_while_suppressing_automoves('timing')
+        return self._for_output_type('timing')
+
     def _format_while_suppressing_automoves(self, output_type):
         '''Calculate version of table according to output_type, but don't include
         final creep or antibacklash moves.'''
@@ -245,12 +245,12 @@ class PosMoveTable(object):
             if row.has_motion:
                 return False
         return True
-    
+
     @property
     def log_note(self):
         '''Returns a copy of property log_note.'''
         return self._log_note
-    
+
     @log_note.setter
     def log_note(self, note):
         '''Sets property log_note. The argument will be converted to str.'''
@@ -259,7 +259,7 @@ class PosMoveTable(object):
     def append_log_note(self, note):
         '''Appends a note to the current log_note.'''
         self._log_note = pc.join_notes(self._log_note, note)
-        
+
     @property
     def error_str(self):
         '''Returns a string that is either empty or contains human-readable
@@ -275,7 +275,7 @@ class PosMoveTable(object):
         if msg:
             msg = f'{self.posid} move table contains errors/warnings:' + msg
         return msg
-    
+
     def total_time(self, suppress_automoves=False):
         '''Returns total time to execute the table.'''
         times_table = self.timing(suppress_automoves=suppress_automoves)
@@ -301,7 +301,7 @@ class PosMoveTable(object):
         if val1 != None or val2 != None:
             string = f'{string}=[{val1}, {val2}]'
         self._orig_command = pc.join_notes(self._orig_command, string)
-        
+
     def append_postmove_cleanup_cmd(self, axisid, cmd_str):
         """Add a posmodel cleanup command for execution after the move has
         been completed.
@@ -340,13 +340,13 @@ class PosMoveTable(object):
         than just firing off the "execute tables" signal.
         '''
         self._is_required = pc.boolean(boolean)
-        
+
     def strip(self):
         '''Removes two things from table:
-        
+
             1. Any "zero" rows, i.e. with no motion and no pauses.
             2. Any pauses that come after the last finite move.
-        
+
         Stripping is performed only on the user-defined rows, *not* on any
         internally auto-generated _rows_extra. In particular, case (2) means
         that any auto-creep moves will be pushed earlier in time, so that they
@@ -391,21 +391,21 @@ class PosMoveTable(object):
             self.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
         self.append_log_note(other_move_table.log_note)
         self.store_orig_command(string=other_move_table._orig_command)
-        
+
         # Second table (since it comes last) takes precedence  when determining
         # whether to do automatic final moves.
         self.should_final_creep = other_move_table.should_final_creep
         self.should_antibacklash = other_move_table.should_antibacklash
-        
+
         # Any disabling of range limits takes precedence.
         self.allow_exceed_limits |= other_move_table.allow_exceed_limits
-        
+
         # Any forcing of creep-only takes precedence.
         self.allow_cruise &= other_move_table.allow_cruise
-        
+
         # Any required table takes precedence.
         self._is_required |= other_move_table._is_required
-        
+
     # internal methods
     def _calculate_true_moves(self):
         """Uses PosModel instance to get the real, quantized, calibrated values.
@@ -502,7 +502,7 @@ class PosMoveTable(object):
             table['Pdot'] = [true_moves[pc.P][i]['speed'] for i in row_range]
         if output_type in {'collider', 'schedule', 'full', 'timing'}:
             table['prepause'] = [rows[i].data['prepause'] for i in row_range]
-            table['postpause'] = [rows[i].data['postpause'] for i in row_range]            
+            table['postpause'] = [rows[i].data['postpause'] for i in row_range]
         if output_type in {'hardware', 'full'}:
             table['motor_steps_T'] = [true_moves[pc.T][i]['motor_step'] for i in row_range]
             table['motor_steps_P'] = [true_moves[pc.P][i]['motor_step'] for i in row_range]
@@ -530,18 +530,18 @@ class PosMoveTable(object):
                     ideal_deltas = [rows[i].data[f'{dkey}_ideal'] for i in row_range]
                     zeroed_deltas = [table[dkey][i] == 0.0 and ideal_deltas[i] != 0.0 for i in row_range]
                     if any(zeroed_deltas):
-                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables        
+                        lock_note = pc.join_notes(lock_note, f'locked {dkey}=0.0')  # ensures some indication of locking event gets into log for "expert" tables
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-            
+
             # interior rows
             table['postpause'] = [rows[i].data['postpause'] + rows[i+1].data['prepause'] for i in range(len(rows) - 1)]
-            
+
             # last row
             table['postpause'].append(rows[-1].data['postpause'])
-            
+
             # new first row, if necessary (because hardware only supports postpauses)
             leading_prepause = rows[0].data['prepause']
             if leading_prepause:
@@ -550,7 +550,7 @@ class PosMoveTable(object):
                     table[key].insert(0, 0)
                 for key in ['speed_mode_T','speed_mode_P']:
                     table[key].insert(0, 'creep') # speed mode doesn't matter here
-                    
+
             table['nrows'] = len(table['move_time'])
             table['total_time'] = sum(table['move_time'] + table['postpause']) # in seconds
             table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds
@@ -605,21 +605,21 @@ class PosMoveRow(object):
                      'postpause': 0,  # [sec] delay for this number of seconds after the move has completed
                      'auto_cmd': '',  # [string] auto-generated command info corresponding to this row
                      }
-        
+
     def __repr__(self):
         return repr(self.data)
 
     def copy(self):
         return copymodule.deepcopy(self)
-    
+
     @property
     def has_motion(self):
         return self.data['dP_ideal'] != 0 or self.data['dT_ideal'] != 0
-    
+
     @property
     def has_prepause(self):
         return self.data['prepause'] != 0
-    
+
     @property
     def has_postpause(self):
         return self.data['postpause'] != 0

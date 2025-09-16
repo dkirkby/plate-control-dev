@@ -44,17 +44,17 @@ import googlesheets
 import time
 
 class LoadPetal(object):
-    def __init__(self,hwsetup_conf='',xytest_conf=''):  
+    def __init__(self,hwsetup_conf='',xytest_conf=''):
 #        global gui_root
 #        gui_root = tkinter.Tk()
 #        gui_root.title='Move Controll for Petal '+str(self.ptl_id)
-	
+
         self.simulate = False
         self.logfile='LoadPetal.log'
         fvc_type='simulator'
 
         self.ptl_id=13
-        fidids=['F021']   
+        fidids=['F021']
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
 	#petalcomm.
@@ -66,7 +66,7 @@ class LoadPetal(object):
         print(self.info)
         for key in sorted(self.info.keys()):
             if len(str(key))==2:
-                self.posids.append('M000'+str(key)) 
+                self.posids.append('M000'+str(key))
             elif len(str(key))==3:
                 self.posids.append('M00'+str(key))
             elif len(str(key))==4:
@@ -74,7 +74,7 @@ class LoadPetal(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
 
 #        self.posschedule=posschedule.PosSchedule(self.ptl)
@@ -89,17 +89,17 @@ class LoadPetal(object):
             self.ptl.schedule.request_target('M00100', 'posTP', (i+1)*10., 180., log_note='')
         print(self.ptl.schedule.get_requests())
         self.ptl.schedule._schedule_with_anticollision() # Make move_tables
-       
+
         move_tables=self.ptl.schedule.move_tables
-        
+
 #        self.ptl.send_move_tables()
-        
+
 #        # Make an animation
 #        self.ptl.collider.add_positioners(self.posmodels)
 #        self.ptl.collider.posmodels=self.posmodels
 #        possweep=poscollider.PosSweep()
 #        possweep.fill_exact(init_obsTP,move_tables)
-        
+
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
@@ -109,4 +109,4 @@ class LoadPetal(object):
             fh.write(line + '\n')
         if stdout:
             print(line)
-			
+

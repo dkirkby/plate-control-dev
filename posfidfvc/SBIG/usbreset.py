@@ -10,7 +10,7 @@
 		usbreset.resetSBIG()
 
 
-	Additional information:	
+	Additional information:
 
 	Edit the c code (usbreset.c) if necessary and recompile:
     $ cc usbreset.c -o usbreset
@@ -18,13 +18,13 @@
 
     Get the Bus and Device ID of the USB device you want to reset:
 
-    $ lsusb  
-    Bus 002 Device 003: ID 0fe9:9010 DVICO  
+    $ lsusb
+    Bus 002 Device 003: ID 0fe9:9010 DVICO
 
     Instead of using this python module the usb bus/device can be reset by executing the code from the
     command line (Make necessary substitution for <Bus> and <Device> ids as found by running the lsusb command):
 
-    $ sudo ./usbreset /dev/bus/usb/002/003  
+    $ sudo ./usbreset /dev/bus/usb/002/003
 
 '''
 
@@ -45,7 +45,7 @@ def resetSBIG():
 	            devices.append(dinfo)
 	for d in devices:
 		if 'Santa Barbara' in d['tag']: device=d['device']
-	print(device)	
+	print(device)
 	subprocess.call(["/home/msdos/dos_products/posfidfvc/SBIG/usbreset",device])
 
 if __name__=="__main__":

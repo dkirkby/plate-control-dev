@@ -51,7 +51,7 @@ class Summarizer(object):
 			init_data   ... dictionary, should contain values for all the keys given in the list init_data_keys
 			state       ... PosState object for the positioner this summarizer will refer to
 			directory   ... (optional) override the standard directory for reading / writing summary files
-		
+
 		Make sure to also update_loop_inits() at the beginning of any new xytest loop.
 		'''
 		self.state = state
@@ -60,7 +60,7 @@ class Summarizer(object):
 		self.row_template['finish time']                    = ''
 		self.row_template['curr cruise']                    = 0
 		self.row_template['curr creep']                     = 0
-		self.row_template['num targets']                    = 0     # number of targets tested in this loop 
+		self.row_template['num targets']                    = 0     # number of targets tested in this loop
 		self.err_keys = Summarizer.make_err_keys()
 		for key in self.err_keys:
 			self.row_template[key] = None
@@ -82,12 +82,12 @@ class Summarizer(object):
 		if not directory[-1] == os.path.sep:
 			directory += os.path.sep
 		self.filename = directory + self.basename
-		
+
 		# checking whether need to start a new file because none exist yet
 		if not(os.path.isfile(self.filename)):
 			with open(self.filename, 'w', newline='') as csvfile:
 				csv.writer(csvfile).writerow(list(self.row_template.keys())) # write header row
-				
+
 		# deal with case where fieldnames have changed since the last time the file was used
 		with open(self.filename, 'r', newline='') as csvfile:
 			reader = csv.DictReader(csvfile)
@@ -107,15 +107,15 @@ class Summarizer(object):
 			writer.writeheader()
 			for row in rows:
 				writer.writerow(row)
-	
+
 	def update_loop_inits(self, loop_data_file, n_pts_calib_T, n_pts_calib_P, calib_mode, ranges_were_remeasured):
 		'''At the start of a new loop within an xytest, always run this method
 		to update values in the row logging function.
-		
+
 		It will initialize some values for the loop, as well as tell the code that
 		the next call to write_row() should append a new row, rather than overwriting
 		the most recent one.
-		
+
 		The inputs to this method are those particular data which we cannot
 		otherwise infer from positioner state, or the internal clock, etc.
 		'''
@@ -128,14 +128,14 @@ class Summarizer(object):
 		self.row_template['curr creep']          = self.state._val['CURR_CREEP']
 		self.row_template['ranges remeasured']   = ranges_were_remeasured
 		self.next_row_is_new = True
-	
+
 	def update_loop_calibs(self, suffix='', params=list(pc.nominals.keys())):
 		'''Update the row template with the current calibration values, gathered up
 		from the positioner state file.
-		
+
 		suffix argument is used for example to distinguish between values that were
 		only measured vs those that were actually used in the test.
-		
+
 		params argument is used to to restrict which parameters are getting upated.
 		'''
 		for calib_key in params:
@@ -143,9 +143,9 @@ class Summarizer(object):
 
 	def write_row(self, err_data_mm, autogather=True):
 		'''Makes a row of values and writes them to the csv file.
-		
+
 		See threshold_and_summarize() method for comments on err_data.
-		
+
 		The autogather flag says whether to automatically gather certain data values from the
 		most current positioner state data.
 		'''
@@ -179,17 +179,17 @@ class Summarizer(object):
 		'''Summarizes the error data for a single positioner, applying thresholds
 		to determine which correction submoves are the ones at which in practice
 		(on the mountain) we would stop correcting.
-		 
+
 		INPUTS:
 			err_data      ... list of lists, where the first index is the submove number,
 							  and then selecting that gives you the list of all error data
 							  for that submove. The units must be mm.
-			
+
 			threshold_um  ... the first submove encountered which has an error value less than
 							  or equal to threshold is considered the point at which a robot would
 							  (in practice on the mountain) be held there and do no more corrections.
 							  The units must be um.
-							
+
 		OUTPUTS:
 			err_summary   ... dictionary, with keys:
 								  'blind max (um)' + statcut_suffix(stat_cut)
@@ -239,7 +239,7 @@ class Summarizer(object):
 	def err_suffix(stat_cut, threshold):
 		'''For consistent internal generation of certain keys.'''
 		return Summarizer.statcut_suffix(stat_cut) + ' with ' + str(threshold) + ' um threshold'
-	
+
 	@staticmethod
 	def statcut_suffix(stat_cut):
 		'''For consistent internal generation of certain keys.'''
@@ -247,11 +247,11 @@ class Summarizer(object):
 			return ' all targets'
 		else:
 			return ' best ' + format(stat_cut*100,'g') + '%'
-	
+
 	@staticmethod
 	def make_err_keys():
 		'''Return list of valid keys for the error data.'''
-		err_keys = []                          
+		err_keys = []
 		for cut in stat_cuts:
 			suffix1 = Summarizer.statcut_suffix(cut)
 			err_keys.append('blind max (um)' + suffix1)    # max error on the blind move 0
@@ -262,12 +262,12 @@ class Summarizer(object):
 				err_keys.append('mean num corr' + suffix2) # avg number of correction moves it took to reach either threshold or end of submove data
 				err_keys.append('max num corr'  + suffix2) # max number of correction moves it took to reach either threshold or end of submove data
 		return err_keys
-	
+
 if __name__=="__main__":
 	import tkinter
 	import tkinter.messagebox
 	import tkinter.filedialog
-	
+
 	# get the files list
 	filetypes = (('Comma-separated Values','*movedata.csv'),('All Files','*'))
 	gui_root = tkinter.Tk()
@@ -282,7 +282,7 @@ if __name__=="__main__":
 	gui_root.withdraw()
 	files = [file for file in files if 'movedata.csv' in file]
 	files.sort()
-	
+
 	# gather the data by file
 	ask_ignore_files_with_logsuffix = True
 	ignore_files_with_logsuffix = False
@@ -344,7 +344,7 @@ if __name__=="__main__":
 					d[file]['pos_id'] = posid
 				else:
 					del d[file]
-	
+
 	# find out where the user wants to save outputs
 	gui_root = tkinter.Tk()
 	if d:
@@ -368,7 +368,7 @@ if __name__=="__main__":
 	if not(d):
 		tkinter.messagebox.showwarning(title='No files summarized.',message='No movedata files were summarized.')
 	gui_root.withdraw()
-	
+
 	# run the summarizer on all the file data
 	for file in d.keys():
 		state = posstate.PosState(d[file]['pos_id'])
@@ -396,7 +396,7 @@ if __name__=="__main__":
 						for row in reader:
 							if row['test loop data file'] == file_basename:
 								default_summary_row = row
-								break            
+								break
 			for key in summ.row_template.keys():
 				if key not in d[file].keys():
 					if key in default_summary_row.keys():

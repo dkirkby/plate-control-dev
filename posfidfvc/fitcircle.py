@@ -3,27 +3,27 @@ import numpy as np
 
 class FitCircle(object):
     """C.f. http://scipy.github.io/old-wiki/pages/Cookbook/Least_Squares_Circle"""
-    
+
     def fit(self, xy):
         """Return a best-fit circle for (x,y) data.
-        
+
         Input:    xy ... cartesian points of the form [[x1,y1], [x2,y2], ...]
-        
+
         Returns:  xy_ctr ... best-fit circle center, in the form [x_center,y_center]
                   radius ... best-fit circle radius
         """
         x = [pt[0] for pt in xy]
         y = [pt[1] for pt in xy]
-        
+
         def calc_R(xc, yc):
             """calculate the distance of each 2D points from the center (xc, yc) """
-            return ((x-xc)**2 + (y-yc)**2)**0.5   
-            
+            return ((x-xc)**2 + (y-yc)**2)**0.5
+
         def func(c):
             """calculate the algebraic distance between the data points and the mean circle centered at c=(xc, yc) """
             Ri = calc_R(*c)
             return Ri - Ri.mean()
-        
+
         xm = np.mean(x)
         ym = np.mean(y)
         center_estimate = xm, ym

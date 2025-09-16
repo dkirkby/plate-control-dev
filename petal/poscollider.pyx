@@ -99,7 +99,7 @@ class PosCollider(object):
                 # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
                 self.animator.add_or_change_item('line t0', self.posindexes[posid], start_time, self.line_t0_polys[posid].points)
                 self.add_posid_label(posid)
-            
+
     def add_posid_label(self, posid):
         """Adds label to animator for posid (if not already there)."""
         if self.animator_label_type == 'posid':
@@ -168,7 +168,7 @@ class PosCollider(object):
             init_poslocTP_A, init_poslocTP_B  ... starting (theta,phi) positions, in the poslocTP coordinate systems
             tableA, table  ... dictionaries defining rotation schedules as described below
             skip ... integer number of initial timesteps for which to skip collision check
-        
+
         ** Subtlety regarding "skip" **
             As of 2020-10-29, I *always* skip the first timestep, regardless of the
             value of skip. In effect, arguing skip=0 is like saying skip=1. This is
@@ -256,7 +256,7 @@ class PosCollider(object):
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
-        A_is_within_Eo = poslocTP_A[1] >= self.Eo_phi or posid_A in self.classified_as_retracted 
+        A_is_within_Eo = poslocTP_A[1] >= self.Eo_phi or posid_A in self.classified_as_retracted
         B_is_within_Eo = poslocTP_B[1] >= self.Eo_phi or posid_B in self.classified_as_retracted
         if A_is_within_Eo and B_is_within_Eo:
             return pc.case.I
@@ -316,16 +316,16 @@ class PosCollider(object):
                 if poly1.collides_with(poly2):
                     return fixed_case
         return pc.case.I
-    
+
     def phi_range_collision(self, posid_A, poslocT_A, posid_B, poslocTP_B=None):
         """Special function to search for collisions in space between a positioner
         and its neighbors for all possible positions of phi. Depending on the arguments,
         this function can also check the full-range phi against neighbors' full-range
         phi, or against fixed boundaries.
-        
+
         The intended use case is for identifying when it is safe to move an
         unpredictable phi arm outside the Eo retracted envelope.
-        
+
             posid_A ... positioner with fixed full-range phi arc
             poslocT_A ... theta position of A
             posid_B ... neighbor of A, which may be either a posid or the string
@@ -335,7 +335,7 @@ class PosCollider(object):
                            ... scalar value --> treat this scalar as the neighbor's theta, and
                                                 use full-range phi arc for neighbor's phi keepout
                            ... arg is ignored if posid_B == 'fixed'
-                           
+
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
@@ -372,11 +372,11 @@ class PosCollider(object):
     def place_phi_arc(self, posid, poslocT):
         """Rotates and translates the full-range phi arc to position defined by the
         positioner's (x0,y0) and the argued poslocT (theta) angle.
-        
+
         This function is like place_phi_arm(), but rather than the typical phi arm
         keepout, it uses a larger swept-arc polygon. That polygon represents the
         total area the phi arm can possibly inhabit, in its full range of motion,
-        when theta is held constant at the argued value. 
+        when theta is held constant at the argued value.
         """
         return self.keepouts_arcP[posid].rotated(poslocT).translated(self.x0[posid], self.y0[posid])
 
@@ -387,7 +387,7 @@ class PosCollider(object):
         return self.keepouts_T[posid].place_as_central_body(theta=poslocT,
                                                             x0=self.x0[posid],
                                                             y0=self.y0[posid])
-    
+
     def place_arm_lines(self, posid, poslocTP):
         '''Generates, rotates, and translates a PosPoly with two lines through the
         central body and phi arms. These graphically indicate the theta dnd phi
@@ -437,7 +437,7 @@ class PosCollider(object):
         poly1 = self.place_phi_arm(posid1, tp1)
         poly2 = self.place_central_body(posid2, t2)
         return poly1.collides_with(poly2)
-    
+
     def _case_IV_collision(self, posid1, posid2, tp1):
         """Search or case IV collision, positioner 1 arm against positioner 2 circular envelope."""
         cdef PosPoly poly1
@@ -621,7 +621,7 @@ class PosSweep(object):
 
     def copy(self):
         return copymodule.deepcopy(self)
-    
+
     def as_dict(self):
         """Returns a dictionary containing copies of all the sweep data."""
         c = self.copy()
@@ -635,7 +635,7 @@ class PosSweep(object):
              'collision_neighbor':  c.collision_neighbor,
              'frozen_time':         c.frozen_time}
         return d
-    
+
     def __repr__(self):
         d = self.as_dict()
         d['time_start'] = d['time'][0] if d['time'] else None
@@ -649,7 +649,7 @@ class PosSweep(object):
 
     def __str__(self):
         return self.__repr__()
-    
+
     def fill_exact(self, init_poslocTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
@@ -670,7 +670,7 @@ class PosSweep(object):
         self.time = time
         self.tp = tp
         self.was_moving_cached = [self.was_moving(step) for step in range(len(self.time))]
-        
+
     def quantize(self, timestep):
         """Converts itself from exact, continuous time to quantized, discrete time.
         The result has approximate intermediate (theta,phi) positions and speeds,
@@ -686,7 +686,7 @@ class PosSweep(object):
             distance_diffs = [self.tp[i][ax] - self.tp[i-1][ax] for ax in axes]
             if n_steps == 0 and any(distance_diffs):
                 n_steps = 1
-            if n_steps:                
+            if n_steps:
                 distance_steps = [distance_diffs[ax] / n_steps for ax in axes]
                 for j in range(n_steps):
                     discrete_time.append(discrete_time[-1] + timestep)
@@ -711,7 +711,7 @@ class PosSweep(object):
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
         self.frozen_time = self.time[-1]
-        
+
     def clear_collision(self):
         """Resets collision state to default (non-colliding) values."""
         blank_sample = PosSweep()
@@ -734,7 +734,7 @@ class PosSweep(object):
         if self.tp[step][0] == self.tp[step-1][0] and self.tp[step][1] == self.tp[step-1][1]:
             return False
         return True
-    
+
     def axis_was_moving(self, step, axis):
         '''Like was_moving, but for axis = 0 (means theta) or 1 (means phi).
         Separately defined from was_moving, to avoid some overhead when that
@@ -752,13 +752,13 @@ class PosSweep(object):
     def phi(self, step):
         """Returns phi position of the sweep at the specified timestep index."""
         return self.tp[step][1]
-    
+
     def check_continuity(self, stepsize, posmodel):
         """Checks that no abs delta theta or abs delta phi is greater than
         stepsize. Returns True if continous by this definition, False if not.
         Note that this check only makes sense to do after the sweep has been
         quantized. Returns True if only 0 or 1 elements exist in the sweep.
-        
+
         Note that a jump e.g. from 180 deg to -180 deg (as defined in posintTP
         coordinates) would intentionally fail this test, because mechanically
         these do in fact represent an enormous discontinuity (due to theta
@@ -993,7 +993,7 @@ cdef class PosPoly:
             return _polygons_collide(self.x, self.y, self.n_pts, other.x, other.y, other.n_pts)
         else:
             return False
-        
+
     cpdef unsigned int collides_with_circle(self, x, y, radius):
         """Searches for collisions in space between this polygon and
         a circle, defined by center (x,y) and radius. Returns a bool,

@@ -48,7 +48,7 @@ class Derive_Platemaker_Pars(object):
         if self.hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in self.hwsetup:
             self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'],fvc_role=self.hwsetup['fvc_role'])
         else:
-            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=True)    
+            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=True)
             self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
@@ -97,7 +97,7 @@ class Derive_Platemaker_Pars(object):
             for key in sorted(posids):
                 self.listbox1.insert(tkinter.END,str(key))
             self.listbox1.bind('<ButtonRelease-1>', self.get_list)
- 
+
 #       Load the information
             Label(gui_root,text="You selected").grid(row=3,column=5)
             self.e_selected=Entry(gui_root)
@@ -106,7 +106,7 @@ class Derive_Platemaker_Pars(object):
             mainloop()
 
             self.m.identify_many_enabled_positioners(self.selected_posids)
-  
+
             self.make_instrfile(self.m.enabled_posids)
             self.push_to_db()
             self.m.identify_disabled_positioners()
@@ -125,17 +125,17 @@ class Derive_Platemaker_Pars(object):
             plt.scatter(x,y)
             plt.show()
 
-            imgfiles=['fvc.20190108160731.fits'] 
+            imgfiles=['fvc.20190108160731.fits']
             n_sources=len(xy_fvc)
             id=[i+1 for i in range(n_sources)]
-            
+
             # Read dots identification result from ptl and store a dictionary
             pix_size=0.006
             if self.fvc.fvc_type == 'FLI':
                 flip=1  # x flip right now this is hard coded since we don't change the camera often.
             else:
                 flip=0
-                
+
             if flip==1:
                 x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             else:
@@ -206,7 +206,7 @@ class Derive_Platemaker_Pars(object):
                 flip=1
                 fvcdata=Table.read('fvc.20181203141706.pos',format='ascii.csv',header_start=0,data_start=1)
                 xy_fvc=[[fvcdata[i]['X'],fvcdata[i]['Y']] for i in range(len(fvcdata))]
-            
+
             n_sources=len(xy_fvc)
             id=[i+1 for i in range(n_sources)]
             if flip==1:
@@ -364,7 +364,7 @@ class Derive_Platemaker_Pars(object):
         if self.fvc.fvc_type=='FLI':
             pix_size=0.006
             label='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
-        else: 
+        else:
             label='scale  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
 
         pp = PdfPages('instrmaker_fit_check.pdf')
@@ -476,14 +476,14 @@ class Derive_Platemaker_Pars(object):
                 dist_arr[j]=np.sum((dist_vector_metro-dist_vector_obs)**2)
             print(dist_arr)
             ind_min,=np.where(dist_arr == min(dist_arr))
-            output_x[i]=metro_x[ind_min[0]] 
+            output_x[i]=metro_x[ind_min[0]]
             output_y[i]=metro_y[ind_min[0]]
-            mask_selected[ind_min[0]]=1 
+            mask_selected[ind_min[0]]=1
         return output_x,output_y
-        
 
 
-    
+
+
 if __name__=="__main__":
     gui = Derive_Platemaker_Pars()
 
@@ -492,7 +492,7 @@ class SourceSelector():
         """
         Tool created to click a source on a image, and return
         the source found in "sources"
-        (astropy Table returned by phot.daofind())      
+        (astropy Table returned by phot.daofind())
         """
 
         def __init__(self, im, sources ):
@@ -577,12 +577,12 @@ class SourceSelector():
                 if self.state=='':
                         print(self.sources[ind], "\n")
 
-                if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE 
+                if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE
                         print('deleting source {}'.format(self.sources['id'][ind]))
                         self.sources.remove_row(ind)
                         self.crosses.set_data(self.sources['xcentroid'],self.sources['ycentroid'])
                         plt.pause(0.01)
-                if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE 
+                if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE
                         hw = 7
                         x0 = event.xdata - hw
                         x1 = event.xdata + hw
@@ -603,7 +603,7 @@ class SourceSelector():
                                 self.crosses.set_data(self.sources['xcentroid'],self.sources['ycentroid'])
                                 plt.pause(0.01)
                 if all([event.button == 1, self.state == 'select']): # select SOURCE
-                        newsource = self.sources[ind] 
+                        newsource = self.sources[ind]
                         print('Selected source \n{}'.format(newsource))
                         if len(self.sources_selected) != 0:
                             self.sources_selected.add_row(newsource)

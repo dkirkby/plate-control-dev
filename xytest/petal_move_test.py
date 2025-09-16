@@ -56,5 +56,5 @@ for can in canlist:
 print('posids:',posids)
 ptl = petal.Petal(ptl_id, posids, fidids, simulator_on=False, user_interactions_enabled=True)
 dtdp=[50,0]
-ptl.quick_direct_dtdp(posids,dtdp,should_anneal=True)  # positive is ccw  
+ptl.quick_direct_dtdp(posids,dtdp,should_anneal=True)  # positive is ccw
 

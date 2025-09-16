@@ -59,7 +59,7 @@ for key in dir_keys_settings:
 for directory in dirs.values():
     if not os.path.isfile(directory):
         os.makedirs(directory, exist_ok=True)
-        
+
 # File locations
 positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v18.csv')
 small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
@@ -531,7 +531,7 @@ def concat_lists_of_lists(L1, L2):
         L2 = []
     elif not(isinstance(L2[0],list)):
         L2 = [L2]
-    return L1 + L2        
+    return L1 + L2
 
 # Enumeration of verbosity level to stdout
 not_verbose = 0
@@ -669,7 +669,7 @@ plot_styles = {
          'linewidth' : 1,
          'edgecolor' : 'green',
          'facecolor' : 'none'},
-        
+
     'positioner element unbold':
         {'linestyle' : '--',
          'linewidth' : 0.5,
@@ -686,26 +686,26 @@ plot_styles = {
         {'linestyle' : '-',
          'linewidth' : 2,
          'edgecolor' : 'blue',
-         'facecolor' : 'none'},                            
+         'facecolor' : 'none'},
 
     'line t0':
         {'linestyle' : '-.',
          'linewidth' : 0.5,
          'edgecolor' : 'gray',
          'facecolor' : 'none'},
-        
+
     'arm lines':
         {'linestyle' : '--',
          'linewidth' : 0.7,
          'edgecolor' : 'black',
-         'facecolor' : 'none'},        
+         'facecolor' : 'none'},
 
     'Eo':
         {'linestyle' : '-',
          'linewidth' : 0.5,
          'edgecolor' : '0.9',
          'facecolor' : 'none'},
-        
+
     'Eo bold':
         {'linestyle' : '-',
          'linewidth' : 1,

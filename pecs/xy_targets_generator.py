@@ -15,7 +15,7 @@ def filled_circle(n_points=24, radius=3.3, random=False, verbose=False):
 
 def filled_annulus(n_points=24, r_min=0.0, r_max=3.3, random=False, verbose=False):
     '''Make a cartesian grid of n_points, filling an annular region.
-    
+
     mirror symmetric about both axes,
     and filling a circle of size radius. Returns a list of size Nx2, where
     N is <= n_points (and as close to n_points as possible).
