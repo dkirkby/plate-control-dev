@@ -985,7 +985,7 @@ class Petal(object):
         for n in range(n_repeats):
             for target in targets:
                 #assert len(target) == 2 and all([isinstance(val, (int, float, np.integer, np.float)) for val in target]), f'dance: invalid target {target}'
-                assert len(target) == 2 and all([isinstance(val, (int, float)) for val in target]), f'dance: invalid target {target}'                
+                assert len(target) == 2 and all([isinstance(val, (int, float)) for val in target]), f'dance: invalid target {target}'
                 count += 1
                 sleep_time = next_allowed_move_time - time.time()
                 if sleep_time > 0:

@@ -41,7 +41,7 @@ logger.addHandler(sh)
 logger.info(f'Running {script_name} to set positioner POS_T and POS_P.')
 logger.info(f'Input file is: {args.infile}')
 logger.info(f'Input table contains {len(frame)} rows')
-    
+
 # validate the table format
 for key in required_keys:
     assert key in frame.columns, f'Error no {key} column found'

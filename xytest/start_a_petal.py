@@ -2,9 +2,9 @@
 Start a Petal
 
 # History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
-# Implemented on Beyonce on 2017-10-17, just change the data_processing_scripts relative location to work. 
-#          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
-#          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
+# Implemented on Beyonce on 2017-10-17, just change the data_processing_scripts relative location to work.
+#          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal.
+#          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check.
 """
 import os
 import sys
@@ -46,7 +46,7 @@ class Start_A_Petal(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/'+account_name+'/focalplane/pos_utility/'        
+        google_dir='/home/'+account_name+'/focalplane/pos_utility/'
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -68,16 +68,16 @@ class Start_A_Petal(object):
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
         self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
-     
+
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
         self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
-        
-        
+
+
         mainloop()
 
         gui_root = tkinter.Tk()
         self.populate_petal=populate_petal_travelers
-        self.show_detected=show_detected        
+        self.show_detected=show_detected
         self.populate_busids=populate_busids
         self.simulate = False
         self.logfile='MoveGUI.log'
@@ -85,11 +85,11 @@ class Start_A_Petal(object):
         gui_root.title='Move Controll for PC '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-        self.pospwr_on()       
+        self.pospwr_on()
         self.info = self.pcomm.pbget('posfid_info')
         self.info_all={}
-        # Generate posids and fidids list in different forms. 
-        
+        # Generate posids and fidids list in different forms.
+
         self.canbuses=sorted(self.info.keys())
         self.posids = []
         self.posidsnum = []
@@ -101,7 +101,7 @@ class Start_A_Petal(object):
             posids_thisbus=self.posidnum_to_posid(posidnum)
             self.can_posids[canbus]=posids_thisbus
             self.can_posidsnum[canbus]=posidnum
-            for i in range(len(posids_thisbus)): 
+            for i in range(len(posids_thisbus)):
                 self.posidsnum.append(posidnum[i])
                 self.info_all[posidnum[i]]= self.info_all[posidnum[i]]+(canbus,)
                 if posids_thisbus[i].startswith('M'):
@@ -123,9 +123,9 @@ class Start_A_Petal(object):
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
             self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
-        #self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        #self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)
         #self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
-       
+
         # Write a new hwsetup file
         file_this='hwsetup_petal'+self.ptl_id+'.conf'
         f = open(file_this, 'w')
@@ -150,8 +150,8 @@ class Start_A_Petal(object):
         f.write("pm_instrument = 'petal"+self.ptl_id+"' \n")            # em, desi
         f.close()
         """
-        # Move All Positioners 
-        should_anneal=False 
+        # Move All Positioners
+        should_anneal=False
         print('MOVE: homing')
         t0=time.time()
         self.ptl.request_homing(self.posids)
@@ -166,7 +166,7 @@ class Start_A_Petal(object):
             for posid in self.posids:
                 requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
             t0=time.time()
-            self.ptl.request_targets(requests) # this is the general use function, where 
+            self.ptl.request_targets(requests) # this is the general use function, where
             self.ptl.schedule_send_and_execute_moves(should_anneal=should_anneal)
             print(time.time()-t0,'s to move to dTdP=[180,0]')
 
@@ -177,14 +177,14 @@ class Start_A_Petal(object):
             for posid in self.posids:
                 requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
             t0=time.time()
-            self.ptl.request_targets(requests) # this is the general use function, where 
+            self.ptl.request_targets(requests) # this is the general use function, where
             self.ptl.schedule_send_and_execute_moves(should_anneal=should_anneal)
             print(time.time()-t0,'s to move to posXY=[-180,0]')
         """
 
 
-          
-# GUI input       
+
+# GUI input
         w=1600
         h=700
         ws=gui_root.winfo_screenwidth()
@@ -192,14 +192,14 @@ class Start_A_Petal(object):
         x=(ws/2)-(w/2)
         y=(hs/2)-(h/2)
         gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
-        
+
         Button(gui_root,text='Set',width=10,command=self.set_fiducial).grid(row=0,column=4,sticky=W,pady=4)
-        
+
         Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
         self.e1=Entry(gui_root)
         self.e1.grid(row=0,column=1)
         self.e1.insert(0,'50')
-        
+
         Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
         self.e2=Entry(gui_root)
         self.e2.grid(row=0,column=3)
@@ -224,18 +224,18 @@ class Start_A_Petal(object):
         self.stopmode=IntVar(gui_root)
         self.stopmode.set(0)
         #Checkbutton(gui_root, text='Low P', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
-    
+
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Movement Check',width=12,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
         #Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write PetalID, SiID and Busids',width=20,command=self.write_PSB).grid(row=3,column=3,sticky=W,pady=4)
-        #Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        #Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
         Button(gui_root,text='3 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
-        Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+        Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)
 
         self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
@@ -246,30 +246,30 @@ class Start_A_Petal(object):
         self.listbox1.insert(tkinter.END,'ALL')
         for canbus in sorted(self.canbuses):
             for posid in sorted(self.can_posids[canbus]):
-                self.listbox1.insert(tkinter.END,posid+' '+canbus) 
-                
+                self.listbox1.insert(tkinter.END,posid+' '+canbus)
+
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
 
         yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
-        yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
+        yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.text1=Text(gui_root,height=30,width=90,wrap=WORD)
         self.text1.grid(row=6,column=1,columnspan=4,rowspan=20,sticky=W,pady=4,padx=15)
-        self.text1.configure(yscrollcommand=yscroll_text1.set)        
+        self.text1.configure(yscrollcommand=yscroll_text1.set)
         yscroll_text1.config(command=self.text1.yview)
 # Right part of the GUI to write to Acceptance Traveller
 
-#       Load the information 
+#       Load the information
         Label(gui_root,text="You selected").grid(row=3,column=5)
         self.e_selected=Entry(gui_root)
         self.e_selected.grid(row=3,column=6)
-        
+
         Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
         Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
         Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
-        
+
         yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
-        yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
+        yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.text2=Text(gui_root,height=30,width=38)
         self.text2.grid(row=6,column=5,columnspan=2,rowspan=20,sticky=W+E+N+S,pady=4,padx=15)
         self.text2.tag_configure('bold_italics', font=('Arial', 12, 'bold', 'italic'))
@@ -277,12 +277,12 @@ class Start_A_Petal(object):
         self.text2.tag_configure('green', foreground='#476042', font=('Tempus Sans ITC', 12, 'bold'))
         self.text2.tag_configure('red', foreground='#ff0000', font=('Tempus Sans ITC', 12, 'bold'))
         self.text2.tag_configure('yellow', background='#ffff00', font=('Tempus Sans ITC', 12, 'bold'))
-        self.text2.configure(yscrollcommand=yscroll_text2.set)   
+        self.text2.configure(yscrollcommand=yscroll_text2.set)
         yscroll_text2.config(command=self.text2.yview)
-        
+
 
 ##      checkboxes
-        
+
         self.plug=IntVar(gui_root)
         self.entered=IntVar(gui_root)
         self.theta_work=IntVar(gui_root)
@@ -291,13 +291,13 @@ class Start_A_Petal(object):
         self.entered.set(1)
         self.theta_work.set(1)
         self.phi_work.set(1)
-        
+
         column_entry=7
         Checkbutton(gui_root, text='Plug?', variable=self.plug).grid(row=4,column=column_entry,sticky=W,pady=4)
         Checkbutton(gui_root, text='POS INFO Entered?', variable=self.entered).grid(row=5,column=column_entry,sticky=W,pady=4)
         Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=6,column=column_entry,sticky=W,pady=4)
         Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=7,column=column_entry,sticky=W,pady=4)
-        
+
         Label(gui_root,text="Note").grid(row=8,column=column_entry)
         self.e3=Entry(gui_root)
         self.e3.grid(row=8,column=column_entry+1)
@@ -318,26 +318,26 @@ class Start_A_Petal(object):
         #Label(gui_root,text="Update DB?, your init").grid(row=12,column=column_entry)
         #self.e6=Entry(gui_root)
         #self.e6.grid(row=12,column=column_entry+1)
-        
 
-        
+
+
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
         Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=7,sticky=W,pady=4)
         self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
         self.pwr_button.grid(row=1, column=7, sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
-        
+
         photo = PhotoImage(file='desi_logo.gif')
         photo=photo.subsample(7)
         label = Label(image=photo,width=20,height=100)
         label.image = photo # keep a reference!
         label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
-        
+
         #self.pcomm.pbset('stop_mode','off')
 
         mainloop()
-   
+
     def toggle(self, flag = [0]):
         flag[0] = not flag[0]
         if flag[0]:
@@ -348,7 +348,7 @@ class Start_A_Petal(object):
             self.pospwr_on()
             self.pwr_button.config(text='POSPWR is ON')
             self.pwr_button.config(bg='green')
- 
+
     def pospwr_on(self):
         self.pcomm.pbset('ps1_en','on')
         self.pcomm.pbset('ps2_en', 'on')
@@ -356,7 +356,7 @@ class Start_A_Petal(object):
     def pospwr_off(self):
         self.pcomm.pbset('ps1_en','off')
         self.pcomm.pbset('ps2_en','off')
-       
+
     def posidnum_to_posid(self,posidnum):
         output=[]
         for i in range(len(posidnum)):
@@ -370,15 +370,15 @@ class Start_A_Petal(object):
             elif len(str(pos_this))==4:
                 str_out='M0'+str(pos_this)
             elif len(str(pos_this))==5:
-                str_out='F'+str(pos_this)[-3:] # fiducials 
+                str_out='F'+str(pos_this)[-3:] # fiducials
             else:
                 str_out=str(pos_this)
             output.append(str_out)
         return output
- 
+
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
-        #self.canbus='can'+self.e_can.get().strip()        
+        #self.canbus='can'+self.e_can.get().strip()
         print('Loading Petal'+self.ptl_id)
         gui_root.destroy()
     def set_fiducial(self):
@@ -404,7 +404,7 @@ class Start_A_Petal(object):
         else:
             #self.pcomm.pbset('stop_mode','off')
             pass
- 
+
     def get_list(self,event):
         # get selected line index
         index = self.listbox1.curselection()
@@ -413,7 +413,7 @@ class Start_A_Petal(object):
         self.selected_posid=[]
         self.selected_can=[]
         for i in range(len(index)):
-            self.selected.append(self.listbox1.get(index[i])[0:6])        
+            self.selected.append(self.listbox1.get(index[i])[0:6])
             if 'ALL' in self.selected:
                 self.selected_posid=self.posids
                 self.selected_can=[20000]
@@ -427,13 +427,13 @@ class Start_A_Petal(object):
         for key,value in sid_dict.items():
             sid_dict[key] = ":".join("{:02x}".format(c) for c in value)
         return sid_dict
-            
+
     def show_info(self):
         self.text1.insert(END,str(len(self.info_all.keys())).strip()+' Pos+Fid are found \n')
         for key in sorted(self.info_all.keys()):
             self.text1.insert(END,str(key)+' '+str(self.info_all[key])+'\n')
-            
-        
+
+
     def theta_cw_degree(self):
         degree=float(self.e1.get())
         dtdp=[-degree,0]
@@ -443,7 +443,7 @@ class Start_A_Petal(object):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', degree)
         else:
             self.quick_direct_dtdp(self.selected_posid,dtdp)
-        
+
     def theta_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[degree,0]
@@ -452,7 +452,7 @@ class Start_A_Petal(object):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', degree)
         else:
             self.quick_direct_dtdp(self.selected_posid,dtdp)
-  
+
     def phi_cw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,-degree]
@@ -461,7 +461,7 @@ class Start_A_Petal(object):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'phi', degree)
         else:
             self.quick_direct_dtdp(self.selected_posid,dtdp)
-        
+
     def phi_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,degree]
@@ -470,7 +470,7 @@ class Start_A_Petal(object):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', degree)
         else:
             self.quick_direct_dtdp(self.selected_posid,dtdp)
-    
+
     def center(self):
         if self.mode.get()==1:
             for i in range(len(self.selected_can)):
@@ -482,13 +482,13 @@ class Start_A_Petal(object):
             for i in range(len(self.selected_can)):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', 195)
 
-            
-       #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
+
+       #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
         else:
             dtdp=[-400,200]
-            self.quick_direct_dtdp(self.selected_posid,dtdp)       
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
             dtdp=[195,0]
-            self.quick_direct_dtdp(self.selected_posid,dtdp)   
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
             self.text1.insert(END,'Centering Done \n')
 
     def movement_check(self):
@@ -519,12 +519,12 @@ class Start_A_Petal(object):
                     #time.sleep(3)
 
                 for i in range(5):
-                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.]) 
+                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.])
                     #time.sleep(3)
                     self.quick_direct_dtdp(self.selected_posid,[30,0.])
                     #time.sleep(3)
             except Exception as e:
-                print('FAILED: ' + str(e)) 
+                print('FAILED: ' + str(e))
         self.center()
         self.text1.insert(END,'Movement Check Done \n')
 
@@ -544,11 +544,11 @@ class Start_A_Petal(object):
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.ptl.request_direct_dtdp(requests)
         self.ptl.schedule_send_and_execute_moves(should_anneal=False)
- 
+
     def write_PSB(self):
         self.text1.insert(END,'Writing PetalID, SiID, BUS_ID \n')
         petal_id=input('Enter Petal ID:')
-         
+
         for key in sorted(self.info_all.keys()):
             info_this=self.info_all[key]
             if float(key)<8000:
@@ -603,14 +603,14 @@ class Start_A_Petal(object):
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot load all positioners simultaneously. \nSelect one positioner.\n')
-        else: 
+        else:
             # Find the column we want first
             pos_list=googlesheets.read_row(self.sheet2,2,False)
             column_skip=6 # Skip the first 6 description columns
             pos_list=np.array(pos_list[column_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
-            ind=np.where(pos_list == selected_can_str)          
+            ind=np.where(pos_list == selected_can_str)
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner while loading... \n')
             else:
@@ -619,7 +619,7 @@ class Start_A_Petal(object):
                 column_info_title=googlesheets.read_col(self.sheet2,2,False)
                 ref_list=['', '', '', '', '', '', '', '',  'A','','', '', '', '', '','','Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', 'P', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','','','','','']
                 #['', '', '', '2017-10-23', '', '1748', '5899', '', '', 'John Mourelatos', '2017-10-23', '', '1.15', 'A', '4.3', 'A', '', '', '', 'John Mourelatos', '2017-10-23', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', 'John Mourelatos', '2017-10-23', 'P', '0.00997', '0.12588', 'SKIP', 'SKIP', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '0.13585', '', 'YES', '', '', '', '2017-11-03', 'KAI ZHANG', 'GREY TOTE\n---------\nREADY FOR PFA INSTALL', 'KZ']
-                 
+
                 for i in range(len(column_info)):
                     if ref_list[i] == '' or column_info[i] == ref_list[i]:
                         if column_info_title[i] == 'DOCUMENT_DEVIATION' and column_info[i] != '':
@@ -629,7 +629,7 @@ class Start_A_Petal(object):
                             self.text2.insert(END,str(column_info_title[i])+': ','big')
                             self.text2.insert(END,str(column_info[i])+'\n','red')
                         elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] == '':
-                            self.text2.insert(END,str(column_info_title[i])+': ','yellow')                        
+                            self.text2.insert(END,str(column_info_title[i])+': ','yellow')
                         elif column_info_title[i] == 'THETA_PHI_ANGLE' and float(column_info[i])>0.5:
                             self.text2.insert(END,str(column_info_title[i])+': ','big')
                             self.text2.insert(END,str(column_info[i])+'\n','red')
@@ -638,7 +638,7 @@ class Start_A_Petal(object):
                             self.text2.insert(END,str(column_info[i])+'\n','red')
                         elif column_info_title[i] == 'COMBINED_ANGLE':
                             if column_info[i] == '':
-                               self.text2.insert(END,str(column_info_title[i])+': \n','yellow') 
+                               self.text2.insert(END,str(column_info_title[i])+': \n','yellow')
                             elif float(column_info[i])>0.5:
                                 self.text2.insert(END,str(column_info_title[i])+': ','big')
                                 self.text2.insert(END,str(column_info[i])+'\n','red')
@@ -651,23 +651,23 @@ class Start_A_Petal(object):
                     else:
                         self.text2.insert(END,str(column_info_title[i])+': ','big')
                         self.text2.insert(END,str(column_info[i])+'\n','red')
-        
-        
-        
+
+
+
     def write_acceptance_traveller(self):
         self.text2.delete('0.0', END)
         self.e4.delete(0, END)
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot write all positioners simultaneously for safety reason. \nSelect one positioner.\n')
-        else: 
+        else:
             # Find the column we want first
             pos_list=googlesheets.read_row(self.sheet2,2,False)
             column_skip=6 # Skip the first 6 description columns
             pos_list=np.array(pos_list[column_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
-            ind=np.where(pos_list == selected_can_str)          
+            ind=np.where(pos_list == selected_can_str)
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner...\n')
             else:
@@ -700,13 +700,13 @@ class Start_A_Petal(object):
                     googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
                     googlesheets.write(self.sheet2,61,'Y',False,False)
                 self.load_acceptance_traveller()
-    
-    
+
+
     def restart(self):
         gui_root.destroy()
         MoveGUI()
     def reload_canbus(self):
-        self.canbus='can'+self.e_can.get().strip()        
+        self.canbus='can'+self.e_can.get().strip()
         self.bus_id=self.canbus
         self.info = self.pcomm.pbget('posfid_info')
         self.info = self.info[self.canbus]
@@ -746,7 +746,7 @@ class Start_A_Petal(object):
         self.text1.delete('0.0', END)
     def clear2(self):
         self.text2.delete('0.0', END)
-        
+
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
         """
@@ -755,6 +755,6 @@ class Start_A_Petal(object):
             fh.write(line + '\n')
         if stdout:
             print(line)
-            
+
 if __name__=="__main__":
     gui = Start_A_Petal()

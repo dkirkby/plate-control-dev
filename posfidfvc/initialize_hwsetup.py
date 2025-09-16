@@ -75,7 +75,7 @@ if USE_LOCAL_PRESETS:
 if USE_LOCAL_PRESETS:
 	print("")
 	print("  Using code tag: "+os.environ['TEST_TAG'])
-	print("")	
+	print("")
 	print("The following presets will be used:")
 	print("")
 	print("  Hardware setup file: "+str(hwsetup_conf))
@@ -85,7 +85,7 @@ if USE_LOCAL_PRESETS:
 	print("  Should identify fiducials: "+str(should_identify_fiducials))
 	print("")
 	print("  Is this correct? (hit 'y' for yes or any key otherwise)")
-	sel=_read_key().__call__()     
+	sel=_read_key().__call__()
 	if sel.lower() !='y':
 		USE_LOCAL_PRESETS=False
 	else:
@@ -119,11 +119,11 @@ if not(sim):
 		try:
 			print("")
 			svn_user=input("Please enter your SVN username: ")
-			svn_pass=getpass.getpass("Please enter your SVN password: ")      
+			svn_pass=getpass.getpass("Please enter your SVN password: ")
 			svn_auth_err=False
 		except:
 			svn_auth_err=True
-  
+
 	svn_update_dirs = [pc.dirs[key] for key in ['pos_logs','pos_settings','xytest_logs','xytest_summaries']]
 
 	if not USE_LOCAL_PRESETS:
@@ -141,8 +141,8 @@ if not(sim):
 if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
     fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],platemaker_instrument=hwsetup['pm_instrument'])
 else:
-    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits']) 
-#fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])
+#fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])
 fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
@@ -163,7 +163,7 @@ if petal_proxy:
     ptl = Petal(hwsetup['ptl_id'])
 else:
     #shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
+    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[],
                       simulator_on = sim,
                       user_interactions_enabled = True,
                       db_commit_on = db_commit_on,
@@ -201,13 +201,13 @@ message_local='Please check the above list of all the positioners and fiducials 
 if not USE_LOCAL_PRESETS:
 	if not tkinter.messagebox.askyesno(title='IDs correct?',message=message):
 		tkinter.messagebox.showinfo(title='Quitting',message='Ok, will quit now so the IDs can be fixed.')
-		gui_root.withdraw()    
+		gui_root.withdraw()
 		sys.exit(0)
 else:
 	print("")
 	print(message_local)
 	print("  Hit 'y' for yes or any key otherwise)")
-	sel=_read_key().__call__()     
+	sel=_read_key().__call__()
 	if sel.lower() !='y':
 		print('Ok, will quit now so the IDs can be fixed.')
 		sys.exit()
@@ -295,7 +295,7 @@ if should_commit_to_svn:
 			err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
 			err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
 			print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
-	else:			
+	else:
 		commit_message="autocommit from initialize_hwsetup script"
 		n_total = len(new_and_changed_files)
 		flist=list(new_and_changed_files)
@@ -308,7 +308,7 @@ if should_commit_to_svn:
 			except:
 				pass
 		print("Added "+str(n_add)+' files out of '+str(n_total))
-		try:	
+		try:
 			loc_repo.commit(commit_message,flist)
 		except:
 			import datetime

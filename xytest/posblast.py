@@ -1,5 +1,5 @@
 import sys
-import os 
+import os
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
 import petalcomm
@@ -7,9 +7,9 @@ import googlesheets
 import posdance
 
 canbus = 'can0'
-        
+
 if __name__ == '__main__':
-    
+
     _sel = posdance._read_key()
     loop = True
     ptlID = input("Input Petal ID:")
@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
         choice = _sel.__call__()
         choice = choice.lower()
-      
+
         if choice == 'e':
             sys.exit()
 
@@ -46,10 +46,10 @@ if __name__ == '__main__':
                 else:
                     print("Could not find " + sid + " in silicon ID log")
 
-        if choice == 'm': 
+        if choice == 'm':
             poslist = []
             print('Input all positioner IDs that you wish to go into the summary, and type \'done\' when finished')
-           
+
             posinput = ''
             while posinput != 'done':
                 posinput = input('Positioner ID: ')
@@ -70,40 +70,40 @@ if __name__ == '__main__':
                 sidlist.append(sid)
 
             for posid in poslist:
-               
+
                 input("Please plug in positioner " + posid + " and press Enter.")
-           
+
                 for x in range(len(posid)):
                     if not (posid[x] == 'M' or posid[x] == '0'):
                         posid = str(posid[x::])
                         break
-               
+
                 newsids = []
                 infodict = pcomm.get_posfid_info(canbus)
 
                 for info in infodict.values():
                     sid = info[3]
                     newsids.append(sid)
-                    
+
                 for oldsid in sidlist:
                     newsids.pop(newsids.index(oldsid))
-                
+
                 if len(newsids) == 1:
                     sidlist.append(newsids[0])
-                    pcomm.set_canid(canbus, newsids[0], posid) 
+                    pcomm.set_canid(canbus, newsids[0], posid)
                 else:
                     print('Error - expected one new silicon ID but detected either none or more than this:' + str(newsids))
                     break
 
-        if choice == 'h':            
-            
+        if choice == 'h':
+
             infodict = pcomm.get_posfid_info(canbus)
             poslist = sorted(list(infodict.keys()))
 
             print(poslist)
 
         if choice == 'c':
-            
+
             print('Would you like to log the following posids and silicon ids to a particular traveler? [y/n]')
             choice2 = _sel.__call__()
             choice2 = choice.lower()
@@ -115,7 +115,7 @@ if __name__ == '__main__':
                 next_empty_col = 7     #hard coded for now
                 while used_spaces[next_empty_col-1] != '':
                     next_empty_col += 1
-                                             
+
             posinput = input('Positioner ID: ')
             while posinput != 'done':
                 firstchar = posinput[0]
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                         posinput = newinput + posinput
                     googlesheets.write(traveler, 'POS_ID', next_empty_col, posinput, ID_col_with_data = False)
                     googlesheets.write(traveler, 'SI_ID',  next_empty_col, sid, ID_col_with_data = False)
-                 
+
                 else:
                     print("The wrong number of positioners is currently plugged in")
                 posinput = input("Programmed CAN ID " + posinput + " .\nUnplug the positioner and input the next ID (type 'done' when finished):")
@@ -162,7 +162,7 @@ if __name__ == '__main__':
 
 
 
-                       
+
 
 
 

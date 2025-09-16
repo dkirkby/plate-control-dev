@@ -35,7 +35,7 @@ try:
     join_instance(inst, must_be_running=True)
 except Exception as e:
     print(f'FP_SETUP: Exception joining instance {inst}: {str(e)}')
-    sys.exit(1) 
+    sys.exit(1)
 
 update_error_report_thresh = 1.0 #warn user that an update of more than value mm was found
 

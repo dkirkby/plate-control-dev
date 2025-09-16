@@ -33,9 +33,9 @@ try:
 		fboxsize=7
 except:
 	print("Proper use: python3 spotfit.py <n_centroids_expected> <fits_filename> <fitbox_size>")
-	sys.exit()		
+	sys.exit()
 #fname='peak_12548.4_fwhm_-0.338_sizefitbox_7.FITS'
-img=pyfits.getdata(fname) 
+img=pyfits.getdata(fname)
 
 #t0=time.time()
 xCenSub, yCenSub, peaks, FWHMSub, filename =multicens.multiCens(img, n_centroids_to_keep=nspots, verbose=False, write_fits=False,size_fitbox=fboxsize)
@@ -46,7 +46,7 @@ energy=[FWHMSub[i]*(peaks[i]/max_counts) for i in range(len(peaks))]
 print(" File: "+str(fname))
 print(" Number of centroids requested: "+str(nspots))
 print(" Fitboxsize: "+str(fboxsize))
-print(" Centroid list:")  
+print(" Centroid list:")
 print(" Spot  x         y          FWHM    Peak     LD  ")
 
 # sort by peak value

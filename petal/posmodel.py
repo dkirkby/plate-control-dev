@@ -40,7 +40,7 @@ class PosModel(object):
     @property
     def is_linphi(self):
         return self.state._val['ZENO_MOTOR_P'] is True
-        
+
     def get_zeno_scale(self, which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
         scale = self.state._val[which]
         if scale is None:

@@ -8,12 +8,12 @@ import time
 
 def start_logger(paths=None):
     '''Initializes a logger which will output log files to one or more paths.
-    
+
     Returns a tuple:
         tuple[0] ... logger instance
         tuple[1] ... file handler associated to logger
         tuple[2] ... stream handler associated to logger
-    
+
     If no paths argument, then logs only to shell.'''
     clear_logger()
     global logger
@@ -45,7 +45,7 @@ def clear_logger():
         return
     for h in logger.handlers:
         logger.removeHandler(h)
-    
+
 def assert2(test, message, show_quit_msg=True):
     '''Like an assert, but cleaner handling of logging.'''
     if not test:
@@ -53,7 +53,7 @@ def assert2(test, message, show_quit_msg=True):
         if show_quit_msg:
             logger.warning('Now quitting, so user can check inputs.')
         assert False  # for ease of jumping back into the error state in ipython debugger
-        
+
 def input2(message):
     '''Wrapper for input which will log the interaction.'''
     logger.info(f'PROMPT: {message}')

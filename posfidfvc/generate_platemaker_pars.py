@@ -36,13 +36,13 @@ class Generate_Platemaker_Pars(object):
         if self.hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in self.hwsetup:
             self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'])
         else:
-            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'])    
+            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'])
             self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
 
-        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'], 
-                  petalbox_id = self.hwsetup['petalbox_id'], 
+        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],
+                  petalbox_id = self.hwsetup['petalbox_id'],
                   posids = [],
                   fidids = [],
                   simulator_on = False,
@@ -95,7 +95,7 @@ class Generate_Platemaker_Pars(object):
             mainloop()
 
             self.m.identify_many_enabled_positioners(self.selected_posids)
- 
+
             self.make_instrfile(self.m.enabled_posids)
             self.push_to_db()
             self.m.identify_disabled_positioners()
@@ -320,7 +320,7 @@ class SourceSelector():
         """
         Tool created to click a source on a image, and return
         the source found in "sources"
-        (astropy Table returned by phot.daofind())      
+        (astropy Table returned by phot.daofind())
         """
 
         def __init__(self, im, sources ):
@@ -392,11 +392,11 @@ class SourceSelector():
                 if self.state=='':
                         print(self.sources[ind], "\n")
 
-                if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE 
+                if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE
                         print('deleting source {}'.format(self.sources['id'][ind]))
                         self.sources.remove_row(ind)
 
-                if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE 
+                if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE
                         hw = 7
                         x0 = event.xdata - hw
                         x1 = event.xdata + hw
@@ -478,4 +478,4 @@ class SourceSelector():
 
 
 
-    
+

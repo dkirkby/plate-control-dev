@@ -15,7 +15,7 @@ _blank_str = '-'
 
 class PosSchedStats(object):
     """Collects statistics from runs of the PosSchedule.
-    
+
     By default, the module starts out disabled. You can override this with a
     boolean value True to initialization argument enabled. Or use the enable()
     and disable() methods separately.
@@ -27,13 +27,13 @@ class PosSchedStats(object):
             self.enable()
         self.clear_cache_after_save = True
         self.filename_suffix = ''
-    
+
     def is_enabled(self):
         '''Boolean whether statistics tracking is currently turned on.'''
-        if self._is_enabled and self.schedule_ids: # 2nd expression is to avoid storing to improperly empty structure (i.e. no schedule yet registered) 
+        if self._is_enabled and self.schedule_ids: # 2nd expression is to avoid storing to improperly empty structure (i.e. no schedule yet registered)
             return True
         return False
-    
+
     def enable(self):
         '''Turn module on, ready for statistics tracking. Any existing
         data in the cache will be cleared.'''
@@ -42,26 +42,26 @@ class PosSchedStats(object):
             carryover_npos = self.numbers['n pos'][-1] # for cases where enabling stats while some posschedule instance (unregistered) already exists
         self._init_data_structures(num_pos=carryover_npos)
         self._is_enabled = True
-    
+
     def disable(self):
         '''Turn module off, disabled for any statistics tracking.'''
         self._is_enabled = False
-    
+
     @property
     def n_rows(self):
         '''Number of rows present in the data structure, considering each
         registered schedule to be a 'row'.'''
         return len(self.schedule_ids)
-    
+
     @property
     def latest(self):
         '''Get latest 'row', i.e. latest registered schedule id, which acts
         as an index to that row.'''
         return self.schedule_ids[-1]
-    
+
     def _init_data_structures(self, num_pos=None):
         '''Initialize data structures.
-        
+
         Note the argument num_pos may be entered in special cases where the
         number of positioners is already known. This value will be put into the
         first (unregistered) row of the data structure. In most cases no need
@@ -96,10 +96,10 @@ class PosSchedStats(object):
         self._latest_saved_row = None
         dummy_id = pc.timestamp_str() + ' (' + _unregistered_schedule_str + ')'
         self.register_new_schedule(schedule_id=dummy_id, num_pos=num_pos)
-    
+
     def register_new_schedule(self, schedule_id, num_pos=None):
         """Register a new schedule object to track statistics of.
-        
+
            schedule_id ... unique string
            num_pos     ... number of positioners
         """
@@ -120,7 +120,7 @@ class PosSchedStats(object):
     def set_num_move_tables(self, n):
         """Record number of move tables in the current schedule."""
         self.numbers['n move tables'][-1] = n
-        
+
     def add_hardware_move_tables(self, tables):
         """Records stats (not necessarily each whole table) on tables."""
         if not tables:
@@ -129,14 +129,14 @@ class PosSchedStats(object):
         self.numbers['max num table rows'][-1] = max(lengths)
         self.numbers['avg num table rows'][-1] = np.mean(lengths)
         self.numbers['std num table rows'][-1] = np.std(lengths)
-        
+
     def add_collisions_found(self, collision_pair_ids):
         """Add collisions that have been found in the current schedule.
             collision_pair_ids ... set of colliding posids
         """
         these_collisions = self.collisions[self.latest]
         these_collisions['found'] = these_collisions['found'].union(collision_pair_ids)
-        
+
     def add_collisions_resolved(self, posid, method, collision_pair_ids):
         """Add collisions that have been resolved in the current schedule.
             posid ... string, the positioner that was adjusted
@@ -150,7 +150,7 @@ class PosSchedStats(object):
         this_dict[method] = this_dict[method].union(collision_pair_ids)
         for pair in collision_pair_ids:
             self.add_avoidance(posid, method, pair)
-            
+
     def add_avoidance(self, posid, method, collision_pair_id):
         '''Add an avoidance method for a collision that has been resolved in the
         current schedule.
@@ -165,7 +165,7 @@ class PosSchedStats(object):
         if posid not in self.avoidances[latest]:
             self.avoidances[latest][posid] = []
         self.avoidances[latest][posid] += [f'{method}/{other}']
-        
+
     def get_collisions_resolved_by(self, method='freeze'):
         '''Returns set of all collisions resolved by method in the latest
         schedule.'''
@@ -173,7 +173,7 @@ class PosSchedStats(object):
         if method in this_dict:
             return this_dict[method].copy()
         return {}
-    
+
     def get_avoidances(self, posid):
         '''Returns collection of all collision avoidances for that positioner
         in the latest schedule. Will be empty if none found.'''
@@ -182,7 +182,7 @@ class PosSchedStats(object):
         if posid in self.avoidances[latest]:
             out = self.avoidances[latest][posid]
         return out
-    
+
     @property
     def total_unresolved(self):
         '''Returns count of how many collisions were recorded as unresolved after
@@ -192,7 +192,7 @@ class PosSchedStats(object):
         if value == None:
             return 0
         return value
-    
+
     @property
     def total_resolved(self):
         '''Returns count of how many collisions were recorded as resolved.
@@ -202,7 +202,7 @@ class PosSchedStats(object):
         for collision_pairs in this_dict.values():
             count += len(collision_pairs)
         return count
-    
+
     @property
     def unresolved_posids(self):
         '''Returns set of posids that were recorded as unresolved after final
@@ -212,24 +212,24 @@ class PosSchedStats(object):
         if 'final' in unresolved:
             return unresolved['final']
         return {}
-        
+
     def add_request(self):
         """Increment requests count."""
         self.numbers['n requests'][-1] += 1
-        
+
     def add_request_accepted(self):
         """Increment requests accepted count."""
         self.numbers['n requests accepted'][-1] += 1
-    
+
     def sub_request_accepted(self):
         """Deccrement requests accepted count."""
         if self.numbers['n requests accepted'][-1] > 0:
             self.numbers['n requests accepted'][-1] -= 1
-    
+
     def add_table_matching_request(self):
         """Increment number of tables matching their original requests."""
         self.numbers['n tables achieving requested-and-accepted targets'][-1] += 1
-            
+
     def add_requesting_time(self, time):
         """Add in time spent processing target requests in the current schedule."""
         self.numbers['request_target calc time'][-1] += time
@@ -247,7 +247,7 @@ class PosSchedStats(object):
     def set_scheduling_method(self, method):
         """Set scheduling method (a string) for the current schedule."""
         self.strings['method'][-1] = str(method)
-    
+
     def add_note(self, note):
         """Add a note string for the current schedule. If one already exists,
         then the argued note will be appended to it, with a standard separator.
@@ -260,7 +260,7 @@ class PosSchedStats(object):
         else:
             new = pc.join_notes(old, note)
         self.strings['note'][-1] = new
-        
+
     def set_max_table_time(self, time):
         """Set the maximum move table time in the current schedule."""
         self.numbers['max table move time'][-1] = time
@@ -268,7 +268,7 @@ class PosSchedStats(object):
     def add_to_num_adjustment_iters(self, iterations):
         """Add data recording number of iterations of path adjustment were made."""
         self.numbers['num path adjustment iters'][-1] += iterations
-        
+
     def add_final_collision_check(self, collision_pairs):
         """Add data recording if there were still any bots colliding after a
         final check."""
@@ -276,7 +276,7 @@ class PosSchedStats(object):
             self.numbers[final_checks_str][-1] = 0
         self.numbers[final_checks_str][-1] += len(collision_pairs)
         self.final_checked_collision_pairs[self.latest] = collision_pairs
-    
+
     def add_unresolved_colliding_at_stage(self, stage_name, colliding_set, colliding_tables, colliding_sweeps):
         """Add data recording ids of any bots colliding in a given stage. This
         is distinct from "final" check data."""
@@ -290,7 +290,7 @@ class PosSchedStats(object):
         self.unresolved[self.latest][stage_name].update(colliding_set)
         self.unresolved_tables[self.latest][stage_name].update(colliding_tables_copies)
         self.unresolved_sweeps[self.latest][stage_name].update(colliding_sweeps)
-    
+
     def summarize_collision_resolutions(self):
         """Returns a summary dictionary of the collisions and resolutions data."""
         summary = {}
@@ -316,7 +316,7 @@ class PosSchedStats(object):
             summary['resolved set'].append(coll['resolved'])
             summary[found_not_registered_str].append(self.found_but_not_resolved(coll['found'],coll['resolved']))
         return summary
-    
+
     def summarize_unresolved_colliding(self):
         """Returns a summary dictionary of the unresolved colliding items."""
         summary = {'unresolved colliding':[], 'unresolved colliding tables':[], 'unresolved colliding sweeps':[], 'final check collision pairs found':[]}
@@ -326,7 +326,7 @@ class PosSchedStats(object):
             summary['unresolved colliding sweeps'].append(self.unresolved_sweeps[sched])
             summary['final check collision pairs found'].append(self.final_checked_collision_pairs[sched])
         return summary
-        
+
     def summarize_all(self):
         """Returns a summary dictionary of all data."""
         data = {'schedule id':self.schedule_ids}
@@ -343,7 +343,7 @@ class PosSchedStats(object):
             data.update({key:self.strings[key]})
         stripped_data, stripped_nrows = self._copy_and_strip_null_rows(data)
         return stripped_data, stripped_nrows
-    
+
     def _copy_and_strip_null_rows(self, data):
         '''Copies summary data structure and strips out any rows that are
         considered "null". Very low-level implementation-specifc stuff, broken
@@ -361,10 +361,10 @@ class PosSchedStats(object):
     def _row_contains_real_data(self, row=-1):
         '''Checks whether a row contains any actual data, or is instead
         completely filled with "null" values. Arguments to input row:
-            
+
             -1 ... last row in data structure
                    (function returns False if data structure is completely empty)
-            
+
             integer >= 0 ... data in that row index
                    (function returns False if that's not a valid index)
         '''
@@ -392,7 +392,7 @@ class PosSchedStats(object):
             elif value != 0:
                 return True
         return False
-    
+
     def _recursive_is_collection_empty(self, item):
         '''Recursively search a collection and any subcollections it contains,
         returning 1 if any of them contain data, and 0 if not. Here, "data"
@@ -414,7 +414,7 @@ class PosSchedStats(object):
     def generate_table(self, footers=False):
         """Returns a pandas dataframe representing a complete report table of
         the current stats.
-        
+
         If the argument footers=True, then a number of rows will be returned
         instead, which match up to the normal table. These special rows will
         give max, min, mean, rms, and median for each data column, collated by
@@ -469,7 +469,7 @@ class PosSchedStats(object):
         value is the path that was generated. If path is specified, it should
         have '.csv' file extension. Repeated calls to save() with the same path
         will generally append rows to that csv file.
-        
+
         Boolean argument "footers" instead appends some extra summary statistics
         to the bottom of the output table. These are helpful for  debugging ---
         saves time processing the table --- but may look weird if you are going
@@ -509,16 +509,16 @@ class PosSchedStats(object):
         if self.clear_cache_after_save:
             self._init_data_structures()
         return path
-    
+
     @staticmethod
     def found_but_not_resolved(found, resolved):
         """Searches through the dictionary of resolved collision pairs, and
         eliminates these from the set of found collision pairs.
-        
+
         Inputs:
             found ... set of strings
             resolved ... dict with keys = strings, values = sets of strings
-            
+
         Output:
             set of strings
         """

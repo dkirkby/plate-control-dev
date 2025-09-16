@@ -80,7 +80,7 @@ def mightex_test(verbose=0,tolerance=8):
     # initialize random number generator
     done=0
     random.seed()
-    
+
     failcount=[0 for j in range(len(m))]
     if(0!=verbose):
         for i in range(len(m)):
@@ -132,5 +132,5 @@ def mightex_test(verbose=0,tolerance=8):
 
         # end of loop
     print("Done")
- 
+
 

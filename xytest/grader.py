@@ -111,7 +111,7 @@ d = collections.OrderedDict()
 for posid in posids:
 	d[posid] = {}
 	d[posid]['file'] = files[posids.index(posid)]
- 
+
 # identify motor types
 ask_ignore_gearbox = True
 ignore_gearbox = False
@@ -139,7 +139,7 @@ else:
 	for posid in d.keys():
 		if d[posid]['has extended gearbox'] == 'unknown':
 			d[posid]['has extended gearbox'] = False # assume non-extension in unknown cases (conservative representation of yields, since extended is generally worse-performing)
-			
+
 # read in the summary data
 ask_ignore_min_tests = True
 ignore_min_tests = False
@@ -193,14 +193,14 @@ for posid in d.keys():
 for posid in pos_to_delete:
 	del d[posid]
 	del posids[posids.index(posid)]
-	
+
 # establish the type of fail grade (non-extension vs extension)
 for posid in d.keys():
 	if d[posid]['has extended gearbox']:
 		d[posid]['fail grade label'] = fail_grade_ext
 	else:
 		d[posid]['fail grade label'] = fail_grade
-		
+
 # gather up all grades passed for each test loop for each positioner
 for posid in d.keys():
 	d[posid]['row grade'] = []
@@ -269,7 +269,7 @@ for posid in d.keys():
 		d[posid]['num moves passing'] = d[posid]['total move sequences at finish'][final_row_idx]
 	if d[posid]['num moves at failure'] == np.Inf:
 		d[posid]['num moves at failure'] = 'n/a' # for formatting in report
-		
+
 # count how many test rows prove this grade
 for posid in d.keys():
 	d[posid]['consecutive tests proving grade'] = []
@@ -289,7 +289,7 @@ for posid in d.keys():
 
 # gather up lifetime statistics
 lifestats = collections.OrderedDict()
-for key in ['ranges','num tested regular','num tested ext'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
+for key in ['ranges','num tested regular','num tested ext'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:
 	lifestats[key] = []
 for i in range(len(important_lifetimes)-1):
 	low = important_lifetimes[i]
@@ -304,7 +304,7 @@ for i in range(len(important_lifetimes)-1):
 				this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
 				if any(this_pos_all_grades_this_bin) and grade == this_pos_all_grades_this_bin[-1]:
 					num_this_grade_this_bin += 1
-					num_all_grades_this_bin += 1                  
+					num_all_grades_this_bin += 1
 			lifestats['Qty ' + grade].append(num_this_grade_this_bin)
 		for grade in these_all_grades:
 			num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
@@ -347,7 +347,7 @@ if report_file:
 		for stage in ['final','start']:
 			header_text = 'TOTALS FOR EACH GRADE:  '
 			if stage == 'start':
-				header_text += '** INITIAL (at burn-in >= ' + str(num_moves_infant_mortality) + ' moves) **' 
+				header_text += '** INITIAL (at burn-in >= ' + str(num_moves_infant_mortality) + ' moves) **'
 			else:
 				header_text += '** FINAL (latest values) **'
 			writer.writerow([header_text])
@@ -371,7 +371,7 @@ if report_file:
 				if num_insuff > 0:
 					writer.writerow(['',insuff_data_grade,num_insuff])
 				writer.writerow([''])
-		writer.writerow(['LIFETIME STATISTICS:'])         
+		writer.writerow(['LIFETIME STATISTICS:'])
 		writer.writerow(['',''] + [r for r in lifestats['ranges']])
 		for has_ext in [False,True]:
 			label = 'regular' if not(has_ext) else 'ext'
@@ -419,7 +419,7 @@ for posid in d.keys():
 def sort_alldata_by(sort_key):
 	sorted_idxs = np.argsort(alldata[sort_key])
 	for key in alldata.keys():
-		alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()   
+		alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()
 
 # write plots
 gui_root = tkinter.Tk()
@@ -483,12 +483,12 @@ while keep_asking:
 				num_moves = [0]
 				last_grade = dict([(posid,None) for posid in d.keys()])
 				cleanup_posid = None
-				for i in range(len(alldata['num moves'])):                    
+				for i in range(len(alldata['num moves'])):
 					this_num_moves = alldata['num moves'][i]
 					if this_num_moves > num_moves[-1]:
 						num_moves.append(this_num_moves)
 						for grade in num_pos_in_each_grade.keys():
-							num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])   
+							num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
 					this_posid = alldata['posid'][i]
 					this_grade = alldata['row grade'][i]
 					if last_grade[this_posid] != this_grade:

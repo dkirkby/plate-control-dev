@@ -20,7 +20,7 @@ this_site=i_conf['site']
 hw_conf=configobj.ConfigObj(hwdir+'hwsetup_'+this_site+'.conf',unrepr=True,encoding='utf-8')
 
 NOTIFY=hw_conf['watcher']['notify']
-#NOTIFY=['schubnel@umich.edu','7343951248@txt.att.net','kfanning@umich.edu','2488187909@messaging.sprintpcs.com'] 
+#NOTIFY=['schubnel@umich.edu','7343951248@txt.att.net','kfanning@umich.edu','2488187909@messaging.sprintpcs.com']
 """ Alltel: phonenumber@message.alltel.com.
     AT&T: phonenumber@txt.att.net.
     T-Mobile: phonenumber@tmomail.net.
@@ -35,7 +35,7 @@ SUBJECT='Test stand '+str(this_site)+' alarm'
 
 def getpids(procname='xytest.py'):
 	aux=os.popen("ps aux").read()
-	pids=[]	
+	pids=[]
 	for line in aux.split('\n'):
 		    if procname in line:
 		            pids.append(line.split()[1])
@@ -50,10 +50,10 @@ if __name__=="__main__":
 
 	run=True
 	if PROCNAME == 'xytest.py':
-		while run:		 		
+		while run:
 			if (len(pids) !=1) or ( not os.path.exists("/proc/"+pids[0])):
 				finishcheck = list(open(newestfile, 'r'))[-2]
-				if finishcheck[-15:-1] == "Test complete.":                        
+				if finishcheck[-15:-1] == "Test complete.":
 					alarm.send (SUBJECT,'xytest is complete')
 				else:
 					alarm.send (SUBJECT,'xytest has crashed')
@@ -65,5 +65,5 @@ if __name__=="__main__":
 				alarm.send (SUBJECT,'xytest no longer running')
 				sys.exit()
 			sleep(INTERVAL)
-			
+
 

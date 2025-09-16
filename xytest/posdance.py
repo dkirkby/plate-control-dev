@@ -9,7 +9,7 @@ else:
 	sys.path.append(os.path.abspath('../petal/'))
 
 import petalcomm
-import time 
+import time
 
 class _read_key:
 	def __init__(self):
@@ -28,7 +28,7 @@ class _read_key:
 		finally:
 			termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 		return ch
-	
+
 def MoveAllandWait(direction, motor, angle):
 	'''
 	Moves the specified motor of every positioner a specified direction and specified angle, then waits 5 seconds so that
@@ -41,17 +41,17 @@ def RangeTest(StartPos):
 	'''
 	Moves every positioner on a single CAN bus through their approximately full range in both theta and phi,
 	leaving each positioner in the neutral position.
-	
+
 	petalID    ... Petal controller ID
 	StartPos   ... Either 'n' (neutral position) or 'r' (random position), a distinction made to minimize hard stop ramming.
-	'''		
-	
+	'''
+
 	if StartPos == 'n':
 		MoveAllandWait('CCW', 'theta', 200)
 	if StartPos == 'r':
 		MoveAllandWait('CCW', 'theta', 400)
 		MoveAllandWait('CCW', 'phi', 200)
-	
+
 	MoveAllandWait('CW', 'theta', 400)
 	MoveAllandWait('CCW', 'theta', 400)
 
@@ -61,24 +61,24 @@ def RangeTest(StartPos):
 	MoveAllandWait('CW', 'theta', 195)
 
 if __name__ == '__main__':
-	
+
 	_sel = _read_key()
 	loop = True
 	ptlID = input("Input Petal ID:")
-	pcomm = petalcomm.PetalComm(ptlID)	
+	pcomm = petalcomm.PetalComm(ptlID)
 	while loop:
 		print("[n]eutral starting position - full range test")
 		print("[r]andom starting position - full range test")
 		print("[e]xit")
 		print("Select: ")
-		
-		choice = _sel.__call__()		
+
+		choice = _sel.__call__()
 		choice = choice.lower()
 
 		if choice == 'e':
 			print ("Bye...")
 			sys.exit()
-	 
+
 		if choice == 'n':
 			RangeTest(choice)
 

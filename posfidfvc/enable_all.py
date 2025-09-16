@@ -32,7 +32,7 @@ new_and_changed_files.add(hwsetup.filename)
 # software initialization and startup
 # software initialization and startup
 ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
-                  posids=[],fidids=[],  
+                  posids=[],fidids=[],
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,

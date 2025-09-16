@@ -22,7 +22,7 @@ def onepoint(pecs, mode='posintTP', move=False, commit=True, tp_tol=0.0, tp_frac
         tp_tol - float, Minimum error in mm over which to update TP.
         tp_frac - float, Percentatge of error to apply in the TP update.
 
-    returns 
+    returns
         updates - pandas.DataFrame with columns 'DEVICE_ID','DEVICE_LOC',
                   'PETAL_LOC','ERR_XY','dT','dP' and a pair of TP parameters
     '''
