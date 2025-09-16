@@ -1,16 +1,16 @@
 #============================================================
-# Name   : 51-sbig-debian.rules 
+# Name   : 51-sbig-debian.rules
 # Version: 1.0
 # Author : Jan Soldan astrosoft at email dot cz
 # Date   : Nov 19, 2012
 #============================================================
 # File locations:
 # 1) Copy libsbigudrv.so to /usr/local/lib
-# 2) Copy all *.hex and *.bin files to: /lib/firmware 
+# 2) Copy all *.hex and *.bin files to: /lib/firmware
 #============================================================
 # Run:
 # sudo udevadm info --name=/dev/bus/usb/bus_num/dev_num --attribute-walk
-# to find the proper udev keywords and possibly update the rest 
+# to find the proper udev keywords and possibly update the rest
 # of this file if you cannot detect your camera.
 # Example:
 # SUBSYSTEM=="usb"

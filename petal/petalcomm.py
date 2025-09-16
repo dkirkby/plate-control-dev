@@ -87,7 +87,7 @@ class PetalComm(object):
         Returns the status of the found_controller flag.
         """
         return self.found_controller.is_set()
-    
+
     # Internal callback and utility functions
     def _repeat_seeker(self):
         while self.repeat.is_set():
@@ -112,7 +112,7 @@ class PetalComm(object):
                                 del self.device['proxy']
                         self.device.update(dev[key])   # make a copy
                         self.found_controller.set()
-                        
+
     def _call_device(self, cmd, *args, **kwargs):
         """
         Call remote function
@@ -147,7 +147,7 @@ class PetalComm(object):
             output = handle(*args, **kwargs)
             return output
         except Exception as e2:
-            raise RuntimeError(f'Exception for command {cmd}. Message: {e2}')            
+            raise RuntimeError(f'Exception for command {cmd}. Message: {e2}')
 
     def ready_for_tables(self, bus_ids=None, can_ids=None):
         """Checks if all the positioners identified by can_id are ready to receive
@@ -170,7 +170,7 @@ class PetalComm(object):
         except Exception as e:
             print('FAILED: Can not execute ready_for_tables. Exception: %s' % str(e))
             print(bus_ids, can_ids)
-            return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
+            return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)
 
     def send_tables(self, move_tables, pc_cmd='send_tables_ex'):
         """
@@ -179,12 +179,12 @@ class PetalComm(object):
 
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
-            
+
             pc_cmd ... optional override of the function name to use when sending
                        to petalcontroller.py. After 2020-06-08 (tag v4.18 and up),
                        use 'send_tables_ex'. For petalcontroller.py versions prior
                        to that, use 'send_tables'.
-            
+
         OUTPUT:
             tuple ... 1st element: string with first token being 'SUCCESS' or 'FAILED'
                   ... 2nd element: dict with keys = busid and values = list of canids,
@@ -250,7 +250,7 @@ class PetalComm(object):
             return self._call_device('pbset', key, value)
         except Exception as e:
             return 'FAILED: Can not set petalbox setting with pbset.  Exception: %s' % str(e)
- 
+
     def send_gfa_serial(self, message):
         """
         Send out message to GFA serial port
@@ -294,7 +294,7 @@ class PetalComm(object):
         try:
             return self._call_device('ops_state', state = state)
         except Exception as e:
-            return 'FAILED: Exception calling petalcontroller ops_state: %s' % str(e)        
+            return 'FAILED: Exception calling petalcontroller ops_state: %s' % str(e)
 
     def clear_errors(self):
         """
@@ -327,12 +327,12 @@ class PetalComm(object):
         """
         Initializes positioner power, CAN and SYNC buffer lines so that everything is ready for CAN communications
         and movetables.
-        
+
         INPUTS:
         en_supplies: string (1, 2, or 'both')  that specifies which supplies are enabled
         en_can_boards:  string (1, 2, or 'both') the specifies which CAN boards are enabled
         en_sync_buffers:  string (1, 2, or 'both') that specifies which SYNC buffers are enabled
-        
+
         'both' is the default for all three arguments.
         """
         try:

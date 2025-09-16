@@ -26,4 +26,3 @@ for i in range(len(run_config['PHI_RADIAL'])):
         collider_config[full_key] = run_config[key][i]
         collider_config.write()
     file_globals = runpy.run_path("harness.py")
-    

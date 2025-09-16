@@ -31,7 +31,7 @@ try:
 except:
     print("<ndots_expected> has to be an integer")
     sys.exit()
-    
+
 margin = 25
 ready_for_centroiding = False
 run_thread = True
@@ -51,7 +51,7 @@ def onClick(event):
         scale, status = calc_scale()
         statustr = 'OK: expected spot configuration' if status else 'WARNING: unexpected spot configuration'
         plt.xlabel('Scale is:%8.2f $\mu$m/pxl,  %s' % (scale, statustr))
-        
+
 def get_cens():
     global peaksav, fwhmav
     while run_thread:
@@ -63,7 +63,7 @@ def get_cens():
             except:
                 peaksav=0
                 fwhmav=0
-     
+
 def find_fid():
     global x,y,peaks,fwhm
     sample_image = cam.start_exposure()
@@ -86,7 +86,7 @@ def take_exposure():
     global img
     img = cam.start_exposure()
     if ready_for_centroiding:
-       return np.log(img[np.min(y)-margin:np.max(y)+margin, np.min(x)-margin:np.max(x)+margin]) 
+       return np.log(img[np.min(y)-margin:np.max(y)+margin, np.min(x)-margin:np.max(x)+margin])
     else:
        return np.log(img)
 

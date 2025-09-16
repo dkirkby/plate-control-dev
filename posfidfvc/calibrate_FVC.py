@@ -55,7 +55,7 @@ print('Turn on illuminator and fiducials')
 fiducial_settings_by_busid = {'can10': {10067:100}, 'can12':{10127:100},'can15':{10059:100},'can22':{15002:100,15008:100}}
 pcomm.pbset('fiducials', fiducial_settings_by_busid)
 
-print('Set number of targets: ',n_spots) 
+print('Set number of targets: ',n_spots)
 myFVC.make_targets(num_spots=n_spots)
 print('Autotune: Setting Threshold')
 myFVC.calibrate_image()

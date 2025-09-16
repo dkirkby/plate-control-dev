@@ -35,7 +35,7 @@ class PosMoveMeasure(object):
         self.fvc = fvc # fvchandler object
         self.wide_spotmatch_radius = 80.0 #20.0 #1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
         self.ref_dist_tol = 3.0   # [pixels on FVC CCD] used for identifying fiducial dots
-        self.ref_dist_thres =100.0  # [pixels on FVC CCD] if distance to all dots are greater than this, probably a misidentification 
+        self.ref_dist_thres =100.0  # [pixels on FVC CCD] if distance to all dots are greater than this, probably a misidentification
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
@@ -58,16 +58,16 @@ class PosMoveMeasure(object):
         self.enabled_posids = []
         self.disabled_posids = []
         self.posid_not_identified=self.all_posids
-        
+
     def measure(self, pos_flags = None):
         """Measure positioner locations with the FVC and return the values.
 
         INPUT:  pos_flags ... (optional) dict keyed by positioner indicating which flag as indicated below that a
                               positioner should receive going to the FLI camera with fvcproxy
-                flags    2 : pinhole center 
-                         4 : fiber center 
-                         8 : fiducial center 
-                        32 : bad fiber or fiducial 
+                flags    2 : pinhole center
+                         4 : fiber center
+                         8 : fiducial center
+                        32 : bad fiber or fiducial
 
         Return data is a dictionary with:   keys ... posid
                                           values ... [measured_obs_x, measured_obs_y]
@@ -75,16 +75,16 @@ class PosMoveMeasure(object):
         if not(pos_flags):
             pos_flags = {}
             for ptl in self.petals:
-                pos_flags.update(ptl.get_pos_flags())        
+                pos_flags.update(ptl.get_pos_flags())
         data = {}
         expected_pos = collections.OrderedDict()
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
         expected_ref = {} if self.fvc.fvcproxy else self.ref_dots_XY
-        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref, pos_flags=pos_flags)            
+        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref, pos_flags=pos_flags)
         for posid in self.all_posids:
-            ptl = self.petal(posid)            
+            ptl = self.petal(posid)
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['obsXY'][0])
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
             ptl.set_posfid_val(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
@@ -112,7 +112,7 @@ class PosMoveMeasure(object):
     def move(self, requests, anticollision='default'):
         """Move positioners. See request_targets method in petal.py for description
         of format of the 'requests' dictionary.
-        
+
         Return is another requests dictionary, but now containing only the requests
         that were accepted as valid.
         """
@@ -136,16 +136,16 @@ class PosMoveMeasure(object):
         tp_updates  ... This optional setting allows one to turn on a mode where the measured fiber positions
                         will be compared against the expected positions, and then if the error exceeds some
                         tolerance value, we will update internal parameters to mitigate the error on future moves.
-                        
+
                             tp_updates='posTP'     ... updates will be made to the internally-tracked shaft positions, POS_T and POS_P
                             tp_updates='offsetsTP' ... updates will be made to the calibration values OFFSET_T and OFFSET_P
-                            tp_updates='offsetsTP_close' ... updates will be made to the calibration values OFFSET_T and OFFSET_P. The difference with 'offsetTP' is that the phi is opend to phi_close_angle instead of the E0 angle specified in poscollider. 
+                            tp_updates='offsetsTP_close' ... updates will be made to the calibration values OFFSET_T and OFFSET_P. The difference with 'offsetTP' is that the phi is opend to phi_close_angle instead of the E0 angle specified in poscollider.
                             tp_updates=None        ... no updating (this is the default)
-                        
+
                         The intention of the 'posTP' option is that if the physical motor shaft hangs up slightly and loses
                         sync with the rotating magnetic field in the motors, then we slightly lose count of where we are. So
                         updating 'posTP' adjusts our internal count of shaft angle to try to mitigate.
-                        
+
                         The usage of the 'offsetsTP' option is expected to be far less common than 'posTP', because
                         we anticipate that the calibration offsets should be quite stable, reflecting the unchanging
                         physical geometry of the fiber positioner as-installed. The purpose of using 'offsetsTP' would be more
@@ -163,7 +163,7 @@ class PosMoveMeasure(object):
         """Move positioners to requested target coordinates, then make a series of correction
         moves in coordination with the fiber view camera, to converge.
 
-        INPUTS:     
+        INPUTS:
             requests      ... dictionary of dictionaries
                                 ... formatted the same as any other move request
                                 ... see request_targets method in petal.py for description of format
@@ -196,7 +196,7 @@ class PosMoveMeasure(object):
             m['log_note'] = 'blind move'
             self.printfunc(str(posid) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
         anticoll = 'adjust' if force_anticoll_on else 'default'
-        
+
         # make the blind move
         this_meas,imgfiles,accepted_requests = self.move_measure(data, tp_updates=self.tp_updates_mode, anticollision=anticoll)
         save_img = False
@@ -218,10 +218,10 @@ class PosMoveMeasure(object):
             timestamp_str = pc.filename_timestamp_str()
             for file in imgfiles:
                 os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move0' + file)
-                
+
         # record which positioners that had their blind move accepted vs denied
-        accepted_blindmove_posids = accepted_requests.keys()         
-        
+        accepted_blindmove_posids = accepted_requests.keys()
+
         # make the correction moves
         for i in range(1,num_corr_max+1):
             correction = {}
@@ -257,7 +257,7 @@ class PosMoveMeasure(object):
             if save_img:
                 timestamp_str = pc.filename_timestamp_str()
                 for file in imgfiles:
-                    os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move' + str(i) + file)                
+                    os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move' + str(i) + file)
         for posid in data.keys():
             self.printfunc(str(posid) + ': final error distance=' + self.fmt(data[posid]['err2D'][-1]))
             print('<posmovemeasure.move_and_correct> anticollision: ',anticoll) #from B141 PAF 5/28/19
@@ -275,7 +275,7 @@ class PosMoveMeasure(object):
                 obsT = self.posmodel(posid).expected_current_obsTP[0]
                 requests[posid] = {'command':'obsTP', 'target':[obsT,obsP], 'log_note':'retracting phi'}
         self.move(requests)
-    
+
     def park(self,posids='all'):
         """Fully retract phi arms inward, and put thetas at their neutral theta = 0 position.
         """
@@ -287,33 +287,33 @@ class PosMoveMeasure(object):
                 posP = max(self.posmodel(posid).targetable_range_P)
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
-        
+
     def one_point_calibration(self, posids='all', mode='posTP', wide_spotmatch=False):
         """Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
         tracked angles for the current theta and phi shaft positions.
-        
+
         This method is attractive after steps like rehoming to hardstops, because it is very
         quick to do, and should be fairly accurate in most cases. But will never be as statistically
         robust as a regular calibration routine, which does arcs of multiple points and then takes
         the best fit circle.
-        
+
           mode ... 'posTP'              --> [common usage] moves positioner to (posT=0,obsP=self.phi_clear_angle),
                                                   and then updates our internal counter on where we currently
                                                   expect the theta and phi shafts to be
-                                                 
+
                ... 'offsetsTP'          --> [expert usage] moves to (posT=0,obsP=self.phi_clear_angle),
                                                   and then updates setting for theta and phi physical offsets
-                                                 
+
                ... 'offsetsTP_close'    --> [expert usage] moves to (posT=0,obsP=self.phi_close_angle),
                                                   and then updates setting for theta and phi physical offsets
-                                                  
+
                ... 'offsetsXY'          --> [expert usage] moves positioner to (posT=0,obsP=180),
                                                   and then updates setting for x and y physical offsets
-               
+
         Prior to calling a mode of 'offsetTP' or 'offsetXY', it is recommended to re-home the positioner
         if there is any uncertainty as to its current location. This is generally not necessary
         in the default case, using 'posTP'.
-        
+
         The wide_spotmatch argument allows forcing use of self.wide_spotmatch_radius when in fvcproxy mode.
         """
         self.printfunc('Running one-point calibration of ' + mode)
@@ -362,7 +362,7 @@ class PosMoveMeasure(object):
         if 'offsets' in mode:
             for petal in self.petals:
                 petal.collider.update_positioner_offsets_and_arm_lengths()
-            
+
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -424,16 +424,16 @@ class PosMoveMeasure(object):
         calibration values for each positioner.
 
         INPUTS:  posids   ... list of posids or 'all'
-        
+
                  mode     ... 'rough' -- very rough calibration using two measured points only, always should be followed by an arc or grid calibration
                               'arc'   -- best-fit circle to arcs of points on the theta and phi axes
                               'grid'  -- error minimizer on grid of points to find best fit calibration parameters
-        
+
                  keep_phi_within_Eo ... boolean, states whether to never let phi outside the free rotation envelope
 
         Typically one does NOT call keep_phi_within_Eo = False unless the theta offsets are already
         reasonably well known. That can be achieved by first doing a 'rough' calibration.
-        
+
         OUTPUTS:  files  ... set of plot file paths generated by the function
                              (this is an empty set if the parameter make_plots_during_calib == False)
         """
@@ -458,8 +458,8 @@ class PosMoveMeasure(object):
             self.one_point_calibration(posids, mode='offsetsTP_close', wide_spotmatch=True)
             self.one_point_calibration(posids, mode='offsetsTP', wide_spotmatch=False)
         elif mode == 'grid':
-            if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
-                new_mode = 'arc'    
+            if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint
+                new_mode = 'arc'
                 self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
                 return self.calibrate(posids,new_mode,save_file_dir,save_file_timestamp,keep_phi_within_Eo)
             grid_data = self._measure_calibration_grid(posids, keep_phi_within_Eo, remove_outliers)
@@ -500,14 +500,14 @@ class PosMoveMeasure(object):
         self.commit_calib()
 
     def identify_many_enabled_positioners(self,posids):
-        """ Identify a list of positioners one-by-one. All positioners are nudged first, then move back to homing positions one-by-one. 
-            The identification of the first positioner takes two images, while all consecutive positioner only need one image. 
-            If a positioner is enabled, it will be added to the enabled_posids list, and if no dots are moving after nudging a positioner, 
-            it is added to disabled_posids list. 
-            Input: posids, a list of positioners. like ['M00322','M01511']. 
-            Output: the obsXY of each enabled positioner will be stored in the conf file.  
+        """ Identify a list of positioners one-by-one. All positioners are nudged first, then move back to homing positions one-by-one.
+            The identification of the first positioner takes two images, while all consecutive positioner only need one image.
+            If a positioner is enabled, it will be added to the enabled_posids list, and if no dots are moving after nudging a positioner,
+            it is added to disabled_posids list.
+            Input: posids, a list of positioners. like ['M00322','M01511'].
+            Output: the obsXY of each enabled positioner will be stored in the conf file.
         """
-        
+
         self.set_fiducials(setting='off')
         n_posids = len(posids)
         n_dots = len(self.all_posids)# + self.n_ref_dots
@@ -522,12 +522,12 @@ class PosMoveMeasure(object):
             this_petal = self.petal(posid)
             if i ==0:
                 request={}
-                log_note='Nudge all positioners first' 
+                log_note='Nudge all positioners first'
                 for j in range(n_posids):
-                    request[posids[j]] = {'target':[0,nudges[0]], 'log_note':log_note} 
+                    request[posids[j]] = {'target':[0,nudges[0]], 'log_note':log_note}
                 this_petal.request_direct_dtdp(request)
                 this_petal.schedule_send_and_execute_moves()
-                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)            
+                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
                 xy_init=xy_meas
             dtdp = [0,nudges[1]]
             log_note = 'nudge back to identify positioner location '
@@ -612,13 +612,13 @@ class PosMoveMeasure(object):
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
         self.move(requests) # go to starting point
         n_posids = len(self.all_posids)
-        self.set_fiducials(setting='off') 
+        self.set_fiducials(setting='off')
         xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_posids)
         self.set_fiducials(setting='on')
         if self.fvc.fvc_type == 'simulator':
             xy_meas = self._simulate_measured_pixel_locations([])
             pseudo_xy_ref = xy_meas[n_posids:]
-            xy_meas = xy_meas[0:n_posids] 
+            xy_meas = xy_meas[0:n_posids]
         ###########################################
         # Match dots to enabled positioners list
         ###########################################
@@ -637,7 +637,7 @@ class PosMoveMeasure(object):
 
         for posid in self.enabled_posids:
             ptl=self.petal(posid)
-            obsXY_this=ptl.expected_current_position(posid,'obsXY') 
+            obsXY_this=ptl.expected_current_position(posid,'obsXY')
             obsX_arr.append(obsXY_this[0])
             obsY_arr.append(obsXY_this[1])
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
@@ -646,7 +646,7 @@ class PosMoveMeasure(object):
             fvcY_enabled_arr.append(this_xy[1])
             test_delta = np.array(this_xy) - np.array(xy_meas)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            matches = [dist < 20 for dist in test_dist] # 20 pixels matching radius. Hard coded for now. 
+            matches = [dist < 20 for dist in test_dist] # 20 pixels matching radius. Hard coded for now.
             if not any(matches):
                 self.printfunc(posid+' was identified earlier but now disappear.')
                 self.printfunc('obsXY:',obsXY_this,'\n','fvcXY:',this_xy)
@@ -655,7 +655,7 @@ class PosMoveMeasure(object):
                 self.printfunc(posid,' matched with ','obsXY:',obsXY_this,' fvcXY:',this_xy)
                 index=np.where(test_dist == min(test_dist))[0][0]
                 xy_meas.remove(xy_meas[index])
-        
+
         plt.plot(fvcX_enabled_arr,fvcY_enabled_arr,'b+')
         plt.xlabel('fvcX')
         plt.ylabel('fvcY')
@@ -675,7 +675,7 @@ class PosMoveMeasure(object):
             self.file_metro=None # might be a bug
 
 
-        # read the Metrology data first, then match positioners to DEVICE_LOC 
+        # read the Metrology data first, then match positioners to DEVICE_LOC
         positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
         device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
         for row in positioners:
@@ -683,7 +683,7 @@ class PosMoveMeasure(object):
             metro_X_file_arr.append(row['X'])
             metro_Y_file_arr.append(row['Y'])
 
-         
+
          ############################################################
          # Enabled positioners should be matched to their dots now
          # Match disabled positioners
@@ -692,7 +692,7 @@ class PosMoveMeasure(object):
         if ptl.shape == 'petal' or ptl.shape == 'small_array':
             for posid in self.disabled_posids:
                 this_petal=self.petal(posid)
-                device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+                device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage.
                 index2=device_loc_file_arr.index(device_loc_this)
                 metroX_this=metro_X_file_arr[index2]
                 metroY_this=metro_Y_file_arr[index2]
@@ -705,7 +705,7 @@ class PosMoveMeasure(object):
                 test_delta = np.array(this_xy) - np.array(xy_meas)
                 test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
                 #print('minimum distance:',np.min(test_dist))
-                mm2pix=1./self.fvc.scale  
+                mm2pix=1./self.fvc.scale
                 matches = [dist < 6*mm2pix for dist in test_dist]
                 min_dist=min(test_dist)
                 index=np.where(test_dist <6*mm2pix)
@@ -764,13 +764,13 @@ class PosMoveMeasure(object):
         plt.close()
         pp.close()
         self.commit()
-     
+
 
     def identify_positioners_2images(self):
-        """ Turn off fiducials, and use two images to identify moving and non-moving dots. Assign all dots to positioners according to metrology data. 
-            Must be a petal or small_array with correct metrology data to work. 
-            
-        """ 
+        """ Turn off fiducials, and use two images to identify moving and non-moving dots. Assign all dots to positioners according to metrology data.
+            Must be a petal or small_array with correct metrology data to work.
+
+        """
         posids=list(self.all_posids)
         n_posids = len(self.all_posids)
         self.set_fiducials(setting='off')
@@ -783,7 +783,7 @@ class PosMoveMeasure(object):
 
         request={}
         log_note='Nudge all positioners first'
-        this_petal = self.petal(posids[0]) 
+        this_petal = self.petal(posids[0])
         for j in range(n_posids):
             request[posids[j]] = {'target':[0,nudges[0]], 'log_note':log_note}
         this_petal.request_direct_dtdp(request)
@@ -803,7 +803,7 @@ class PosMoveMeasure(object):
         for this_xy in xy_meas:
             test_delta = np.array(this_xy) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            min_dist=min(test_dist) 
+            min_dist=min(test_dist)
             if min_dist<self.ref_dist_tol:
                 move_arr.append(False)
             else:
@@ -816,9 +816,9 @@ class PosMoveMeasure(object):
         else:
             self.printfunc('Must be a petal or a small_array to proceed. Exit')
             raise SystemExit
-        
 
-        # read the Metrology data first, then match positioners to DEVICE_LOC 
+
+        # read the Metrology data first, then match positioners to DEVICE_LOC
         positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
         device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
         for row in positioners:
@@ -844,7 +844,7 @@ class PosMoveMeasure(object):
             posid=posids[i]
             self.printfunc('Identifying location of positioner '+posid+' ('+str(i+1)+' of '+str(n_posids)+')')
             this_petal=self.petal(posid)
-            device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+            device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage.
             index2=device_loc_file_arr.index(device_loc_this)
             metroX_this=metro_X_file_arr[index2]
             metroY_this=metro_Y_file_arr[index2]
@@ -855,7 +855,7 @@ class PosMoveMeasure(object):
             test_delta = np.array(this_xy) - np.array(xy_meas)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
             if self.fvc.fvc_type == 'FLI':
-                mm2pix=1./(13.308*0.006) 
+                mm2pix=1./(13.308*0.006)
             else:
                 1./self.fvc.scale
             matches = [dist < 6*mm2pix for dist in test_dist]
@@ -909,7 +909,7 @@ class PosMoveMeasure(object):
         plt.subplot(212)
         plt.plot(obsX_arr,obsY_arr,'ko')
         for i in range(len(posids)):
-            posid=posids[i] 
+            posid=posids[i]
             plt.text(obsX_arr[i],obsY_arr[i],posid,fontsize=2.5,color='blue')
         plt.legend(loc=2)
         plt.xlabel('obsX')
@@ -932,7 +932,7 @@ class PosMoveMeasure(object):
         ptl_map = {posid:self._petals_map[posid] for posid in posids}
         posids_by_petal = {petal:{p for p in ptl_map if ptl_map[p] == petal} for petal in set(ptl_map.values())}
         return posids_by_petal
-    
+
     @property
     def all_posids(self):
         """Returns a set of all the posids on all the petals.
@@ -941,7 +941,7 @@ class PosMoveMeasure(object):
         for ptl in self.petals:
             all_posids = all_posids.union(ptl.posids)
         return all_posids
-    
+
     @property
     def all_fidids(self):
         """Returns a set of all the fidids on all the petals.
@@ -955,7 +955,7 @@ class PosMoveMeasure(object):
         """Returns the petal object associated with a single id key.
         """
         return self._petals_map[posid_or_fidid_or_dotid]
-    
+
     def posmodel(self, posid):
         """Returns the posmodel object associated with a single posid.
         """
@@ -965,12 +965,12 @@ class PosMoveMeasure(object):
         """Returns the posstate object associated with a single posid.
         """
         return self.posmodel(posid).state
-    
+
     def trans(self, posid):
         """Returns the postransforms object associated with a single posid.
         """
         return self.posmodel(posid).trans
-    
+
     def commit(self,log_note=''):
         """Commit state data controlled by all petals to storage.
         See commit function in petal.py for explanation of optional additional log note.
@@ -984,7 +984,7 @@ class PosMoveMeasure(object):
         """
         for ptl in self.petals:
             ptl.commit_calib_DB()
-    
+
     def set_fiducials(self, setting='on'):
         """Apply uniform settings to all fiducials on all petals simultaneously.
         See set_fiducials() comments in petal for further details on argument and
@@ -997,7 +997,7 @@ class PosMoveMeasure(object):
             settings_done = petal.set_fiducials(setting=setting)
             all_settings_done.update(settings_done)
         return all_settings_done
-            
+
     @property
     def ref_dots_XY(self):
         """Ordered dict of ordered dicts of nominal locations of all fixed reference dots in the FOV.
@@ -1012,7 +1012,7 @@ class PosMoveMeasure(object):
                 more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([more_data[dotid]['fvcXY']])[0]
             data.update(more_data)
         if not self.fvc.fvcproxy:
-            for i in range(len(self.extradots_fvcXY)):            
+            for i in range(len(self.extradots_fvcXY)):
                 dotid = self.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
                 data[dotid] = collections.OrderedDict()
                 data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([self.extradots_fvcXY[i]])[0]
@@ -1064,7 +1064,7 @@ class PosMoveMeasure(object):
                 data[posid]['petal'] = petal
                 data[posid]['measured_obsXY'] = []
                 n_pts = len(data[posid]['target_posTP'])
-        
+
         # make the measurements
         for i in range(n_pts):
             requests = {}
@@ -1078,8 +1078,8 @@ class PosMoveMeasure(object):
         # optionally remove outliers
         if remove_outliers:
             data = self._remove_outlier_calibration_points(data, 'grid')
-            
-        return data 
+
+        return data
 
     def _measure_calibration_arc(self, posids='all', axis='theta', keep_phi_within_Eo=True, remove_outliers=False):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -1151,11 +1151,11 @@ class PosMoveMeasure(object):
             this_meas_data,imgfiles,accepted_requests = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
-        
+
         # optionally remove outliers
         if remove_outliers:
             data = self._remove_outlier_calibration_points(data, 'arc')
-        
+
         # circle fits
         for posid in data:
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
@@ -1270,7 +1270,7 @@ class PosMoveMeasure(object):
         """
         param_keys = self.grid_calib_param_keys
         for posid in data.keys():
-            trans = data[posid]['trans']   
+            trans = data[posid]['trans']
             trans.alt_override = True
             for key in param_keys:
                 data[posid][key] = []
@@ -1325,17 +1325,17 @@ class PosMoveMeasure(object):
             t_targ_posT = [posTP[pc.T] for posTP in T[posid]['target_posTP']]
             t_targ_posP = [posTP[pc.P] for posTP in T[posid]['target_posTP']]
             p_targ_posP = [posTP[pc.P] for posTP in P[posid]['target_posTP']]
-            p_targ_posT = [posTP[pc.T] for posTP in P[posid]['target_posTP']]        
+            p_targ_posT = [posTP[pc.T] for posTP in P[posid]['target_posTP']]
             t_meas_obsXY = T[posid]['measured_obsXY']
             p_meas_obsXY = P[posid]['measured_obsXY']
-            
+
             # arms and offsets
             ptl = T[posid]['petal']
             t_ctr = np.array(T[posid]['xy_center'])
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
-            
+
 			# BEGIN - probably should remove this -- JHS
 			# It is not in a good place to bury these automatic actions
             if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
@@ -1346,7 +1346,7 @@ class PosMoveMeasure(object):
                 self.printfunc(str(posid) + ': disabled due to poor arc calibration.')
 			# END - probably should remove this
 			# (and may also want to remove the if statement right below)
-				
+
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
                 ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
@@ -1368,13 +1368,13 @@ class PosMoveMeasure(object):
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
-            
+
             # unwrap thetas
             t_meas_posTP = [T[posid]['trans'].obsXY_to_posTP(this_xy,range_limits='full')[0] for this_xy in t_meas_obsXY]
             t_meas_posT = [this_tp[pc.T] for this_tp in t_meas_posTP]
             expected_direction = pc.sign(t_targ_posT[1] - t_targ_posT[0])
             t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
-            
+
             # gather data to return in an organized fashion (used especially for plotting)
             data[posid] = {}
             data[posid]['xy_ctr_T'] = t_ctr
@@ -1390,14 +1390,14 @@ class PosMoveMeasure(object):
             data[posid]['targ_posP_during_T_sweep'] = t_targ_posP[0]
             data[posid]['targ_posT_during_P_sweep'] = p_targ_posT[0]
             data[posid]['posmodel'] = self.posmodel(posid)
-            
+
             # gear ratios
             ratios_T = np.divide(np.diff(t_meas_posT_wrapped),np.diff(t_targ_posT))
             ratios_P = np.divide(np.diff(p_meas_posP_wrapped),np.diff(p_targ_posP))
             ratio_T = np.median(ratios_T)
             ratio_P = np.median(ratios_P)
             data[posid]['gear_ratio_T'] = ratio_T
-            data[posid]['gear_ratio_P'] = ratio_P            
+            data[posid]['gear_ratio_P'] = ratio_P
             if set_gear_ratios and ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'GEAR_CALIB_T',ratio_T)
                 ptl.set_posfid_val(posid,'GEAR_CALIB_P',ratio_P)
@@ -1426,7 +1426,7 @@ class PosMoveMeasure(object):
             else:
                 self.printfunc(str(posid)+' does not have enough good measurement for '+mode+' fit')
 
-        #for i in unmatched_index:	
+        #for i in unmatched_index:
         #    del data[posid]['measured_obsXY'][i]
         #    del data[posid]['target_posTP'][i]
         #    self.printfunc(str(posid) + ': Removed ' + str(mode) + ' calibration point ' + str(i) + ' of ' + str(n_pts) + ', due to no matched spot.')
@@ -1441,7 +1441,7 @@ class PosMoveMeasure(object):
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_init = []
         pseudo_xy_ref = []
-        
+
         if posid == None:
             identify_fiducials = True
             xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
@@ -1573,26 +1573,26 @@ class PosMoveMeasure(object):
     def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
         """Check if errors between measured positions and expected positions exceeds a tolerance
         value, and if so, then adjust parameters in the direction of the measured error.
-        
+
         By default, this function will only changed the internally-tracked shaft position, POS_T
         and POS_P. The assumption is that we have fairly stable theta and phi offset values, based
         on the mechanical reality of the robot. However there is an option (perhaps useful in limited cases,
         such as when a calibration angle unwrap appears to have gone awry on a new test stand setup) where
         one would indeed want to change the calibration parameters, OFFSET_T and OFFSET_P. Activate
         this by arguing tp_updates='offsetsTP'.
-        
+
         The overall idea here is to be able to deal gracefully with cases where the shaft has slipped
         just a little, and we have slightly lost count of shaft positions, or where the initial
         calibration was just a little off.
-        
+
         The input value 'measured_data' is the same format as produced by the 'measure()' function.
-        
+
         Any updating of parameters that occurs will be written to the move log. Check the notes field for
         a note like 'updated POS_T and POS_P after positioning error of 0.214 mm', to figure out when
         this has occurred.
-        
+
         The return is a dictionary with:
-            keys   ... posids 
+            keys   ... posids
             values ... 1x2 [delta_theta,delta_phi]
         """
         delta_TP = {}
@@ -1621,14 +1621,14 @@ class PosMoveMeasure(object):
                     else:
                         param = 'POS'
                     old_T = ptl.get_posfid_val(posid,param + '_T')
-                    old_P = ptl.get_posfid_val(posid,param + '_P')              
+                    old_P = ptl.get_posfid_val(posid,param + '_P')
                     new_T = old_T + delta_T
                     new_P = old_P + delta_P
                     if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
                         ptl.set_posfid_val(posid,'OFFSET_T',new_T)
                         ptl.set_posfid_val(posid,'OFFSET_P',new_P)
                         self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
-                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P)) 
+                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))
                         ptl.collider.update_positioner_offsets_and_arm_lengths()
                     else:
                         posmodel.axis[pc.T].pos = new_T
@@ -1640,12 +1640,12 @@ class PosMoveMeasure(object):
                     if param == 'OFFSET':
                         ptl.altered_calib_states.add(ptl.posmodels[posid].state)
         return delta_TP
-    
+
     def _outside_of_tolerance_from_nominals(self, posid, r1, r2):
         """Check to see if R1 or R2 are outside of a certain tolerance
         from nominal values.  Return True if either of these values are out of bounds, else False.
         Add offset x,y check to this.
-        """         
+        """
         tol = pc.nominals['LENGTH_R1']['tol']
         nom_val = pc.nominals['LENGTH_R1']['value']
         if not(nom_val - tol <= r1 <= nom_val + tol):
@@ -1658,15 +1658,15 @@ class PosMoveMeasure(object):
     def fiducial_dots_fvcXY(self, ptl):
         """Returns an ordered dict of ordered dicts of all [x,y] positions of all
         fiducial dots this petal contributes in the field of view.
-        
+
         Primary keys are the fiducial dot ids, formatted like:
             'F001.0', 'F001.1', etc...
-        
+
         Returned values are accessed with the sub-key 'fvcXY'. So that:
             data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
-            
+
         The coordinates are all given in fiber view camera pixel space.
-        
+
         In some laboratory setups, we have a "extra" fixed reference fibers. These
         are not provided here (instead they are handled in posmovemeasure.py).
         """
@@ -1695,11 +1695,11 @@ class PosMoveMeasure(object):
         phi_Eo_angle = self.petals[0].collider.Eo_phi
         phi_clear = phi_Eo_angle + self.phi_Eo_margin
         return phi_clear
-        
+
     @property
     def grid_calib_num_DOF(self):
         return len(self.grid_calib_param_keys) # need at least this many points to exactly constrain the TP --> XY transformation function
-    
+
     @property
     def grid_calib_num_constraints(self):
         return self.n_points_calib_T * self.n_points_calib_P
@@ -1714,14 +1714,14 @@ class PosMoveMeasure(object):
             n_dots += n_dots_ptl
         n_dots += self.n_extradots_expected
         return n_dots
-    
+
     @property
     def n_moving_dots(self):
         """Returns the total number of mobile dots (on functioning positioners) to expect in an fvc image.
         """
         self.printfunc('n_moving_dots() method not yet implemented')
         pass
-    
+
     @property
     def n_fixed_dots(self):
         """Returns the total number of immobile light dots (fiducials or non-functioning positioners) to expect in an fvc image.
@@ -1736,7 +1736,7 @@ class PosMoveMeasure(object):
     @staticmethod
     def extract_fidid(dotid):
         return dotid.split('.')[0]
-            
+
     def _wrap_consecutive_angles(self, angles, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas
         we are trying to wrap all increase or all decrease sequentially. In other words, that
@@ -1749,7 +1749,7 @@ class PosMoveMeasure(object):
                 delta += expected_direction * 360
             wrapped.append(wrapped[-1] + delta)
         return wrapped
-    
+
     def _centralize_angular_offset(self,offset_angle):
         """A special unwrapping check for OFFSET_T and OFFSET_P angles, for which we are always
         going to want to default to the option closer to 0 deg. Hence if our calibration routine

@@ -74,7 +74,7 @@ class XYTest(object):
                 sys.exit(0)
             gui_root.withdraw()
 
-    
+
         if USE_LOCAL_PRESETS:
             self.presets={}
             try:
@@ -85,7 +85,7 @@ class XYTest(object):
                 self.presets['test station']=os.environ['TEST_STAND_NAME']
             except:
                 USE_LOCAL_PRESETS=False
-                
+
 
         self.use_local_presets=    USE_LOCAL_PRESETS
         self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
@@ -112,18 +112,18 @@ class XYTest(object):
             self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
         self.logwrite('Code version: ' + pc.code_version)
-                
+
         # simulation mode
         self.simulate = self.xytest_conf['simulate']
-        self.logwrite('Simulation mode on: ' + str(self.simulate))        
-        
+        self.logwrite('Simulation mode on: ' + str(self.simulate))
+
         # set up fvc and platemaker
         if self.simulate:
             fvc_type = 'simulator'
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
         if fvc_type == 'FLI' and 'pm_instrument' in self.hwsetup_conf:
-            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'],fvc_role=self.hwsetup_conf['fvc_role'])       
+            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'],fvc_role=self.hwsetup_conf['fvc_role'])
         else:
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
@@ -133,7 +133,7 @@ class XYTest(object):
         self.logwrite('FVC type: ' + str(fvc_type))
         self.logwrite('FVC rotation: ' + str(fvc.rotation))
         self.logwrite('FVC scale: ' + str(fvc.scale))
-        
+
         # set up positioners, fiducials, and petals
         self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as posids list)
         ptl_id=self.hwsetup_conf['ptl_id']
@@ -153,18 +153,18 @@ class XYTest(object):
         if petal_proxy:
             ptl = Petal(ptl_id)
         else:
-            ptl = petal.Petal(ptl_id, 
+            ptl = petal.Petal(ptl_id,
                 posids=[],
                 fidids=[],
                 simulator_on=self.simulate,
                 sched_stats_on=True,
                 printfunc=self.logwrite,
                 collider_file=self.xytest_conf['collider_file'],
-                db_commit_on=db_commit_on, 
+                db_commit_on=db_commit_on,
                 anticollision=self.xytest_conf['anticollision']) # petal_shape=shape)
         posids=self.posids=ptl.posids
         fidids=self.fidids=ptl.fidids
-        
+
         while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
 
@@ -231,7 +231,7 @@ class XYTest(object):
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
         self.logwrite('Random targets file: ' + targs_file)
         self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
-        
+
     def intro_questions(self):
         print('Please enter the following data. Hit blank if unknown or unmeasured.')
         keys = summarizer.user_data_keys.copy()
@@ -240,7 +240,7 @@ class XYTest(object):
         for key in user_vals.keys():
             if self.use_local_presets and key in self.presets:
                 user_vals[key]=self.presets[key]
-            else:    
+            else:
                 user_vals[key] = input(key + ': ')
         print('')
         print('You entered:')
@@ -254,7 +254,7 @@ class XYTest(object):
             return self.intro_questions()
         else:
             return user_vals
-        
+
     def get_and_log_comments_from_user(self):
         print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
         thanks_msg = False
@@ -266,7 +266,7 @@ class XYTest(object):
             note = input('observation/note: ')
             thanks_msg = True
         if thanks_msg:
-            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
+            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)
         return notes
 
     def run_range_measurement(self, loop_number):
@@ -342,14 +342,14 @@ class XYTest(object):
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
         """
-        
+
         log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.filename_timestamp_str_now()
         def movedata_name(posid):
             return pc.dirs['xytest_data']  + posid + '_' + log_timestamp + log_suffix + '_movedata.csv'
         def summary_plot_name(posid):
-            return pc.dirs['xytest_plots'] + posid + '_' + log_timestamp + log_suffix + '_xyplot'    
+            return pc.dirs['xytest_plots'] + posid + '_' + log_timestamp + log_suffix + '_xyplot'
 
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
@@ -361,11 +361,11 @@ class XYTest(object):
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
         self.logwrite('Number of local targets = ' + str(len(local_targets)))
         self.logwrite('Local target xy positions: ' + str(local_targets))
-        
+
         num_corr_max = self.xytest_conf['num_corr_max'][loop_number]
         submove_idxs = [i for i in range(num_corr_max+1)]
         self.logwrite('Number of corrections max = ' + str(num_corr_max))
-        
+
         # write headers for move data files
         move_log_header = 'timestamp,cycle,move_log,target_x,target_y'
         submove_fields = ['meas_obsXY','errXY','err2D','posTP']
@@ -380,10 +380,10 @@ class XYTest(object):
             file = open(filename,'w')
             file.write(move_log_header)
             file.close()
-        
+
         # transform test grid to each positioner's global position, and create all the move request dictionaries
         all_targets = []
-        
+
         if self.xytest_conf['input_targs_file']:
             targ_list=ascii.read(pc.dirs['test_settings']+self.xytest_conf['input_targs_file'])
             targ_list=targ_list['filename']
@@ -404,7 +404,7 @@ class XYTest(object):
                     if enabled_this:
                         these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
                     else:
-                        these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])} 
+                        these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
 
                 all_targets.append(these_targets)
         else:
@@ -414,14 +414,14 @@ class XYTest(object):
                     ptl = self.m.petal(posid)
                     enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
                     posT_this=ptl.get_posfid_val(posid,'POS_T')
-                    posP_this=ptl.get_posfid_val(posid,'POS_P') 
+                    posP_this=ptl.get_posfid_val(posid,'POS_P')
                     trans = self.m.trans(posid)
                     if enabled_this:
                         these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
                     else:
                         these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
                 all_targets.append(these_targets)
-            
+
         # initialize some data structures for storing test data
         targ_num = 0
         all_data_by_target = []
@@ -432,9 +432,9 @@ class XYTest(object):
             for key in submove_fields:
                 all_data_by_posid[posid][key] = [[] for i in submove_idxs]
             start_cycles[posid] = self.m.state(posid).read('TOTAL_MOVE_SEQUENCES')
-        
+
         # run the test
-        try:  
+        try:
             start_time = time.time()
             for these_targets in all_targets:
                 targ_num += 1
@@ -444,19 +444,19 @@ class XYTest(object):
                 this_timestamp = pc.timestamp_str_now()
                 these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
                 import pdb; pdb.set_trace()
-                
+
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
                 for posid in these_targets.keys():
                     all_data_by_posid[posid]['targ_obsXY'].append(these_meas_data[posid]['targ_obsXY'])
                     for sub in submove_idxs:
                         for key in submove_fields:
-                            all_data_by_posid[posid][key][sub].append(these_meas_data[posid][key][sub])              
-                
+                            all_data_by_posid[posid][key][sub].append(these_meas_data[posid][key][sub])
+
                 # update summary data logs
                 for posid in self.posids:
                     self.summarizers[posid].write_row(all_data_by_posid[posid]['err2D'])
-        
+
                 # update move data log
                 for posid in these_targets.keys():
                     state = self.m.state(posid)
@@ -478,11 +478,11 @@ class XYTest(object):
                     file = open(movedata_name(posid),'a')
                     file.write(row)
                     file.close()
-            
+
             # make summary plots showing the targets and measured positions
             if self.xytest_conf['should_make_plots']:
                 for posid in all_data_by_posid.keys():
-                    posmodel = self.m.posmodel(posid) 
+                    posmodel = self.m.posmodel(posid)
                     title = log_timestamp + log_suffix
                     center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
                     theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
@@ -508,7 +508,7 @@ class XYTest(object):
             if self.xytest_conf['should_email']:
                 pass
                 #test_report.email_error(traceback.format_exc(),log_timestamp)
-            raise            
+            raise
         self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
 
     def run_unmeasured_moves(self, loop_number):
@@ -541,7 +541,7 @@ class XYTest(object):
                     requests[posid]['log_note'] = 'unmeasured ' + this_status_str
                 self.m.move(requests)
             self.logwrite(str(n_moves) + ' moves completed in ' + self._elapsed_time_str(start_time) + '.')
-    
+
     def run_hardstop_strikes(self, loop_number):
         """Exercise positioners to a series of hardstop strikes without doing FVC measurements in-between.
         """
@@ -557,7 +557,7 @@ class XYTest(object):
                 self.m.move(retract_requests)
                 self.m.rehome(self.posids)
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
-    
+
     def get_svn_credentials(self):
         '''Query the user for credentials to the SVN, and store them.'''
         if not self.simulate:
@@ -565,7 +565,7 @@ class XYTest(object):
             print('')
             if self.use_local_presets:
                 [svn_user, svn_pass, err] = self.simple_svn_creds()
-            else:    
+            else:
                 [svn_user, svn_pass, err] = XYTest.ask_user_for_creds(should_simulate=self.simulate)
 
             if err:
@@ -578,10 +578,10 @@ class XYTest(object):
                 self.svn_pass = svn_pass
         else:
             self.logwrite('Skipped querying user for SVN credentials in simulation mode.')
-                
+
     def svn_add_commit(self, keep_creds=False):
         '''Commit logs through SVN.
-        
+
         Optional keep_creds parameter instructs to *not* delete SVN user/pass after
         this commit is complete. Otherwise they get automatically deleted.
         '''
@@ -601,7 +601,7 @@ class XYTest(object):
                         n_total += 1
                 print("these_files_to_commit")
                 print(these_files_to_commit)
-                print("")        
+                print("")
                 self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
                 err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
                 err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
@@ -625,11 +625,11 @@ class XYTest(object):
         """Standard logging function for writing to the test traveler log file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
-        with open(self.xytest_logfile,'a',encoding='utf8') as fh:            
+        with open(self.xytest_logfile,'a',encoding='utf8') as fh:
             fh.write(line + '\n')
         if stdout:
             print(line)
-            
+
     def logwrite_conf(self,conf_file):
         """Standard function for copying a config file's contents to the test traveler log file.
         """
@@ -665,7 +665,7 @@ class XYTest(object):
                     self.logwrite(str(posid) + ': ' + key + ' is ' + str(self.old_currents[posid][key]))
                     self.old_currents[posid][key] = None # indicates later in clear_current_overrides() method whether to do anything
         self.m.set_motor_parameters()
-        
+
     def clear_current_overrides(self):
         """Restore current settings for each positioner to their original values.
         """
@@ -685,7 +685,7 @@ class XYTest(object):
         r_max = self.xytest_conf['targ_max_radius']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
         targets = [[x,y] for x in line for y in line]
-        for i in range(len(targets)-1,-1,-1): # go backwards thru list for popping so indices always work 
+        for i in range(len(targets)-1,-1,-1): # go backwards thru list for popping so indices always work
             if not(self.target_within_limits(targets[i])):
                 targets.pop(i)
         return targets
@@ -701,7 +701,7 @@ class XYTest(object):
         if r > r_min and r < r_max:
             return True
         return False
-    
+
     def generate_posXY_move_requests(self, xytargets_list):
         """For a list of local xy targets, make a list of move request dictionaries.
         Each dictionary contains the move requests to move all the positioners to that
@@ -718,7 +718,7 @@ class XYTest(object):
     def track_file(self, filename, commit='always'):
         """Use this to put new filenames into the list of new and changed files we keep track of.
         This list gets put into the log later, and is also used for auto-updating of the SVN.
-        
+
           commit ... 'always'        --> always commit this file to the SVN upon svn_add_commit
                  ... 'once'          --> only commit this file to the SVN upon the next svn_add_commit
                  ... 'do not commit' --> do not commit this file (anymore) to the SVN
@@ -726,7 +726,7 @@ class XYTest(object):
         self.new_and_changed_files[filename] = commit
         self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
         self.xytest_conf.write()
-        
+
     def track_all_poslogs_once(self):
         '''Special function to run track_file on all the latest pos logs, since they are kind of
         a moving target. So it's nice to have a convenience function for that.
@@ -775,7 +775,7 @@ class XYTest(object):
             sys.exit('Not all loop lengths the same in config file ' + self.xytest_conf.filename)
         else:
             return n
-    
+
     def _elapsed_time_str(self,start_time):
         """Standard string for elapsed time.
         """
@@ -785,12 +785,12 @@ class XYTest(object):
     def simple_svn_creds(self):
         try:
             svn_user=input("Please enter your SVN username: ")
-            svn_pass=getpass.getpass("Please enter your SVN password: ")      
+            svn_pass=getpass.getpass("Please enter your SVN password: ")
             svn_auth_err=False
         except:
             svn_auth_err=True
         return svn_user, svn_pass, svn_auth_err
-            
+
     @staticmethod
     def ask_user_for_creds(should_simulate=False):
         '''General function to gather SVN username and password from operator.
@@ -827,11 +827,11 @@ if __name__=="__main__":
             if arguments[0].lower()=='uselocal': USE_LOCAL_PRESETS=True
 
         if len(arguments) > 1:
-            if arguments[1].lower()[0:4]=='cont': CONTINUE_TEST=True    
+            if arguments[1].lower()[0:4]=='cont': CONTINUE_TEST=True
     except:
         pass
     hwsetup_conf=''
-    xytest_conf=''    
+    xytest_conf=''
 
     if USE_LOCAL_PRESETS:
         try:
@@ -861,7 +861,7 @@ if __name__=="__main__":
         print("  XYtest config file: "+str(xytest_conf))
         print("")
         print("  Is this correct? (hit 'y' for yes or any key otherwise)")
-        sel=_read_key().__call__()     
+        sel=_read_key().__call__()
         if sel.lower() !='y':
             USE_LOCAL_PRESETS=False
             hwsetup_conf=''

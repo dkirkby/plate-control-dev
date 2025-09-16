@@ -9,7 +9,7 @@
   Options:
 		-a		Show information for all Mightex devices (note, no settings will be read,
 				and no commands will be sent to the controller)
-		-c		Show Maximum and Set Current (milliAmp) 
+		-c		Show Maximum and Set Current (milliAmp)
 		-C "Max Set"	Set Maximum and Set Current (milliAmp) values
 		-d		Show automatically found device_path
 		-D device_path	Use the specified device path rather than auto-finding it
@@ -176,7 +176,7 @@ int main (int argc, char **argv)
 //	int fd;
 	char use_device[MAX_STR];
 	char command_string[MAX_STR];
-	
+
 	mystrSZcpy(use_device,"");
 
 	/* read command line options and set up appropriate actions */
@@ -219,8 +219,8 @@ int main (int argc, char **argv)
 				add_to_command_queue(command_string);
 				break;
 			case 'C':
-				if((2==sscanf(optarg,"%d  %d",&iMaxmilliA,&iSetmilliA) || 
-				    2==sscanf(optarg,"%d, %d",&iMaxmilliA,&iSetmilliA)) && 
+				if((2==sscanf(optarg,"%d  %d",&iMaxmilliA,&iSetmilliA) ||
+				    2==sscanf(optarg,"%d, %d",&iMaxmilliA,&iSetmilliA)) &&
 				   iMaxmilliA>=iSetmilliA)
 				{
 					CapCflag=1;
@@ -228,7 +228,7 @@ int main (int argc, char **argv)
 					// It turns out that you can set the Max to 1000, but if you do
 					// you're only allowed two digits for the current setting because
 					// the whole command string can only be 16 chars long.
-					// Setting iMaxmilliA to a Maximum of 999 avoids that issue 
+					// Setting iMaxmilliA to a Maximum of 999 avoids that issue
 					if(iMaxmilliA>1000)
 						iMaxmilliA=999;
 					if(iSetmilliA>1000)
@@ -377,7 +377,7 @@ int main (int argc, char **argv)
 	   which contains the device's path in /sys. */
 	udev_list_entry_foreach(dev_list_entry, devices) {
 		const char *path;
-		
+
 		/* Get the filename of the /sys entry for the device
 		   and create a udev_device object (dev) representing it */
 		path = udev_list_entry_get_name(dev_list_entry);
@@ -407,7 +407,7 @@ int main (int argc, char **argv)
 			fprintf(stderr,"; Unable to find parent usb device for %s", Device_Node_Path);
 			break;
 		}
-	
+
 		/* From here, we can call get_sysattr_value() for each file
 		   in the device's /sys entry. The strings passed into these
 		   functions (idProduct, idVendor, serial, etc.) correspond
@@ -481,7 +481,7 @@ int main (int argc, char **argv)
 						Max_Channels=m_Max_Channels[nMightexDevices-1];
 					}
 				}
-				else 
+				else
 				{	// No SerialNo and no Device was specified, use this device
 					if('\0'!=*Device_Node_Path)
 					{
@@ -521,7 +521,7 @@ int main (int argc, char **argv)
 	if(verbose)
 	{
 		if(prev_stderr)
-			fprintf(stderr,"; \n"); 
+			fprintf(stderr,"; \n");
 		// "acdehimnrvFRSC:D:H:M:N:"
 		fprintf(stderr,"; aflag=%d cflag=%d dflag=%d eflag=%d hflag=%d iflag=%d mflag=%d nflag=%d rflag=%d vflag=%d Cflag=%d Dflag=%d Fflag=%d Hflag=%d Mflag=%d Nflag=%d Rflag=%d Sflag=%d\n",
 			aflag,cflag,dflag,eflag,hflag,iflag,mflag,nflag,rflag,verbose, CapCflag, CapDflag, CapFflag, CapHflag, CapMflag, CapNflag, CapRflag, CapSflag);
@@ -578,7 +578,7 @@ int main (int argc, char **argv)
 	if(0==aflag && 0!=Command_Count && '\0'!=*use_device)
 		return hidmain(use_device);
 
-	return 0;       
+	return 0;
 }
 
 /* Add a command to the command queue */
@@ -652,11 +652,11 @@ int my_getFeature(int fd, int ireport, char *buf, int bufsz, int feature_size)
 	for(i=0;i<bufsz;i++) buf[i]='\0';
 	buf[0] = ireport; /* Report Number */
 	res = ioctl(fd, HIDIOCGFEATURE(feature_size), buf);
-	if (res < 0) 
+	if (res < 0)
 	{
 		perror("HIDIOCGFEATURE");
-	} 
-	else 
+	}
+	else
 	{
 		if(print_debug_output)
 		{
@@ -692,7 +692,7 @@ char *get_mightex_response(int fd, int ireport,int *response_size)
 
 		/* Get Feature */
 		res = my_getFeature(fd, ireport, buf, sizeof(buf), fsize);
-		if (res >= 0) 
+		if (res >= 0)
 		{
 			if(res && buf[0]==0x01 && buf[1]==0x00)
 				usleep(10000L);	// sleep 0.01 sec waiting for more
@@ -711,7 +711,7 @@ char *get_mightex_response(int fd, int ireport,int *response_size)
 					if(need_more && answer[a_ndx-1]==0x0a && answer[a_ndx-2]==0x0d)
 						need_more=0;
 				}
-			}			
+			}
 		}
 	}
 	if(verbose)
@@ -783,11 +783,11 @@ int hidmain(char *use_device)
 	/* Get Report Descriptor */
 	rpt_desc.size = desc_size;
 	res = ioctl(fd, HIDIOCGRDESC, &rpt_desc);
-	if (res < 0) 
+	if (res < 0)
 	{
 		perror("HIDIOCGRDESC");
-	} 
-	else 
+	}
+	else
 	{
 		fprintf(stderr,"Report Descriptor:\n");
 		print_hexascii(stderr,(char *)&rpt_desc.value[0],rpt_desc.size);
@@ -846,7 +846,7 @@ int hidmain(char *use_device)
 		else
 			if(print_debug_output)
 			  fprintf(stderr,"ioctl HIDIOCSFEATURE returned: %d\n", res);
-	
+
 		usleep(10000L);	// sleep 0.01 sec before checking for response
 		/* Get Feature */
 		res=my_getFeature(fd,ireport,buf,sizeof(buf),fsize);
@@ -883,7 +883,7 @@ int hidmain(char *use_device)
 			if(print_debug_output)
 				fprintf(stderr,"ioctl HIDIOCSFEATURE returned: %d\n", res);
 		}
-	
+
 		usleep(10000L);	// sleep 0.01 sec before checking for response
 		resp_retries=0;
 		response=get_mightex_response(fd,ireport,&response_size);
@@ -929,12 +929,12 @@ int hidmain(char *use_device)
 			#endif
 			int ijunk[MAX_JUNK_COUNT],imax,icurrent,icount,i;
 			char format[FMT_SZ];
-			
+
 			mystrSZcpy(format,"#");
 			for(i=0;i<MAX_JUNK_COUNT;i++)
 			  mystrSZcat(format,"%d ");
-			
-			#if(12!=MAX_JUNK_COUNT) 
+
+			#if(12!=MAX_JUNK_COUNT)
 				"The Following Line must be fixed"
 			#endif
 			icount=sscanf(response,format,&ijunk[0],&ijunk[1],&ijunk[2],&ijunk[3],&ijunk[4],&ijunk[5],&ijunk[6],&ijunk[7],&ijunk[8],&ijunk[9],&ijunk[10],&ijunk[11]);

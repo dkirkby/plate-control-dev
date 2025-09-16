@@ -51,7 +51,7 @@ class PosAnimator(object):
         """Clear the animator completely of old data.
         """
         self = PosAnimator(self.fignum, self.timestep)
-    
+
     def clear_after(self, time):
         '''Clear the animator of existing data from value time (in seconds)
         onward.'''
@@ -67,7 +67,7 @@ class PosAnimator(object):
 
     def add_or_change_item(self, item_str, item_idx, time, polygon_points, style_override=''):
         """Add a polygonal item at a particular time to the animation data.
-            
+
             item_str       ... valid options are string keys defined in self.pospoly_keys and self.fixpoly_keys
             item_idx       ... numeric index which gets appended to item_str, in particular to distinguish multiple positioners from each other
             time           ... seconds, time at which this item should be shown
@@ -103,26 +103,26 @@ class PosAnimator(object):
         else:
             item['time'].insert(idx, time)
             item['poly'].insert(idx, polygon_points)
-            item['style'].insert(idx, style)            
+            item['style'].insert(idx, style)
         self.items[key] = item
-        
+
     def add_label(self, text, x, y):
         """Add a text string at position (x,y)."""
         key = len(self.labels)
         self.labels[key] = {'text':text, 'x':x, 'y':y}
 
-    @property    
+    @property
     def all_times(self):
         """Inspect contents and return the frame times."""
         temp = np.array([])
         for item in self.items.values():
             temp = np.append(temp, item['time'])
-        all_times = np.unique(temp)        
+        all_times = np.unique(temp)
         return all_times
-    
+
     def set_note(self, note=None, time=None):
         '''Add a string to the animation plot.
-        
+
             note ... str, will be displayed on plots. None clears existing note.
             time ... seconds, global time. None sets note to display at latest time.
         '''
@@ -256,8 +256,8 @@ class PosAnimator(object):
         """
         path = os.path.join(self.frame_dir, self.framefile_prefix + str(frame_number).zfill(self.n_framefile_digits) + self.framefile_extension)
         plt.savefig(path, bbox_inches='tight')
-        return frame_number + 1, path  
-    
+        return frame_number + 1, path
+
     @staticmethod
     def get_patch(item,index):
         return plt.Polygon(pc.transpose(item['poly'][index]),

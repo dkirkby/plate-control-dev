@@ -117,14 +117,14 @@ def make_sequence_for_one_petal(table):
         for key in params_dict:
             params_dict[key].append(row[key])
     params = Table(params_dict)
-    
+
     # ensure single, unique positioner in any given device locations per petal
     possible_locs = set(pc.generic_pos_neighbor_locs)
     device_locs = params['DEVICE_LOC']
     invalid_locs = set(params['DEVICE_LOC']) - possible_locs
     assert len(invalid_locs) == 0, f'invalid device locations in input file: {invalid_locs}'
     assert len(device_locs) == len(set(device_locs)), f'found repeated device location(s) in input file for petal {petal_id}'
-    
+
     # select which positioners get move commands
     if uargs.posids == 'all':
         movers = all_posids
@@ -135,7 +135,7 @@ def make_sequence_for_one_petal(table):
     disabled = set(params['POS_ID'][params['CTRL_ENABLED'] == False])
     movers -= disabled
     movers = sorted(movers)  # code lower down assumes consistent order of these
-    
+
     # reduce positioners collection to just movers + their neighbors, for speed-up
     # in cases where not sequencing the whole petal, etc
     loc2id = {params['DEVICE_LOC'][i]: params['POS_ID'][i] for i in range(len(params))}
@@ -149,7 +149,7 @@ def make_sequence_for_one_petal(table):
     elim_rows = [np.where(params['POS_ID'] == posid)[0][0] for posid in eliminate]
     params.remove_rows(elim_rows)
     params.sort('POS_ID')
-    
+
     # initialize a simulated petal instance
     print(f'Now initializing petal {petal_id}, will take a few seconds...')
     ptl = petal.Petal(petal_id        = petal_id,
@@ -168,7 +168,7 @@ def make_sequence_for_one_petal(table):
                       petalbox_id     = -1, # [2021-01-14 JHS] horrible hack, actual intent is to skip trying to read non-existent config file when at KPNO
                       save_debug      = False,
                       )
-    
+
     # set up calibration parameters
     assert ptl.collider.use_neighbor_loc_dict, 'must configure petal to initialize using neighbor locs from file, since calib params not yet set'
     keys_to_store = set(params.columns) - {'POS_ID'}
@@ -177,7 +177,7 @@ def make_sequence_for_one_petal(table):
         for key in keys_to_store:
             state.store(key, row[key])
     ptl.collider.refresh_calibrations()
-    
+
     def set_keepout_buffers(posids, sign=1):
         '''Set keepout expansion buffers. Sign is +1 (add) or -1 (subtract) from existing.'''
         if not buffers:
@@ -188,7 +188,7 @@ def make_sequence_for_one_petal(table):
                 ptl.states[posid].store(key, adjusted, register_if_altered=False)
         ptl.collider.refresh_calibrations()
         print(f'Keepout polygons on {len(posids)} pos adjusted by {sign:+2} * {buffers}.')
-    
+
     # helper functions
     def generate_target_set(posids):
         '''Produces one target set, for the argued collection of posids. Returns a
@@ -248,10 +248,10 @@ def make_sequence_for_one_petal(table):
             if attempts_remaining <= 0:
                 v = model.state._val
                 print(f'Warning: no valid target found for posid: {posid} at location {v["DEVICE_LOC"]}' +
-                      f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')        
+                      f' (x0, y0) = ({v["OFFSET_X"]:.3f}, {v["OFFSET_Y"]:.3f})!')
         set_keepout_buffers(posids, sign=-1)
         return targets_posXY
-    
+
     def generate_request_set(targets):
         '''Produces a dict of requests, ready for petal, from a dict with keys = posids
         and values = target locations (poslocXY coordinates).
@@ -260,12 +260,12 @@ def make_sequence_for_one_petal(table):
         for posid, target in targets.items():
             requests[posid] = {'command': 'poslocXY', 'target':target, 'log_note':''}
         return requests
-    
+
     def get_current_posTP():
         '''Returns dict with keys=posid, values=posintTP for all positioners.
         '''
         return {posid: model.expected_current_posintTP for posid, model in ptl.posmodels.items()}
-    
+
     def set_posTP(tp):
         '''Set system with POS_T, POS_P values. Input is a dict with keys = posid,
         values=posintTP.
@@ -274,7 +274,7 @@ def make_sequence_for_one_petal(table):
             state = ptl.states[posid]
             state.store('POS_T', values[0])
             state.store('POS_P', values[1])
-            
+
     n_stats_lines = 20
     statsfile = os.path.join(pc.dirs['temp_files'], 'stats_make_sequence')
     import cProfile, pstats
@@ -285,7 +285,7 @@ def make_sequence_for_one_petal(table):
         p.strip_dirs()
         p.sort_stats('cumtime')
         p.print_stats(n_stats_lines)
-    
+
     # generate sequence
     print('\nGENERATING MOVE SEQUENCE')
     print(f'n_moves = {uargs.num_moves}\n')
@@ -325,7 +325,7 @@ def make_sequence_for_one_petal(table):
         seq.append(move)
     seq.n_collisions_resolved = n_collisions_resolved  # hack, sneaks this value into the sequence meta data
     path = seq.save(pc.dirs['temp_files'])
-    return path 
+    return path
 
 # single/multiprocess switching
 n_processes_max = 1 if uargs.debug_mode else uargs.n_processes_max

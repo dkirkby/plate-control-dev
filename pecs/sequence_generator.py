@@ -113,7 +113,7 @@ move = sequence.Move(command='home_and_debounce', target0=1, target1=1, log_note
 seq.append(move)
 seqs.append(seq)
 
-seq = sequence.Sequence(short_name='home_no_debounce', 
+seq = sequence.Sequence(short_name='home_no_debounce',
                         long_name='run a single rehome on both axes, with no debounce moves',
                         )
 move = sequence.Move(command='home_no_debounce', target0=1, target1=1, log_note='', allow_corr=False)
@@ -150,7 +150,7 @@ for axis, targs in targets.items():
         move = sequence.Move(command=cmd, target0=target[0], target1=target[1], log_note='', allow_corr=False)
         seq.append(move)
     seqs.append(seq)
-    
+
 cmd = 'dTdP'
 deltas = [1.0 for i in range(10)]
 for axis in ['theta', 'phi']:
@@ -209,7 +209,7 @@ def wiggle(forward, case=0):
     if case == 1:
         deltas = backward + backandforth + forward + backward_reversed + forward_reversed
     return deltas
-    
+
 def typ_motortest_sequence(prefix, short_suffix, long_suffix, details, forward_deltas, settings):
     seq = sequence.Sequence(short_name=f'motortest {prefix} {short_suffix}',
                             long_name=f'{prefix} motor test, {long_suffix}',
@@ -237,7 +237,7 @@ option_groups = {'NOMINAL': {},
                      {'FINAL_CREEP_ON': False,
                       'ANTIBACKLASH_ON': False,
                       'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
-                      },                     
+                      },
                  'CRUISEONLY_NOSPINUPDOWN':
                      {'FINAL_CREEP_ON': False,
                       'MIN_DIST_AT_CRUISE_SPEED': sequence.nominals['stepsize_cruise'], # smallest finite value
@@ -399,7 +399,7 @@ for seq in seqs:
         table.write(sparse_path, overwrite=True, delimiter=',')
         sparse_paths.append(sparse_path)
     paths.extend(sparse_paths)
-    
+
 # READ FROM DISK AND PRINT TO STDOUT
 # ----------------------------------
 for path in paths:
@@ -416,5 +416,5 @@ for path in paths:
         print('\n')
         # print('delta sequence: ' + str(deltas))
         # print('running total: ' + str(cumsum))
-    
-    
+
+

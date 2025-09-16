@@ -415,7 +415,7 @@ class PosMoveTable(object):
             2. Any pause-only rows (except the first)
 
         Compacting is performed only on the user-defined rows, *not* on any
-        internally auto-generated _rows_extra. 
+        internally auto-generated _rows_extra.
         '''
         for i in reversed(range(len(self.rows))):
             if i != 0:
