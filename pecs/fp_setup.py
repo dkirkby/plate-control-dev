@@ -44,7 +44,7 @@ log_timestamp = pc.filename_timestamp_str()
 log_name = 'FP_setup_' + log_timestamp + '.log'
 log_path = os.path.join(log_dir, log_name)
 logger, logger_fh, logger_sh = simple_logger.start_logger(log_path)
-logger_fh.setLevel(logging.DEBUG)
+logger_fh.setLevel(logging.INFO)
 logger_sh.setLevel(logging.INFO)
 logger.info('FP_SETUP: script is starting. The logging is rather verbose, but please try to follow along. A summary of important notes are provided at the end.')
 simple_logger.input2(f'Alert: you are about to run the focalplane setup script to recover positioners or prepare the focalplane. This takes *up to half an hour* to execute. Hit enter to continue. ')
