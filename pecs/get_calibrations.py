@@ -6,6 +6,7 @@ an astropy table (when run as an imported module) or save to disk as an ecsv.
 
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("-i", "--instance",type=str, help = 'Instance name (desi_<obsday> is default>')
 parser.add_argument('-ptl', '--petal_ids', type=str, default='kpno', help='Comma-separated integers, specifying one or more PETAL_ID number(s) for which to retrieve data. Defaults to all known petals at kpno. Alternately argue "lbnl" for all known petals at lbnl.')
 parser.add_argument('-o', '--outdir', type=str, default='.', help='Path to directory where to save output file. Defaults to current dir.')
 parser.add_argument('-m', '--comment', type=str, default='', help='Comment string which will be included in output file metadata.')
@@ -41,6 +42,11 @@ else:
     log_path = os.path.join(log_dir, log_name)
 logger, _, _ = simple_logger.start_logger(log_path)
 assert2 = simple_logger.assert2
+
+# determine instance name to join
+inst = uargs.instance
+if not isinstance(inst, str):
+    inst = f'desi_{obs_day()}'
 
 # validate petal ids
 default_petal_ids = {'kpno': {2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
@@ -199,6 +205,12 @@ if online:
     import signal
     # First check for Pyro Name Server
     import Pyro4
+    try:
+        logger.info(f'Joining instance {inst}')
+        join_instance(inst, must_be_running=True)
+    except Exception as e:
+        logger.error(f'Failed to join instance {inst}: {str(e)}')
+        sys.exit(1)
     try:
         Pyro4.locateNS()
         logger.info('found name server')
