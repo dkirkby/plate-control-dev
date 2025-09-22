@@ -54,8 +54,6 @@ cs.ptlm.record_script_usage(script='fp_setup', alarm_id=1801, message='FP_SETUP 
 logger.info(f'FP_SETUP: starting as exposure id {cs.exp.id}')
 
 cs.fvc_feedback_timeout = 120.0 #2 minutes everyday
-# if datetime.today().weekday() == 6: #this is sunday
-#     cs.fvc_feedback_timeout = 120.0 #2 minutes!
 
 #from 1p_calib import onepoint # doesn't work
 import importlib
