@@ -589,8 +589,8 @@ class PECS:
             self.print(f'FVCCollector.collect returned code: {retcode}')
             if retcode == 'SUCCESS':
                 wait_time = 60 #wait for data transfer, maybe make this calculated time*iterations?
-                exit_cond = lambda : os.path.isfile(f'{destination}/fvc-{self.exp.id:08}.fits.fz')
-                self.print(f'Sleeping for maximum {wait_time} to wait for FVC data transfer...')
+                exit_cond = lambda : os.path.isfile(f'{destination}/{self.fvc_role.lower()}-{self.exp.id:08}.fits.fz')
+                self.print(f'Sleeping for maximum {wait_time} to wait for FVC data transfer of {destination}/{self.fvc_role.lower()}-{self.exp.id:08}.fits.fz...')
                 self.countdown_sec(wait_time, break_condition=exit_cond) #wait a minute for data transfer/break early if file exists
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')

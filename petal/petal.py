@@ -269,7 +269,7 @@ class Petal(object):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnopetalv2_v2.09'  # MUST be changed manually!
+        version = 'PETAL_v2.10'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:

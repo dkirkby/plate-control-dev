@@ -709,4 +709,3 @@ class PosMoveRow(object):
     @property
     def has_postpause(self):
         return self.data['postpause'] != 0
-
