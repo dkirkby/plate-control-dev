@@ -263,12 +263,13 @@ class Petal(object):
 
         self.petal_debug = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
                             'cancel_anneal_verbose': True } # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
+                                                            # Set 'compact_linphi' to True to compact move tables before conversion for LinPhi operation
 
     def petal_version(self):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_kpnolinphinc-a_v2.09'  # MUST be changed manually!
+        version = 'PETAL_v2.10'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:

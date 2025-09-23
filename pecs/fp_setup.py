@@ -261,4 +261,3 @@ if restore_keepout_err:
 ### Clean up logger ###
 logger.info(f'Log file: {log_path}')
 simple_logger.clear_logger()
-

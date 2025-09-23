@@ -61,7 +61,7 @@ class PECS:
         self.logger = logger
         self.input = inputfunc
 
-        self.fvc_feedback_timeout = 60.0
+        self.fvc_feedback_timeout = 120.0
         self.execute_move_timeout = 120.0
 
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')

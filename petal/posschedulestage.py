@@ -101,6 +101,9 @@ class PosScheduleStage(object):
 #       last_motor_direction is always > 0
 #       last_motor_direction = table.posmodel.linphi_params['LAST_P_DIR']
         last_motor_direction = 1
+        vrbose = self.petal_debug.get('linphi_verbose')
+        if self.petal_debug.get('compact_linphi'):
+            table.compact()
         if table.has_phi_motion:
             new_table = table.copy()
             idx = 0
@@ -110,6 +113,7 @@ class PosScheduleStage(object):
             for row in table.rows:
                 phi_dist = table.get_move(idx, pc.P)
                 theta_dist = table.get_move(idx, pc.T)
+                postpause = table.get_postpause(idx)
                 if phi_dist == 0:
                     if verbose:
                         self.printfunc(f'no phi movement in old row {idx}, new row {l_idx}, skipping') # DEBUG
@@ -143,9 +147,12 @@ class PosScheduleStage(object):
                         self.printfunc(f'original index = {idx}, new indices = {l_idx}, {l_idx+1}') # DEBUG
                     new_table.set_move(l_idx, pc.P, first_move)
                     new_table.set_move(l_idx, pc.T, 0.0)
+                    new_table.set_postpause(l_idx, 0)
                     new_table.insert_new_row(l_idx + 1)
                     new_table.set_move(l_idx + 1, pc.P, second_move)
                     new_table.set_move(l_idx + 1, pc.T, theta_dist)
+                    if postpause:
+                        new_table.set_postpause(l_idx + 1, postpause)
 # Second move is always >0, so LAST_P_DIR is always 1, never -1
 #                   table.posmodel.linphi_params['LAST_P_DIR'] = 1 if second_move > 0 else -1  # store new direction
                     idx += 1

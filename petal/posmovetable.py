@@ -310,6 +310,18 @@ class PosMoveTable(object):
             return None
         return self.rows[rowidx].data[dist_label[axisid]]
 
+    def get_prepause(self, rowidx):
+        ''' Returns prepause (integer msec) for specified axis in row of move table '''
+        if rowidx >= len(self.rows):
+            return None
+        return self.rows[rowidx].data['prepause']
+
+    def get_postpause(self, rowidx):
+        ''' Returns postpause (integer msec) for specified axis in row of move table '''
+        if rowidx >= len(self.rows):
+            return None
+        return self.rows[rowidx].data['postpause']
+
     # setters
     def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
@@ -395,6 +407,26 @@ class PosMoveTable(object):
             has_postpause = self.rows[i].has_postpause
             if not has_motion and not has_prepause and not has_postpause:
                 del self.rows[i]
+
+    def compact(self):
+        '''Removes two things from table:
+
+            1. Any "zero" rows, i.e. with no motion and no pauses.
+            2. Any pause-only rows (except the first)
+
+        Compacting is performed only on the user-defined rows, *not* on any
+        internally auto-generated _rows_extra.
+        '''
+        for i in reversed(range(len(self.rows))):
+            if i != 0:
+                if not self.rows[i].has_motion:
+                    prepause = self.get_prepause(i)
+                    postpause = self.get_postpause(i)
+                    if prepause or postpause:
+                        prev_postpause = self.get_postpause(i-1)
+                        prev_postpause += prepause + postpause
+                        self.set_postpause(i-1, prev_postpause)
+                    del self.rows[i]
 
     # row manipulations
     def insert_new_row(self, index):
@@ -677,4 +709,3 @@ class PosMoveRow(object):
     @property
     def has_postpause(self):
         return self.data['postpause'] != 0
-
