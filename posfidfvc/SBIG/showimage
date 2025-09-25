@@ -1,4 +1,0 @@
-#!/bin/bash
-ds9 $1 -scale log -zoom to fit  -regions region.reg &
-
-
