@@ -997,8 +997,8 @@ class PosSchedule(object):
 
     def _schedule_moves_initialize_logging(self, anticollision):
         """Initial logging tasks for the schedule_moves() function."""
+        self.__timer_start = time.perf_counter()
         if self.stats.is_enabled():
-            self.__timer_start = time.perf_counter()
             self.stats.set_scheduling_method(str(anticollision))
             self.__original_request_posids = set(self._requests.keys())
             self.__max_net_time = 0
