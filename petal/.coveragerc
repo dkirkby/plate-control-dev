@@ -1,0 +1,14 @@
+[run]
+source = .
+omit =
+    regression/*
+    setup.py
+    */__pycache__/*
+    */site-packages/*
+
+[report]
+# Show which lines weren't covered
+show_missing = True
+
+# Sort by coverage percentage
+sort = Cover

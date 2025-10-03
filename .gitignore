@@ -22,5 +22,9 @@ petal/poscollider.c
 petal/poscollider.html
 petal/poscollider.*.so
 
+# Coverage outputs
+.coverage
+htmlcov
+
 # Markdown files
 *.md
