@@ -103,6 +103,8 @@ WARNING: DOSlib.flags not imported! Flags will not be set!
 
 **⚠️ IMPORTANT: Only do this once, before you start refactoring!**
 
+This step was run on 2-Oct-2025 to establish baselines for the unified code base before any refactoring work. The resulting outputs are in [commit 7b4a283](https://github.com/dkirkby/plate-control-dev/commit/7b4a283815557e02634694ca6ac308c4c185634f). In case refactoring changes an output in an expected and desired way, see instructions below for updating the baselines.
+
 ```bash
 cd /path/to/plate-control-dev/petal
 python -m regression.regression_test --mode baseline
@@ -267,26 +269,35 @@ The `.coveragerc` file is already configured to:
 - Show which specific lines weren't covered
 - Sort results by coverage percentage
 
-### Understanding Coverage Results
+### Coverage Report from 3-Oct-2025
 
 ```
-Name                 Stmts   Miss  Cover   Missing
---------------------------------------------------
-petal.py              2888    450    84%   123-145, 234-267, ...
-posmodel.py            312     45    86%   67-72, 145, ...
-posstate.py            456     89    80%   234-245, 567, ...
-posschedule.py         789    123    84%   456-478, 890, ...
-...
---------------------------------------------------
-TOTAL                 5234    789    85%
+Name                                   Stmts   Miss  Cover
+----------------------------------------------------------
+collision_lookup_generator.py            363    363     0%
+collision_lookup_generator_subset.py      26     26     0%
+petalcomm.py                             211    211     0%
+petsockcomm.py                            37     37     0%
+replay.py                                301    301     0%
+posanimator.py                           206    155    25%
+petal.py                                1689   1253    26%
+posschedstats.py                         338    244    28%
+posschedulestage.py                      454    284    37%
+petaltransforms.py                       228    130    43%
+posschedule.py                           796    387    51%
+postransforms.py                         259    122    53%
+posstate.py                              294    109    63%
+posmovetable.py                          463    159    66%
+posconstants.py                          338    103    70%
+posmodel.py                              371     75    80%
+xy2tp.py                                  96      7    93%
+----------------------------------------------------------
+TOTAL                                   6470   3966    39%
 ```
 
 - **Stmts**: Total lines of executable code
 - **Miss**: Lines not executed during tests
 - **Cover**: Percentage covered
-- **Missing**: Specific line numbers not covered
-
-High coverage (>80%) indicates the regression tests exercise most of the code paths, providing confidence that refactoring won't break untested code.
 
 ---
 
@@ -504,13 +515,12 @@ git commit -m "Update test_XX baseline: improved collision detection algorithm"
 petal/
 ├── regression/
 │   ├── __init__.py
-│   ├── regression_test.py       # Main test suite
+│   ├── regression_test.py        # Main test suite
 │   ├── baselines/                # Golden master JSON files
 │   │   ├── test_01_basic_moves.json
 │   │   ├── test_02_collision_scenarios.json
 │   │   └── ... (8 total)
-│   └── docs/
-│       └── README.md             # This file
+│   └── README.md                 # This file
 ├── petal.py                      # Code being tested
 ├── posmodel.py                   # Code being tested
 └── ... (other petal module files)

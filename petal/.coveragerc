@@ -8,7 +8,7 @@ omit =
 
 [report]
 # Show which lines weren't covered
-show_missing = True
+show_missing = False
 
 # Sort by coverage percentage
 sort = Cover
