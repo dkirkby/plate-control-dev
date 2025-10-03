@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "f685ae84e40be710ca62058fe8d055908caf507130cbf809723c71685c107356",
+  "data": {
+    "after_correction": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        38.873376,
+        123.054046
+      ],
+      "poslocTP": [
+        168.627684,
+        121.968339
+      ]
+    },
+    "after_move_1": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        30.00005,
+        120.000034
+      ],
+      "poslocTP": [
+        159.754359,
+        118.914326
+      ]
+    },
+    "after_move_2": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        -20.000034,
+        150.000084
+      ],
+      "poslocTP": [
+        109.754275,
+        148.914376
+      ]
+    }
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "da67f879cff672b780923401858d497b9d38a30bedb9478463ad2792751e5fbc",
+  "data": {
+    "opposing_moves_adjust": {
+      "final_state": {
+        "has_schedule": true,
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              159.754359,
+              118.914326
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              -30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -207.175836,
+              95.903617
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -48.866799,
+              90.563219
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "opposing_moves_freeze": {
+      "final_state": {
+        "has_schedule": true,
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              159.754359,
+              118.914326
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              -30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -207.175836,
+              95.903617
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -48.866799,
+              90.563219
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    }
+  }
+}

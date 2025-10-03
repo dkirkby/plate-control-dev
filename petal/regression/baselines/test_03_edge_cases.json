@@ -1,0 +1,66 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "6d01378dad46e512fd0c21fd1efb48ca6bb8de60ff7c733e952cd5c9d682c7c1",
+  "data": {
+    "near_negative_limit": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        185.000014,
+        100.0
+      ],
+      "poslocTP": [
+        314.754323,
+        98.914292
+      ]
+    },
+    "near_positive_limit": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        174.999997,
+        100.0
+      ],
+      "poslocTP": [
+        304.754306,
+        98.914292
+      ]
+    },
+    "phi_maximum": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        0.0,
+        180.000134
+      ],
+      "poslocTP": [
+        129.754309,
+        178.914427
+      ]
+    },
+    "phi_minimum": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        0.0,
+        10.000145
+      ],
+      "poslocTP": [
+        129.754309,
+        8.914438
+      ]
+    },
+    "wrap_around": {
+      "classified_as_retracted": false,
+      "is_enabled": true,
+      "posintTP": [
+        178.999886,
+        100.0
+      ],
+      "poslocTP": [
+        308.754194,
+        98.914292
+      ]
+    }
+  }
+}

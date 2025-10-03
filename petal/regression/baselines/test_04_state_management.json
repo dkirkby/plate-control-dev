@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "bc14249de9b49ccc1d8fae16462405e142a4aeef411212a0582d98d5293c2525",
+  "data": {
+    "stored_values": {
+      "LENGTH_R1": 3.0,
+      "LENGTH_R2": 3.0,
+      "OFFSET_P": -0.3,
+      "OFFSET_T": 0.5,
+      "POS_P": 90.0,
+      "POS_T": 45.0
+    },
+    "validation": {
+      "has_required_keys": true,
+      "pos_p_in_range": true,
+      "pos_t_in_range": true
+    }
+  }
+}

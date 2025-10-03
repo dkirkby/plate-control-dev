@@ -1,0 +1,81 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "0318259fa3e59b62745ac17126dd7e364883bf23f1221efb01981e12a3c3b17c",
+  "data": {
+    "posintTP_-30.0_150.0": {
+      "original": [
+        -30.0,
+        150.0
+      ],
+      "poslocTP": [
+        99.754309,
+        148.914292
+      ],
+      "poslocXY": [
+        -1.671903,
+        0.151602
+      ],
+      "roundtrip_from_locTP": [
+        -30.0,
+        150.0
+      ],
+      "roundtrip_from_locXY": [
+        [
+          -30.0,
+          150.0
+        ],
+        false
+      ]
+    },
+    "posintTP_0.0_90.0": {
+      "original": [
+        0.0,
+        90.0
+      ],
+      "poslocTP": [
+        129.754309,
+        88.914292
+      ],
+      "poslocXY": [
+        -4.450048,
+        0.438118
+      ],
+      "roundtrip_from_locTP": [
+        0.0,
+        90.0
+      ],
+      "roundtrip_from_locXY": [
+        [
+          0.0,
+          90.0
+        ],
+        false
+      ]
+    },
+    "posintTP_45.0_120.0": {
+      "original": [
+        45.0,
+        120.0
+      ],
+      "poslocTP": [
+        174.754309,
+        118.914292
+      ],
+      "poslocXY": [
+        -1.848842,
+        -2.591765
+      ],
+      "roundtrip_from_locTP": [
+        45.0,
+        120.0
+      ],
+      "roundtrip_from_locXY": [
+        [
+          45.0,
+          120.0
+        ],
+        false
+      ]
+    }
+  }
+}

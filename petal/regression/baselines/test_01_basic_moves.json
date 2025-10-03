@@ -1,0 +1,867 @@
+{
+  "timestamp": "2025-10-02T16:37:33.369672",
+  "signature": "98e5ddf2ce92d18b10354f03e668341e1b12f0235d8a9f67a5671726c6042863",
+  "data": {
+    "posintTP": [
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                10.000017,
+                89.999983
+              ],
+              "poslocTP": [
+                139.754325,
+                88.914276
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          10.0,
+          90.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -15.000025,
+                120.000034
+              ],
+              "poslocTP": [
+                114.754283,
+                118.914326
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          -15.0,
+          120.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                150.000084
+              ],
+              "poslocTP": [
+                129.754309,
+                148.914376
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          0.0,
+          150.0
+        ]
+      }
+    ],
+    "poslocTP": [
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -119.754173,
+                91.085769
+              ],
+              "poslocTP": [
+                10.000135,
+                90.000061
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          10.0,
+          90.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -144.754215,
+                121.085819
+              ],
+              "poslocTP": [
+                -14.999907,
+                120.000111
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          -15.0,
+          120.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -129.75419,
+                151.085573
+              ],
+              "poslocTP": [
+                0.000119,
+                149.999865
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          0.0,
+          150.0
+        ]
+      }
+    ],
+    "poslocXY": [
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -120.30166,
+                43.975185
+              ],
+              "poslocTP": [
+                9.452648,
+                42.889477
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          5.0,
+          3.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -57.80452,
+                89.985162
+              ],
+              "poslocTP": [
+                71.949789,
+                88.899455
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          -2.0,
+          4.0
+        ]
+      },
+      {
+        "final_state": {
+          "has_schedule": true,
+          "positioner_states": {
+            "M02101": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                -56.518354,
+                34.512577
+              ],
+              "poslocTP": [
+                73.235954,
+                33.426869
+              ]
+            },
+            "M02201": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -177.175786,
+                75.903583
+              ]
+            },
+            "M02601": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -48.866799,
+                90.563219
+              ]
+            },
+            "M02701": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                -179.113875,
+                90.24081
+              ]
+            },
+            "M02801": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                25.593681,
+                97.458672
+              ]
+            },
+            "M03301": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.081367,
+                92.991259
+              ]
+            },
+            "M03401": {
+              "classified_as_retracted": false,
+              "is_enabled": true,
+              "posintTP": [
+                0.0,
+                100.0
+              ],
+              "poslocTP": [
+                174.433238,
+                94.408249
+              ]
+            }
+          }
+        },
+        "target": [
+          0.0,
+          6.0
+        ]
+      }
+    ]
+  }
+}
