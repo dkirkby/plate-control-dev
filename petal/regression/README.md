@@ -91,7 +91,8 @@ pip install numpy astropy pandas configobj Cython
 
 ```bash
 cd /path/to/plate-control-dev/petal
-python setup.py build_ext --inplace clean --all
+python setup.py clean --all
+python setup.py build_ext --inplace
 ```
 
 ### DOSlib Dependency
@@ -284,7 +285,8 @@ The workflow is triggered automatically for the `regtest` branch, so you can ver
 - name: Compile Cython extensions
   run: |
     cd petal
-    python setup.py build_ext --inplace clean --all
+    python setup.py clean --all
+    python setup.py build_ext --inplace
 
 - name: Run regression tests
   run: |
@@ -456,7 +458,8 @@ export FP_SETTINGS_PATH=/path/to/fp_settings
 Cython extensions not compiled:
 ```bash
 cd petal
-python setup.py build_ext --inplace clean --all
+python setup.py clean --all
+python setup.py build_ext --inplace
 ```
 
 ### Tests Fail Immediately After Creating Baseline

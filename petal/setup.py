@@ -15,10 +15,12 @@ for module in ['poscollider']:
 # General tips for the Cython-uninitiated...
 # ------------------------------------------
 # sample call to compile at general console:
-# python setup.py build_ext --inplace clean --all
+# python setup.py clean --all
+# python setup.py build_ext --inplace
 #
 # sample call to compile in Spyder console (generally, do so within a fresh console):
-# runfile('setup.py', args='build_ext --inplace clean --all')
+# runfile('setup.py', args='clean --all')
+# runfile('setup.py', args='build_ext --inplace')
 #
 # for Windows compiling, need build tools for visual studio:
 # https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017

@@ -31,7 +31,8 @@ jobs:
     - name: Compile Cython extensions
       run: |
         cd petal
-        python setup.py build_ext --inplace clean --all
+        python setup.py clean --all
+        python setup.py build_ext --inplace
 
     - name: Run regression tests
       run: |
