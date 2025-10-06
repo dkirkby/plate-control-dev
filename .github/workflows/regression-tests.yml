@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools numpy astropy pandas configobj Cython coverage
+        pip install setuptools numpy astropy pandas configobj Cython coverage matplotlib
 
     - name: Compile Cython extensions
       run: |
@@ -35,17 +35,8 @@ jobs:
         python setup.py build_ext --inplace
         # If --inplace didn't work, manually copy from build directory
         if [ ! -f poscollider*.so ]; then
-          echo "=== .so not in current dir, looking in build/ ==="
           find build -name "poscollider*.so" -exec cp {} . \;
         fi
-        echo "=== Final .so files in petal/ ==="
-        ls -la *.so
-
-    - name: Test poscollider import
-      run: |
-        cd petal
-        python -c "import poscollider; print('poscollider imported successfully')"
-      continue-on-error: true
 
     - name: Run regression tests
       run: |

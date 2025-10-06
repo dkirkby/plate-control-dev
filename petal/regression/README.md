@@ -84,7 +84,7 @@ export FP_SETTINGS_PATH=$PWD/fp_settings
 ### Required Python Packages
 
 ```bash
-pip install numpy astropy pandas configobj Cython
+pip install numpy astropy pandas configobj Cython matplotlib
 ```
 
 ### Compile Cython Extensions
