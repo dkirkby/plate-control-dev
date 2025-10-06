@@ -91,6 +91,11 @@ pip install numpy astropy pandas configobj Cython matplotlib
 
 ```bash
 cd /path/to/plate-control-dev/petal
+python setup.py build_ext --inplace
+```
+
+If you encounter issues (e.g., after switching Python versions), clean first:
+```bash
 python setup.py clean --all
 python setup.py build_ext --inplace
 ```
@@ -285,7 +290,6 @@ The workflow is triggered automatically for the `regtest` branch, so you can ver
 - name: Compile Cython extensions
   run: |
     cd petal
-    python setup.py clean --all
     python setup.py build_ext --inplace
 
 - name: Run regression tests
@@ -458,6 +462,11 @@ export FP_SETTINGS_PATH=/path/to/fp_settings
 Cython extensions not compiled:
 ```bash
 cd petal
+python setup.py build_ext --inplace
+```
+
+If that doesn't work, clean first and retry:
+```bash
 python setup.py clean --all
 python setup.py build_ext --inplace
 ```
