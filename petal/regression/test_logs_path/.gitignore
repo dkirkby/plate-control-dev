@@ -1,0 +1,6 @@
+# Ignore all log files and directories created during testing
+*
+
+# But keep the README and this .gitignore
+!README.md
+!.gitignore
