@@ -1,0 +1,174 @@
+{
+  "timestamp": "2025-10-05T18:21:05.587303",
+  "signature": "91f4541e994ffbc6dd83698b432efbd6c08b88863ff34d30f041aa41ef6ca3c5",
+  "data": {
+    "obsXY_moves": [
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -1.965263,
+            103.285517
+          ],
+          "poslocTP": [
+            127.789046,
+            102.199809
+          ]
+        },
+        "target": [
+          45.0,
+          5.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            24.172142,
+            74.513237
+          ],
+          "poslocTP": [
+            153.92645,
+            73.427529
+          ]
+        },
+        "target": [
+          44.0,
+          4.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -30.081862,
+            121.351708
+          ],
+          "poslocTP": [
+            99.672446,
+            120.266
+          ]
+        },
+        "target": [
+          46.0,
+          6.0
+        ]
+      }
+    ],
+    "ptlXY_moves": [
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -1.965263,
+            103.285517
+          ],
+          "poslocTP": [
+            127.789046,
+            102.199809
+          ]
+        },
+        "target": [
+          45.0,
+          5.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            24.172142,
+            74.513237
+          ],
+          "poslocTP": [
+            153.92645,
+            73.427529
+          ]
+        },
+        "target": [
+          44.0,
+          4.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -30.081862,
+            121.351708
+          ],
+          "poslocTP": [
+            99.672446,
+            120.266
+          ]
+        },
+        "target": [
+          46.0,
+          6.0
+        ]
+      }
+    ],
+    "transform_roundtrips": [
+      {
+        "original_posintTP": [
+          0.0,
+          90.0
+        ],
+        "poslocTP": [
+          129.754309,
+          88.914292
+        ],
+        "poslocXY": [
+          -4.450048,
+          0.438118
+        ],
+        "ptlXY": [
+          44.483479,
+          5.376208
+        ]
+      },
+      {
+        "original_posintTP": [
+          30.0,
+          120.0
+        ],
+        "poslocTP": [
+          159.754309,
+          118.914292
+        ],
+        "poslocXY": [
+          -2.456642,
+          -2.024937
+        ],
+        "ptlXY": [
+          46.476806,
+          2.913183
+        ]
+      },
+      {
+        "original_posintTP": [
+          -45.0,
+          100.0
+        ],
+        "poslocTP": [
+          84.754309,
+          98.914292
+        ],
+        "poslocXY": [
+          -2.849587,
+          2.908994
+        ],
+        "ptlXY": [
+          46.083862,
+          7.84704
+        ]
+      }
+    ]
+  }
+}

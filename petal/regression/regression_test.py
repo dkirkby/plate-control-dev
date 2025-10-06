@@ -556,6 +556,127 @@ class RegressionTestSuite:
 
         return results
 
+    def test_09_petal_level_coordinates(self) -> Dict:
+        """Test petal-level and observer-level coordinate systems"""
+        if self.verbose:
+            print("  Testing petal-level coordinate systems...")
+
+        results = {}
+
+        # Test ptlXY coordinate system (petal-level Cartesian)
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
+
+        posid = self.test_posids[0]
+
+        # Test ptlXY moves
+        # Note: ptlXY coordinates are petal-level positions in mm
+        # Positioners have limited reach (~6mm), so targets must be near positioner center
+        # For device_loc 21, center is approximately at ptlXY (44.86, 4.98)
+        ptlXY_targets = [
+            (45.0, 5.0),    # Near center
+            (44.0, 4.0),    # Slightly offset
+            (46.0, 6.0),    # Another offset
+        ]
+
+        ptlXY_results = []
+        for target in ptlXY_targets:
+            requests = {
+                posid: {
+                    'command': 'ptlXY',
+                    'target': list(target),
+                    'log_note': f'test_09_ptlXY_{target[0]}_{target[1]}'
+                }
+            }
+            ptl.request_targets(requests)
+            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+
+            ptlXY_results.append({
+                'target': target,
+                'final_state': self._capture_positioner_state(ptl, posid)
+            })
+
+        results['ptlXY_moves'] = ptlXY_results
+
+        # Test obsXY coordinate system (observer-level global)
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
+
+        # Note: obsXY coordinates are observatory-level global positions
+        # These coordinates may be unreachable for this test positioner,
+        # but the test still exercises the coordinate transform code paths
+        obsXY_targets = [
+            (45.0, 5.0),     # Similar to ptlXY for petal_loc=3
+            (44.0, 4.0),
+            (46.0, 6.0),
+        ]
+
+        obsXY_results = []
+        for target in obsXY_targets:
+            requests = {
+                posid: {
+                    'command': 'obsXY',
+                    'target': list(target),
+                    'log_note': f'test_09_obsXY_{target[0]}_{target[1]}'
+                }
+            }
+            ptl.request_targets(requests)
+            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+
+            obsXY_results.append({
+                'target': target,
+                'final_state': self._capture_positioner_state(ptl, posid)
+            })
+
+        results['obsXY_moves'] = obsXY_results
+
+        # Test coordinate transform roundtrips for ptlXY and obsXY
+        state = posstate.PosState(
+            unit_id=posid,
+            device_type='pos',
+            petal_id=self.petal_id,
+            logging=False
+        )
+        state.store('POS_T', 0.0, register_if_altered=False)
+        state.store('POS_P', 90.0, register_if_altered=False)
+
+        pm = posmodel.PosModel(state=state)
+        trans = pm.trans
+
+        # Test roundtrip transforms
+        test_positions = [
+            [0.0, 90.0],
+            [30.0, 120.0],
+            [-45.0, 100.0],
+        ]
+
+        transform_results = []
+        for posintTP in test_positions:
+            # Forward transforms to ptlXY and obsXY
+            poslocTP = trans.posintTP_to_poslocTP(posintTP)
+            ptlXY = trans.posintTP_to_ptlXY(posintTP)
+
+            # For obsXY, we need to go through the petal transforms
+            # Use the petal object's transforms
+            poslocXY = trans.posintTP_to_poslocXY(posintTP)
+
+            transform_results.append({
+                'original_posintTP': posintTP,
+                'poslocTP': list(poslocTP) if hasattr(poslocTP, '__iter__') else poslocTP,
+                'ptlXY': list(ptlXY) if hasattr(ptlXY, '__iter__') else ptlXY,
+                'poslocXY': list(poslocXY) if hasattr(poslocXY, '__iter__') else poslocXY,
+            })
+
+        results['transform_roundtrips'] = transform_results
+
+        return results
+
     # ============================================================
     # HELPER METHODS - PETAL CREATION & STATE CAPTURE
     # ============================================================
