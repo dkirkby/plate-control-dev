@@ -41,6 +41,12 @@ jobs:
         echo "=== Final .so files in petal/ ==="
         ls -la *.so
 
+    - name: Test poscollider import
+      run: |
+        cd petal
+        python -c "import poscollider; print('poscollider imported successfully')"
+      continue-on-error: true
+
     - name: Run regression tests
       run: |
         cd petal

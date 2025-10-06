@@ -4,10 +4,14 @@ import posmovetable
 import posstate
 try:
     import poscollider
-except:
+except Exception as e:
     import sys
+    import traceback
     print('Error while importing poscollider. Make sure you have compiled the cython file ' +
           'poscollider.pyx. Use setup.py in the petal directory, see usage comments in there.')
+    print(f'\nActual error: {type(e).__name__}: {e}')
+    print('\nFull traceback:')
+    traceback.print_exc()
     sys.exit(1)
 import posconstants as pc
 import posschedstats
