@@ -1,0 +1,107 @@
+{
+  "timestamp": "2025-10-05T18:44:27.098741",
+  "signature": "b6c7328b935a9399998dcf3b43244bd0e969056eab7e6f76177859db72c94e67",
+  "data": {
+    "regular_comparison": {
+      "is_linphi": false,
+      "zeno_motor_p": false
+    },
+    "zeno_config": {
+      "is_linphi": true,
+      "sz_ccw_p": 1.0,
+      "sz_cw_p": 1.0,
+      "zeno_motor_p": true
+    },
+    "zeno_move_1": {
+      "final_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          15.000025,
+          109.989346
+        ],
+        "poslocTP": [
+          144.754334,
+          108.903638
+        ]
+      },
+      "target": [
+        15.0,
+        110.0
+      ]
+    },
+    "zeno_move_sequence": [
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            0.0,
+            95.020148
+          ],
+          "poslocTP": [
+            129.754309,
+            93.93444
+          ]
+        },
+        "target": [
+          0.0,
+          95.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            30.00005,
+            104.979852
+          ],
+          "poslocTP": [
+            159.754359,
+            103.894144
+          ]
+        },
+        "target": [
+          30.0,
+          105.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -20.000034,
+            114.99884
+          ],
+          "poslocTP": [
+            109.754275,
+            113.913132
+          ]
+        },
+        "target": [
+          -20.0,
+          115.0
+        ]
+      }
+    ],
+    "zeno_move_table": {
+      "has_zeno_field": true,
+      "num_rows": 1,
+      "pccwa": 1.0,
+      "pcwa": 1.0,
+      "zeno_value": "P"
+    },
+    "zeno_short_move": {
+      "num_rows": 1,
+      "theta_move_data": {
+        "auto_cmd": "",
+        "dP_ideal": 1.0,
+        "dT_ideal": 1.0,
+        "postpause": 0,
+        "prepause": 0
+      }
+    }
+  }
+}

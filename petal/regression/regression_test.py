@@ -807,6 +807,115 @@ class RegressionTestSuite:
 
         return results
 
+    def test_11_linear_phi_motor(self) -> Dict:
+        """
+        Test linear phi motor (Zeno motor) functionality.
+
+        Exercises code paths specific to Zeno motors:
+        - is_linphi property detection
+        - Zeno scaling parameters (SZ_CW_P, SZ_CCW_P)
+        - Special move table generation for linear phi
+        - No creep moves on phi axis for Zeno motors
+        - No backlash compensation on phi axis for Zeno motors
+        """
+        results = {}
+
+        # Test with Zeno motor positioner (M03501)
+        zeno_posid = 'M03501'
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            posids=[zeno_posid]
+        )
+
+        # Verify Zeno motor is detected correctly
+        posmodel = ptl.posmodels[zeno_posid]
+        results['zeno_config'] = {
+            'is_linphi': posmodel.is_linphi,
+            'zeno_motor_p': posmodel.state._val.get('ZENO_MOTOR_P', False),
+            'sz_cw_p': posmodel.get_zeno_scale('SZ_CW_P'),
+            'sz_ccw_p': posmodel.get_zeno_scale('SZ_CCW_P'),
+        }
+
+        # Test 1: Execute a move with Zeno motor
+        ptl.request_targets({
+            zeno_posid: {
+                'command': 'posintTP',
+                'target': [15.0, 110.0],
+                'log_note': 'test_zeno_move_1'
+            }
+        })
+        ptl.schedule_send_and_execute_moves(anticollision=None)
+
+        results['zeno_move_1'] = {
+            'target': [15.0, 110.0],
+            'final_state': self._capture_positioner_state(ptl, zeno_posid)
+        }
+
+        # Test 2: Create move table and verify Zeno-specific parameters
+        table = posmovetable.PosMoveTable(posmodel)
+        table.set_move(0, pc.T, 20.0)
+        table.set_move(0, pc.P, 15.0)
+
+        # Check that move table has Zeno parameters
+        hw_table = table.for_hardware()
+        results['zeno_move_table'] = {
+            'has_zeno_field': 'zeno' in hw_table,
+            'zeno_value': hw_table.get('zeno', None),
+            'pccwa': hw_table.get('PCCWA', None),  # CCW scale for phi
+            'pcwa': hw_table.get('PCWA', None),     # CW scale for phi
+            'num_rows': len(table.rows),
+        }
+
+        # Test 3: Verify no creep on phi axis for Zeno motors
+        # Make a short move that would normally use creep on a regular motor
+        table_short = posmovetable.PosMoveTable(posmodel)
+        table_short.set_move(0, pc.T, 1.0)   # Short theta move (should use creep)
+        table_short.set_move(0, pc.P, 1.0)   # Short phi move (Zeno: should NOT use creep)
+
+        results['zeno_short_move'] = {
+            'num_rows': len(table_short.rows),
+            'theta_move_data': table_short.rows[0].data if len(table_short.rows) > 0 else None,
+        }
+
+        # Test 4: Compare with regular motor behavior
+        regular_posid = 'M02101'
+        ptl_regular = self._create_test_petal(
+            simulator_on=True,
+            posids=[regular_posid]
+        )
+
+        regular_posmodel = ptl_regular.posmodels[regular_posid]
+        results['regular_comparison'] = {
+            'is_linphi': regular_posmodel.is_linphi,
+            'zeno_motor_p': regular_posmodel.state._val.get('ZENO_MOTOR_P', False),
+        }
+
+        # Test 5: Multi-move sequence with Zeno motor
+        move_targets = [
+            [0.0, 95.0],
+            [30.0, 105.0],
+            [-20.0, 115.0],
+        ]
+
+        move_results = []
+        for target in move_targets:
+            ptl.request_targets({
+                zeno_posid: {
+                    'command': 'posintTP',
+                    'target': target,
+                    'log_note': f'test_zeno_seq_{target}'
+                }
+            })
+            ptl.schedule_send_and_execute_moves(anticollision=None)
+            move_results.append({
+                'target': target,
+                'final_state': self._capture_positioner_state(ptl, zeno_posid)
+            })
+
+        results['zeno_move_sequence'] = move_results
+
+        return results
+
     # ============================================================
     # HELPER METHODS - PETAL CREATION & STATE CAPTURE
     # ============================================================
