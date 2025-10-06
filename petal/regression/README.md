@@ -266,33 +266,30 @@ open htmlcov/index.html
 
 The `.coveragerc` file is already configured to:
 - Measure coverage for petal module code only (excludes regression test code)
-- Show which specific lines weren't covered
+- Exclude collision_lookup_generator.py and collision_lookup_generator_subset.py which are obsolete
+- Exclude petalcomm.py and petalsockcomm.py which require access to hardware
 - Sort results by coverage percentage
 
-### Coverage Report from 3-Oct-2025
+### Coverage Report from 5-Oct-2025
 
 ```
-Name                                   Stmts   Miss  Cover
-----------------------------------------------------------
-collision_lookup_generator.py            363    363     0%
-collision_lookup_generator_subset.py      26     26     0%
-petalcomm.py                             211    211     0%
-petsockcomm.py                            37     37     0%
-replay.py                                301    301     0%
-posanimator.py                           206    155    25%
-petal.py                                1689   1253    26%
-posschedstats.py                         338    244    28%
-posschedulestage.py                      454    284    37%
-petaltransforms.py                       228    130    43%
-posschedule.py                           796    387    51%
-postransforms.py                         259    122    53%
-posstate.py                              294    109    63%
-posmovetable.py                          463    159    66%
-posconstants.py                          338    103    70%
-posmodel.py                              371     75    80%
-xy2tp.py                                  96      7    93%
-----------------------------------------------------------
-TOTAL                                   6470   3966    39%
+Name                  Stmts   Miss  Cover
+-----------------------------------------
+replay.py               301    301     0%
+posanimator.py          206    155    25%
+petal.py               1689   1253    26%
+posschedstats.py        338    244    28%
+posschedulestage.py     454    284    37%
+petaltransforms.py      228    130    43%
+posschedule.py          796    387    51%
+postransforms.py        259    122    53%
+posstate.py             294    102    65%
+posmovetable.py         463    159    66%
+posconstants.py         338    103    70%
+posmodel.py             371     75    80%
+xy2tp.py                 96      7    93%
+-----------------------------------------
+TOTAL                  5833   3322    43%
 ```
 
 - **Stmts**: Total lines of executable code

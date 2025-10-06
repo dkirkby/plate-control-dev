@@ -1,6 +1,10 @@
 [run]
 source = .
 omit =
+    collision_lookup_generator.py
+    collision_lookup_generator_subset.py
+    petalcomm.py
+    petsockcomm.py
     regression/*
     setup.py
     */__pycache__/*
