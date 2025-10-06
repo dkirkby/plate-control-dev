@@ -68,8 +68,8 @@ python -m regression.regression_test --mode compare --fp-settings-path /path/to/
 
 | Component | Full fp_settings | fp_settings_min |
 |-----------|-----------------|-----------------|
-| **Size** | ~150MB | ~15KB |
-| **pos_settings/** | ~12,000 unit files | 1 DEFAULT template |
+| **Size** | ~150MB | ~30KB |
+| **pos_settings/** | ~12,000 unit files | 1 DEFAULT template + 7 `unit_M0XXXX.conf` files |
 | **fid_settings/** | ~300 unit files | 1 DEFAULT template |
 | **ptl_settings/** | ~20 unit files | 1 DEFAULT template |
 | **collision_settings/** | Multiple configs | 1 DEFAULT config |
