@@ -1,0 +1,106 @@
+{
+  "timestamp": "2025-10-05T18:53:19.858082",
+  "signature": "ab6e44e7c747d9b9d679a7da8fec1efb73fecd3e6a01e267299d2bf62c186eff",
+  "data": {
+    "after_enabled_move": {
+      "disabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": false,
+        "posintTP": [
+          0.0,
+          100.0
+        ],
+        "poslocTP": [
+          129.754309,
+          98.914292
+        ]
+      },
+      "enabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          -10.000017,
+          94.999992
+        ],
+        "poslocTP": [
+          119.754292,
+          93.914284
+        ]
+      }
+    },
+    "after_mixed_move": {
+      "disabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": false,
+        "posintTP": [
+          0.0,
+          100.0
+        ],
+        "poslocTP": [
+          129.754309,
+          98.914292
+        ]
+      },
+      "enabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          20.000034,
+          105.000008
+        ],
+        "poslocTP": [
+          149.754342,
+          103.914301
+        ]
+      }
+    },
+    "disabled_request": {
+      "accepted_posids": [],
+      "num_requests_accepted": 0,
+      "num_requests_sent": 1
+    },
+    "disabled_unchanged": {
+      "final_position": [
+        0.0,
+        100.0
+      ],
+      "initial_position": [
+        0.0,
+        100.0
+      ],
+      "positions_match": true
+    },
+    "enabled_request": {
+      "accepted_posids": [
+        "M02101"
+      ],
+      "num_requests_accepted": 1,
+      "num_requests_sent": 1
+    },
+    "mixed_request": {
+      "accepted_posids": [
+        "M02101"
+      ],
+      "num_requests_accepted": 1,
+      "num_requests_sent": 2
+    },
+    "positioner_status": {
+      "all_disabled_posids": [
+        "M03601"
+      ],
+      "all_enabled_posids": [
+        "M02101"
+      ],
+      "disabled": {
+        "ctrl_enabled": false,
+        "is_enabled": false,
+        "posid": "M03601"
+      },
+      "enabled": {
+        "ctrl_enabled": true,
+        "is_enabled": true,
+        "posid": "M02101"
+      }
+    }
+  }
+}

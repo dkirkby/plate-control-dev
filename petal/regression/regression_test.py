@@ -916,6 +916,122 @@ class RegressionTestSuite:
 
         return results
 
+    def test_12_disabled_positioner(self) -> Dict:
+        """
+        Test disabled positioner handling.
+
+        Exercises code paths for positioners with CTRL_ENABLED = False:
+        - Disabled positioners are excluded from enabled lists
+        - Move requests to disabled positioners are rejected
+        - Mixed requests (enabled + disabled) only move enabled positioners
+        - Scheduling excludes disabled positioners
+        """
+        results = {}
+
+        # Test with both enabled and disabled positioners
+        enabled_posid = 'M02101'
+        disabled_posid = 'M03601'
+
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            posids=[enabled_posid, disabled_posid]
+        )
+
+        # Test 1: Verify positioner status detection
+        results['positioner_status'] = {
+            'enabled': {
+                'posid': enabled_posid,
+                'is_enabled': ptl.posmodels[enabled_posid].is_enabled,
+                'ctrl_enabled': ptl.posmodels[enabled_posid].state._val['CTRL_ENABLED'],
+            },
+            'disabled': {
+                'posid': disabled_posid,
+                'is_enabled': ptl.posmodels[disabled_posid].is_enabled,
+                'ctrl_enabled': ptl.posmodels[disabled_posid].state._val['CTRL_ENABLED'],
+            },
+            'all_enabled_posids': sorted(list(ptl.all_enabled_posids())),
+            'all_disabled_posids': sorted(list(ptl.all_disabled_posids())),
+        }
+
+        # Test 2: Request move to disabled positioner only (should be rejected)
+        requests_disabled_only = ptl.request_targets({
+            disabled_posid: {
+                'command': 'posintTP',
+                'target': [15.0, 110.0],
+                'log_note': 'test_disabled_reject'
+            }
+        })
+
+        results['disabled_request'] = {
+            'num_requests_sent': 1,
+            'num_requests_accepted': len(requests_disabled_only),
+            'accepted_posids': sorted(list(requests_disabled_only.keys())),
+        }
+
+        # Test 3: Request moves to both enabled and disabled positioners
+        # Only enabled should be accepted
+        requests_mixed = ptl.request_targets({
+            enabled_posid: {
+                'command': 'posintTP',
+                'target': [20.0, 105.0],
+                'log_note': 'test_enabled_move'
+            },
+            disabled_posid: {
+                'command': 'posintTP',
+                'target': [25.0, 115.0],
+                'log_note': 'test_disabled_reject'
+            }
+        })
+
+        results['mixed_request'] = {
+            'num_requests_sent': 2,
+            'num_requests_accepted': len(requests_mixed),
+            'accepted_posids': sorted(list(requests_mixed.keys())),
+        }
+
+        # Execute the move (only enabled positioner should move)
+        ptl.schedule_send_and_execute_moves(anticollision=None)
+
+        results['after_mixed_move'] = {
+            'enabled_state': self._capture_positioner_state(ptl, enabled_posid),
+            'disabled_state': self._capture_positioner_state(ptl, disabled_posid),
+        }
+
+        # Test 4: Request move to enabled positioner only (should work)
+        requests_enabled_only = ptl.request_targets({
+            enabled_posid: {
+                'command': 'posintTP',
+                'target': [-10.0, 95.0],
+                'log_note': 'test_enabled_move_2'
+            }
+        })
+
+        results['enabled_request'] = {
+            'num_requests_sent': 1,
+            'num_requests_accepted': len(requests_enabled_only),
+            'accepted_posids': sorted(list(requests_enabled_only.keys())),
+        }
+
+        ptl.schedule_send_and_execute_moves(anticollision=None)
+
+        results['after_enabled_move'] = {
+            'enabled_state': self._capture_positioner_state(ptl, enabled_posid),
+            'disabled_state': self._capture_positioner_state(ptl, disabled_posid),
+        }
+
+        # Test 5: Verify disabled positioner position hasn't changed from initial
+        # (it should still be at 0.0, 100.0)
+        results['disabled_unchanged'] = {
+            'initial_position': [0.0, 100.0],
+            'final_position': results['after_enabled_move']['disabled_state']['posintTP'],
+            'positions_match': (
+                abs(results['after_enabled_move']['disabled_state']['posintTP'][0] - 0.0) < 0.001 and
+                abs(results['after_enabled_move']['disabled_state']['posintTP'][1] - 100.0) < 0.001
+            ),
+        }
+
+        return results
+
     # ============================================================
     # HELPER METHODS - PETAL CREATION & STATE CAPTURE
     # ============================================================

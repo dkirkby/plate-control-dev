@@ -279,17 +279,17 @@ replay.py               301    301     0%
 posanimator.py          206    155    25%
 petal.py               1689   1253    26%
 posschedstats.py        338    244    28%
-posschedulestage.py     454    284    37%
 petaltransforms.py      228    127    44%
-posschedule.py          796    385    52%
+posschedulestage.py     454    241    47%
+posschedule.py          796    374    53%
 postransforms.py        259    103    60%
 posstate.py             294    102    65%
-posmovetable.py         463    159    66%
 posconstants.py         338    103    70%
-posmodel.py             371     75    80%
+posmovetable.py         463    135    71%
+posmodel.py             371     56    85%
 xy2tp.py                 96      7    93%
 -----------------------------------------
-TOTAL                  5833   3298    43%
+TOTAL                  5833   3201    45%
 ```
 
 - **Stmts**: Total lines of executable code
