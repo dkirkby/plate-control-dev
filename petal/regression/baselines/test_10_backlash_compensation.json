@@ -1,0 +1,109 @@
+{
+  "timestamp": "2025-10-05T18:33:21.615263",
+  "signature": "502c83133c9fe016f9fa8810668aaf69bd4ec94342b1ffb128740418b24456d7",
+  "data": {
+    "config": {
+      "antibacklash_final_move_dir_p": 1,
+      "antibacklash_final_move_dir_t": -1,
+      "antibacklash_on": true,
+      "backlash": 3.0
+    },
+    "move_1": {
+      "final_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          30.00005,
+          120.000034
+        ],
+        "poslocTP": [
+          159.754359,
+          118.914326
+        ]
+      },
+      "target": [
+        30.0,
+        120.0
+      ]
+    },
+    "move_sequence": [
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            15.000025,
+            100.0
+          ],
+          "poslocTP": [
+            144.754334,
+            98.914292
+          ]
+        },
+        "target": [
+          15.0,
+          100.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -15.000025,
+            110.000017
+          ],
+          "poslocTP": [
+            114.754283,
+            108.914309
+          ]
+        },
+        "target": [
+          -15.0,
+          110.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            30.00005,
+            94.999992
+          ],
+          "poslocTP": [
+            159.754359,
+            93.914284
+          ]
+        },
+        "target": [
+          30.0,
+          95.0
+        ]
+      }
+    ],
+    "move_table_test": {
+      "hardware_table_keys": [
+        "motor_steps_T",
+        "motor_steps_P",
+        "speed_mode_T",
+        "speed_mode_P",
+        "move_time",
+        "posid",
+        "canid",
+        "busid",
+        "postpause",
+        "nrows",
+        "total_time",
+        "required"
+      ],
+      "has_hardware_table": true,
+      "num_rows": 1,
+      "should_antibacklash": true
+    },
+    "no_backlash_comparison": {
+      "num_rows": 1,
+      "should_antibacklash": false
+    }
+  }
+}

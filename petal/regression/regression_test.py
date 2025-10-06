@@ -677,6 +677,136 @@ class RegressionTestSuite:
 
         return results
 
+    def test_10_backlash_compensation(self) -> Dict:
+        """Test automatic backlash compensation moves"""
+        if self.verbose:
+            print("  Testing backlash compensation...")
+
+        results = {}
+
+        # Use posid M02101 which has ANTIBACKLASH_ON = True in its config
+        posid = self.test_posids[0]  # M02101
+
+        # Verify backlash settings from config
+        state = posstate.PosState(
+            unit_id=posid,
+            device_type='pos',
+            petal_id=self.petal_id,
+            logging=False
+        )
+
+        # Record backlash configuration
+        results['config'] = {
+            'antibacklash_on': state._val.get('ANTIBACKLASH_ON'),
+            'backlash': state._val.get('BACKLASH'),
+            'antibacklash_final_move_dir_t': state._val.get('ANTIBACKLASH_FINAL_MOVE_DIR_T'),
+            'antibacklash_final_move_dir_p': state._val.get('ANTIBACKLASH_FINAL_MOVE_DIR_P'),
+        }
+
+        # Create petal with backlash-enabled positioner
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
+
+        # Test 1: Move that requires backlash compensation
+        requests = {
+            posid: {
+                'command': 'posintTP',
+                'target': [30.0, 120.0],
+                'log_note': 'test_10_move_with_backlash'
+            }
+        }
+        ptl.request_targets(requests)
+        ptl.schedule_send_and_execute_moves(anticollision='adjust')
+
+        results['move_1'] = {
+            'target': [30.0, 120.0],
+            'final_state': self._capture_positioner_state(ptl, posid),
+        }
+
+        # Test 2: Create a move table directly and check backlash generation
+        pm = posmodel.PosModel(state=state)
+        state.store('POS_T', 0.0, register_if_altered=False)
+        state.store('POS_P', 90.0, register_if_altered=False)
+
+        # Create move table with backlash enabled
+        table = posmovetable.PosMoveTable(this_posmodel=pm, init_posintTP=[0.0, 90.0])
+
+        # Add moves in both axes
+        table.set_move(0, pc.T, 45.0)  # Move theta by 45 degrees
+        table.set_move(0, pc.P, 30.0)  # Move phi by 30 degrees
+
+        # Get hardware-ready format which includes backlash moves
+        hardware_table = table.for_hardware()
+
+        results['move_table_test'] = {
+            'num_rows': len(table.rows),
+            'should_antibacklash': table.should_antibacklash,
+            'has_hardware_table': hardware_table is not None,
+            'hardware_table_keys': list(hardware_table.keys()) if hardware_table else None,
+        }
+
+        # Test 3: Multiple sequential moves to verify backlash is applied
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
+
+        move_sequence = [
+            [15.0, 100.0],
+            [-15.0, 110.0],
+            [30.0, 95.0],
+        ]
+
+        sequence_results = []
+        for target in move_sequence:
+            requests = {
+                posid: {
+                    'command': 'posintTP',
+                    'target': target,
+                    'log_note': f'test_10_sequence_{target[0]}_{target[1]}'
+                }
+            }
+            ptl.request_targets(requests)
+            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+
+            sequence_results.append({
+                'target': target,
+                'final_state': self._capture_positioner_state(ptl, posid),
+            })
+
+        results['move_sequence'] = sequence_results
+
+        # Test 4: Test with ANTIBACKLASH_ON = False for comparison
+        # Modify state temporarily
+        state_no_backlash = posstate.PosState(
+            unit_id=posid,
+            device_type='pos',
+            petal_id=self.petal_id,
+            logging=False
+        )
+        state_no_backlash.store('POS_T', 0.0, register_if_altered=False)
+        state_no_backlash.store('POS_P', 90.0, register_if_altered=False)
+        state_no_backlash.store('ANTIBACKLASH_ON', False, register_if_altered=False)
+
+        pm_no_backlash = posmodel.PosModel(state=state_no_backlash)
+        table_no_backlash = posmovetable.PosMoveTable(
+            this_posmodel=pm_no_backlash,
+            init_posintTP=[0.0, 90.0]
+        )
+        table_no_backlash.set_move(0, pc.T, 45.0)
+        table_no_backlash.set_move(0, pc.P, 30.0)
+
+        results['no_backlash_comparison'] = {
+            'should_antibacklash': table_no_backlash.should_antibacklash,
+            'num_rows': len(table_no_backlash.rows),
+        }
+
+        return results
+
     # ============================================================
     # HELPER METHODS - PETAL CREATION & STATE CAPTURE
     # ============================================================
