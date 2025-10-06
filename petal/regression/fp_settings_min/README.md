@@ -26,7 +26,8 @@ fp_settings_min/
 │   ├── unit_M02801.conf                        (2.1K - test positioner, device_loc 28)
 │   ├── unit_M03301.conf                        (2.1K - test positioner, device_loc 33)
 │   ├── unit_M03401.conf                        (2.1K - test positioner, device_loc 34)
-│   └── unit_M03501.conf                        (2.2K - Zeno motor positioner, device_loc 35)
+│   ├── unit_M03501.conf                        (2.2K - Zeno motor positioner, device_loc 35)
+│   └── unit_M03601.conf                        (2.2K - disabled positioner, device_loc 36, CTRL_ENABLED=False)
 ├── collision_settings/
 │   └── _collision_settings_DEFAULT.conf       (4.0K - collision parameters)
 ├── ptl_settings/
@@ -49,7 +50,7 @@ fp_settings_min/
 
 When regression tests run:
 
-1. **Static configuration**: The 8 pre-configured positioner files (`unit_M02101.conf` through `unit_M03501.conf`) are loaded directly - no files are created or modified during test execution
+1. **Static configuration**: The 9 pre-configured positioner files (`unit_M02101.conf` through `unit_M03601.conf`) are loaded directly - no files are created or modified during test execution
 2. **Read-only access**: The entire `fp_settings_min/` directory can be accessed read-only; the regression tests only read configuration, never write to it
 3. **Complete structure**: All required subdirectories exist (tracked via `.gitkeep` files), so no directory creation is needed
 
@@ -70,7 +71,7 @@ python -m regression.regression_test --mode compare --fp-settings-path /path/to/
 | Component | Full fp_settings | fp_settings_min |
 |-----------|-----------------|-----------------|
 | **Size** | ~150MB | ~30KB |
-| **pos_settings/** | ~12,000 unit files | 1 DEFAULT template + 8 `unit_M0XXXX.conf` files |
+| **pos_settings/** | ~12,000 unit files | 1 DEFAULT template + 9 `unit_M0XXXX.conf` files |
 | **fid_settings/** | ~300 unit files | 1 DEFAULT template |
 | **ptl_settings/** | ~20 unit files | 1 DEFAULT template |
 | **collision_settings/** | Multiple configs | 1 DEFAULT config |

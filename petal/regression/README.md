@@ -37,7 +37,7 @@ Regression testing verifies that code changes don't break existing functionality
 
 ### What's Tested?
 
-The suite includes 8 comprehensive test scenarios:
+The suite includes 12 comprehensive test scenarios:
 
 1. **test_01_basic_moves** - All coordinate systems (posintTP, poslocTP, poslocXY, etc.)
 2. **test_02_collision_scenarios** - Known collision cases with adjust/freeze modes
@@ -47,27 +47,39 @@ The suite includes 8 comprehensive test scenarios:
 6. **test_06_scheduling_algorithms** - All anticollision × anneal mode combinations
 7. **test_07_move_table_formats** - All 7 output formats (schedule, collider, hardware, etc.)
 8. **test_08_complex_sequences** - Multi-move operations with corrections
+9. **test_09_petal_level_coordinates** - Petal-level (ptlXY) and observatory-level (obsXY) coordinate systems
+10. **test_10_backlash_compensation** - Automatic backlash compensation in move tables
+11. **test_11_linear_phi_motor** - Zeno motor (linear phi motor) specific behavior
+12. **test_12_disabled_positioner** - Handling of positioners with CTRL_ENABLED = False
 
 ---
 
 ## Prerequisites
 
-### Required Environment Variables
+### Environment Variables (Optional)
+
+**The regression tests now work out-of-the-box with no environment setup required!**
+
+The test suite includes a minimal `fp_settings_min/` directory and uses `test_logs_path/` for logs. However, you can override these defaults:
 
 ```bash
-# Create log directory
-mkdir -p /tmp/poslogs
-export POSITIONER_LOGS_PATH=/tmp/poslogs
-
-# Point to fp_settings directory
+# Optional: Use custom fp_settings directory
 export FP_SETTINGS_PATH=/path/to/fp_settings
+
+# Optional: Use custom log directory
+export POSITIONER_LOGS_PATH=/path/to/logs
 ```
 
-If `fp_settings` is not available:
+To use the full `fp_settings` from SVN:
 ```bash
 svn co https://desi.lbl.gov/svn/code/focalplane/fp_settings
 export FP_SETTINGS_PATH=$PWD/fp_settings
 ```
+
+**Default behavior** (no environment variables set):
+- Uses `regression/fp_settings_min/` (30KB, self-contained)
+- Logs to `regression/test_logs_path/`
+- Command-line overrides: `--fp-settings-path` and `--positioner-logs-path`
 
 ### Required Python Packages
 
@@ -103,7 +115,7 @@ WARNING: DOSlib.flags not imported! Flags will not be set!
 
 **⚠️ IMPORTANT: Only do this once, before you start refactoring!**
 
-This step was run on 2-Oct-2025 to establish baselines for the unified code base before any refactoring work. The resulting outputs are in [commit 7b4a283](https://github.com/dkirkby/plate-control-dev/commit/7b4a283815557e02634694ca6ac308c4c185634f). In case refactoring changes an output in an expected and desired way, see instructions below for updating the baselines.
+Baselines for tests 01-08 were created on 2-Oct-2025 to establish the unified code base ([commit 7b4a283](https://github.com/dkirkby/plate-control-dev/commit/7b4a283815557e02634694ca6ac308c4c185634f)). Tests 09-12 were added on 5-Oct-2025 to improve coverage. All baselines are committed to version control.
 
 ```bash
 cd /path/to/plate-control-dev/petal
@@ -115,7 +127,7 @@ This creates baseline JSON files in `regression/baselines/` that capture the cur
 **Expected output** (verbose petal module logging omitted for clarity):
 ```
 ======================================================================
-Running 8 regression test(s)
+Running 12 regression test(s)
 Mode: BASELINE
 Baseline directory: /path/to/petal/regression/baselines
 ======================================================================
@@ -128,11 +140,15 @@ Running test_05_transform_chain... 💾 BASELINE_SAVED
 Running test_06_scheduling_algorithms... [... verbose logging ...] 💾 BASELINE_SAVED
 Running test_07_move_table_formats... [... verbose logging ...] 💾 BASELINE_SAVED
 Running test_08_complex_sequences... [... verbose logging ...] 💾 BASELINE_SAVED
+Running test_09_petal_level_coordinates... [... verbose logging ...] 💾 BASELINE_SAVED
+Running test_10_backlash_compensation... [... verbose logging ...] 💾 BASELINE_SAVED
+Running test_11_linear_phi_motor... [... verbose logging ...] 💾 BASELINE_SAVED
+Running test_12_disabled_positioner... [... verbose logging ...] 💾 BASELINE_SAVED
 
 ======================================================================
 TEST SUMMARY
 ======================================================================
-  BASELINE_SAVED      :   8 (100.0%)
+  BASELINE_SAVED      :  12 (100.0%)
 ```
 
 **Note**: Each test generates extensive output from the petal module (state loading, collision checks, move execution, etc.). This is normal operation - focus on the final test status.
@@ -165,7 +181,7 @@ python -m regression.regression_test --mode compare
 **Success output** (verbose logging omitted):
 ```
 ======================================================================
-Running 8 regression test(s)
+Running 12 regression test(s)
 Mode: COMPARE
 Baseline directory: /path/to/petal/regression/baselines
 ======================================================================
@@ -178,11 +194,15 @@ Running test_05_transform_chain... ✓ PASS
 Running test_06_scheduling_algorithms... [... verbose logging ...] ✓ PASS
 Running test_07_move_table_formats... [... verbose logging ...] ✓ PASS
 Running test_08_complex_sequences... [... verbose logging ...] ✓ PASS
+Running test_09_petal_level_coordinates... [... verbose logging ...] ✓ PASS
+Running test_10_backlash_compensation... [... verbose logging ...] ✓ PASS
+Running test_11_linear_phi_motor... [... verbose logging ...] ✓ PASS
+Running test_12_disabled_positioner... [... verbose logging ...] ✓ PASS
 
 ======================================================================
 TEST SUMMARY
 ======================================================================
-  PASS                :   8 (100.0%)
+  PASS                :  12 (100.0%)
 ```
 
 ---
@@ -236,11 +256,15 @@ python -m regression.regression_test --baseline-dir /path/to/custom/baselines --
 Add to your GitHub Actions workflow:
 
 ```yaml
+- name: Compile Cython extensions
+  run: |
+    cd petal
+    python setup.py build_ext --inplace clean --all
+
 - name: Run regression tests
   run: |
     cd petal
-    export POSITIONER_LOGS_PATH=/tmp/poslogs
-    export FP_SETTINGS_PATH=${{ github.workspace }}/fp_settings
+    # No environment setup needed - uses built-in fp_settings_min
     python -m regression.regression_test --mode compare
 ```
 
@@ -270,18 +294,18 @@ The `.coveragerc` file is already configured to:
 - Exclude petalcomm.py and petalsockcomm.py which require access to hardware
 - Sort results by coverage percentage
 
-### Coverage Report from 5-Oct-2025
+### Coverage Report from 5-Oct-2025 (All 12 Tests)
 
 ```
 Name                  Stmts   Miss  Cover
 -----------------------------------------
 replay.py               301    301     0%
 posanimator.py          206    155    25%
-petal.py               1689   1253    26%
+petal.py               1689   1245    26%
 posschedstats.py        338    244    28%
 petaltransforms.py      228    127    44%
 posschedulestage.py     454    241    47%
-posschedule.py          796    374    53%
+posschedule.py          796    369    54%
 postransforms.py        259    103    60%
 posstate.py             294    102    65%
 posconstants.py         338    103    70%
@@ -289,8 +313,14 @@ posmovetable.py         463    135    71%
 posmodel.py             371     56    85%
 xy2tp.py                 96      7    93%
 -----------------------------------------
-TOTAL                  5833   3201    45%
+TOTAL                  5833   3188    45%
 ```
+
+**Coverage improvements from tests 09-12:**
+- **test_09**: Added ptlXY and obsXY coordinate system coverage (postransforms.py: 53% → 60%)
+- **test_10**: Verified backlash compensation paths (already covered by existing tests)
+- **test_11**: Added Zeno motor (linear phi) coverage (posmodel.py: 80% → 85%, posmovetable.py: 66% → 71%, posschedulestage.py: 37% → 47%)
+- **test_12**: Added disabled positioner handling (petal.py: 26%, posschedule.py: 53% → 54%)
 
 - **Stmts**: Total lines of executable code
 - **Miss**: Lines not executed during tests
@@ -516,7 +546,13 @@ petal/
 │   ├── baselines/                # Golden master JSON files
 │   │   ├── test_01_basic_moves.json
 │   │   ├── test_02_collision_scenarios.json
-│   │   └── ... (8 total)
+│   │   └── ... (12 total)
+│   ├── fp_settings_min/          # Minimal config for self-contained testing
+│   │   ├── pos_settings/         # 9 positioner configs (7 standard + 1 Zeno + 1 disabled)
+│   │   ├── collision_settings/   # Collision parameters
+│   │   ├── ptl_settings/         # Petal templates
+│   │   └── fid_settings/         # Fiducial templates
+│   ├── test_logs_path/           # Default log output directory
 │   └── README.md                 # This file
 ├── petal.py                      # Code being tested
 ├── posmodel.py                   # Code being tested
@@ -585,9 +621,9 @@ python -m regression.regression_test --help
 
 ## Performance
 
-- **Runtime**: ~2-3 minutes for all 8 tests
-- **Per test**: ~15-30 seconds average (varies by test complexity)
-- **Baseline size**: ~50-200 KB per test (8 files total ~1 MB)
+- **Runtime**: ~3-4 minutes for all 12 tests
+- **Per test**: ~10-30 seconds average (varies by test complexity)
+- **Baseline size**: ~3-200 KB per test (12 files total ~1.2 MB)
 
 Tests run sequentially to ensure deterministic execution order.
 
