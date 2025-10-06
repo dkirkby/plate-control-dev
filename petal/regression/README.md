@@ -253,7 +253,32 @@ python -m regression.regression_test --baseline-dir /path/to/custom/baselines --
 
 ### Integration with CI/CD
 
-Add to your GitHub Actions workflow:
+A GitHub Actions workflow is configured in `.github/workflows/regression-tests.yml` to automatically run regression tests on every push and pull request.
+
+**What the workflow does:**
+- Runs tests on Python 3.8, 3.9, 3.10, and 3.11
+- Compiles Cython extensions
+- Executes all regression tests
+- Measures code coverage (Python 3.11 only)
+- Uploads coverage HTML report as an artifact
+
+**Viewing CI results:**
+- Check the "Actions" tab on GitHub to see test results
+- Download coverage reports from successful runs (available for 30 days)
+
+**Testing on the `regtest` branch:**
+To test the workflow on your development branch before merging:
+
+```bash
+# Push your commits to the regtest branch
+git push origin regtest
+
+# View results at: https://github.com/YOUR_USERNAME/plate-control-dev/actions
+```
+
+The workflow is triggered automatically for the `regtest` branch, so you can verify that all tests pass before merging to `main`.
+
+**Adding to your own workflow:**
 
 ```yaml
 - name: Compile Cython extensions
