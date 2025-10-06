@@ -4,25 +4,33 @@
 """
 Comprehensive Regression Test Suite for Plate Control Refactoring
 
-IMPORTANT: Before running, ensure environment variables are set:
-    export POSITIONER_LOGS_PATH=/path/to/logs  (or /tmp/poslogs)
-    export FP_SETTINGS_PATH=/path/to/fp_settings
-
 This module implements a "golden master" testing strategy to ensure that
 refactored code produces identical results to the original implementation.
 
+The test suite includes a minimal fp_settings directory with all required
+configuration files, so it can be run without any environment setup.
+
 Usage:
+    # Compare against baselines (uses built-in minimal fp_settings)
+    python -m regression.regression_test --mode compare
+
     # Create initial baselines (run once before refactoring)
     python -m regression.regression_test --mode baseline
-
-    # Compare against baselines (run during/after refactoring)
-    python -m regression.regression_test --mode compare
 
     # Run specific test
     python -m regression.regression_test --mode compare --test test_01_basic_moves
 
     # Update baselines after intentional behavior change
     python -m regression.regression_test --mode update --test test_03_edge_cases
+
+    # Use custom fp_settings directory
+    python -m regression.regression_test --mode compare --fp-settings-path /path/to/fp_settings
+
+Environment Variables (optional):
+    FP_SETTINGS_PATH - Path to fp_settings directory
+                       (default: regression/fp_settings_min/)
+    POSITIONER_LOGS_PATH - Path for log files
+                           (default: regression/test_logs_path/)
 
 For detailed documentation, see docs/README.md (REGRESSION_TESTING.md)
 """
@@ -37,7 +45,58 @@ from typing import Dict, List, Any, Optional, Tuple
 import traceback
 import argparse
 
-# Check required environment variables BEFORE importing petal modules
+
+def _setup_environment_for_tests():
+    """
+    Set up environment variables for regression testing.
+
+    Priority order:
+    1. Command line arguments (--fp-settings-path, --positioner-logs-path)
+    2. Default values (fp_settings_min/, test_logs_path/)
+
+    Any existing FP_SETTINGS_PATH or POSITIONER_LOGS_PATH environment variables
+    are ignored with a warning.
+    """
+    # Get the regression directory
+    regression_dir = Path(__file__).parent
+
+    # Parse command line arguments early
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--fp-settings-path', type=str, default=None)
+    parser.add_argument('--positioner-logs-path', type=str, default=None)
+    args, _ = parser.parse_known_args()
+
+    # Handle FP_SETTINGS_PATH
+    if 'FP_SETTINGS_PATH' in os.environ:
+        print("WARNING: Ignoring FP_SETTINGS_PATH environment variable.")
+        print(f"         Was set to: {os.environ['FP_SETTINGS_PATH']}")
+
+    if args.fp_settings_path:
+        fp_settings_path = Path(args.fp_settings_path).resolve()
+        print(f"Using fp_settings from command line: {fp_settings_path}")
+    else:
+        fp_settings_path = (regression_dir / 'fp_settings_min').resolve()
+        print(f"Using default fp_settings: {fp_settings_path}")
+
+    os.environ['FP_SETTINGS_PATH'] = str(fp_settings_path)
+
+    # Handle POSITIONER_LOGS_PATH
+    if 'POSITIONER_LOGS_PATH' in os.environ:
+        print("WARNING: Ignoring POSITIONER_LOGS_PATH environment variable.")
+        print(f"         Was set to: {os.environ['POSITIONER_LOGS_PATH']}")
+
+    if args.positioner_logs_path:
+        logs_path = Path(args.positioner_logs_path).resolve()
+    else:
+        logs_path = (regression_dir / 'test_logs_path').resolve()
+
+    os.environ['POSITIONER_LOGS_PATH'] = str(logs_path)
+
+
+# Set up environment before importing petal modules
+_setup_environment_for_tests()
+
+# Now check that required environment variables are set
 required_env_vars = ['POSITIONER_LOGS_PATH', 'FP_SETTINGS_PATH']
 missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
 if missing_vars:
@@ -45,10 +104,7 @@ if missing_vars:
     print("ERROR: Required environment variables not set:")
     for var in missing_vars:
         print(f"  {var}")
-    print("\nPlease set them before running regression tests:")
-    print("  export POSITIONER_LOGS_PATH=/tmp/poslogs  # or your preferred path")
-    print("  export FP_SETTINGS_PATH=/path/to/fp_settings")
-    print("\nSee QUICK_START_REGTEST.md for details.")
+    print("\nThis should not happen - please report as a bug.")
     print("="*70 + "\n")
     sys.exit(1)
 
@@ -97,9 +153,6 @@ class RegressionTestSuite:
         self.petal_loc = 3
         self.test_posids = self._get_test_posids()
 
-        # Ensure config files exist for test positioners
-        self._ensure_test_configs_exist()
-
     def _get_test_posids(self) -> List[str]:
         """Get list of positioner IDs for testing"""
         # Use a small, representative subset for fast tests
@@ -109,32 +162,8 @@ class RegressionTestSuite:
         # Map device locations to posids
         # Use M0XXXX format where XXXX = device_loc * 100 + 1
         # This ensures unique posids that encode device location
+        # These correspond to pre-existing static config files in fp_settings_min/pos_settings/
         return [f'M{loc*100+1:05d}' for loc in sorted(test_device_locs)]
-
-    def _ensure_test_configs_exist(self):
-        """
-        Ensure positioner config files exist for test posids.
-        Creates minimal config files if they don't exist.
-        """
-        for i, posid in enumerate(self.test_posids):
-            # Derive device_loc from posid (reverse of _get_test_posids logic)
-            device_loc = sorted({21, 22, 26, 27, 28, 33, 34})[i]
-
-            state = posstate.PosState(
-                unit_id=posid,
-                device_type='pos',
-                petal_id=self.petal_id,
-                logging=False
-            )
-
-            # Set minimal required values
-            state.store('POS_T', 0.0, register_if_altered=False)
-            state.store('POS_P', 100.0, register_if_altered=False)
-            state.store('DEVICE_LOC', device_loc, register_if_altered=False)
-            state.store('CTRL_ENABLED', True, register_if_altered=False)
-
-            # Write to create config file (will use existing if already there)
-            state.write()
 
     # ============================================================
     # TEST SCENARIOS
@@ -931,7 +960,7 @@ Examples:
   # Create initial baselines
   python regression_test.py --mode baseline
 
-  # Compare against baselines
+  # Compare against baselines (uses built-in minimal fp_settings by default)
   python regression_test.py --mode compare
 
   # Run specific test
@@ -942,6 +971,9 @@ Examples:
 
   # Verbose output
   python regression_test.py --mode compare --verbose
+
+  # Use custom fp_settings directory
+  python regression_test.py --mode compare --fp-settings-path /path/to/fp_settings
         """
     )
 
@@ -969,6 +1001,20 @@ Examples:
         '--verbose',
         action='store_true',
         help='Print detailed output during test execution'
+    )
+
+    parser.add_argument(
+        '--fp-settings-path',
+        type=str,
+        default=None,
+        help='Path to fp_settings directory (default: regression/fp_settings_min/)'
+    )
+
+    parser.add_argument(
+        '--positioner-logs-path',
+        type=str,
+        default=None,
+        help='Path to positioner logs directory (default: regression/test_logs_path/)'
     )
 
     args = parser.parse_args()
