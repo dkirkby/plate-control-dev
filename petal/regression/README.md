@@ -256,7 +256,7 @@ python -m regression.regression_test --baseline-dir /path/to/custom/baselines --
 A GitHub Actions workflow is configured in `.github/workflows/regression-tests.yml` to automatically run regression tests on every push and pull request.
 
 **What the workflow does:**
-- Runs tests on Python 3.8, 3.9, 3.10, and 3.11
+- Runs tests on Python 3.9.6 (currently used at LBL and KPNO), 3.11, and 3.13
 - Compiles Cython extensions
 - Executes all regression tests
 - Measures code coverage (Python 3.11 only)
