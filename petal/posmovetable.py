@@ -146,7 +146,11 @@ class PosMoveTable(object):
         singletons = [k for k,v in t.items() if not isinstance(v, (list, tuple))]
         newline = f'\n{tab}'
         for key in singletons:
-            output += f'\n{tab}{key}: {t[key]}'
+            # Format total_time with 6 digits of precision to avoid platform differences
+            if key == 'total_time' and isinstance(t[key], (int, float)):
+                output += f'\n{tab}{key}: {t[key]:.6f}'
+            else:
+                output += f'\n{tab}{key}: {t[key]}'
         multiples = [k for k in t if k not in singletons]
         headers = [str(m) for m in multiples]
         widths = [max(8, len(h)) for h in headers]

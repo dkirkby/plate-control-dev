@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-06T18:59:17.871318",
-  "signature": "cf1441715fc83395c004d16f6e69cd804567a7340b13bc04bf514a8211384b09",
+  "timestamp": "2025-10-07T06:08:58.000309",
+  "signature": "468ec9aa95a313040148dc8fff6326f1af09edd577ce2f1b58e12682141f89db",
   "data": {
     "after_correction": {
       "move_tables": {
@@ -10,7 +10,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 3.3938888888888883",
+          "  total_time: 3.393889",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -40,7 +40,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 5",
-          "  total_time: 2.603277777777778",
+          "  total_time: 2.603278",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -72,7 +72,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 4",
-          "  total_time: 2.780777777777778",
+          "  total_time: 2.780778",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",

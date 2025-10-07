@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-06T18:59:17.871318",
-  "signature": "ed84b7c987704cc6a0dc74186afccdbaf404a5a07160874e767025e0b12522fe",
+  "timestamp": "2025-10-07T06:08:58.000309",
+  "signature": "5b2f148d96e5f775b3cc7cfe8e4db1af958cdc0a152fa2ec8669218386abbd6b",
   "data": {
     "near_negative_limit": {
       "move_tables": {
@@ -10,7 +10,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 2.3274444444444446",
+          "  total_time: 2.327444",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -40,7 +40,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 3.264666666666667",
+          "  total_time: 3.264667",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -70,7 +70,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 3.237722222222222",
+          "  total_time: 3.237722",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -100,7 +100,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 3.2895",
+          "  total_time: 3.289500",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
@@ -130,7 +130,7 @@
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
-          "  total_time: 2.3072777777777778",
+          "  total_time: 2.307278",
           "  required: True",
           "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
           "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
