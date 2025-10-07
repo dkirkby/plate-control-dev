@@ -132,15 +132,17 @@ class PosMoveTable(object):
         if output_type == 'hardware':
             t = self.for_hardware()
             t['row_time'] = [t['move_time'][i] + t['postpause'][i]/1000 for i in range(t['nrows'])]
+        elif output_type == 'regression':
+            t = self.for_hardware()
         elif output_type == 'collider':
             t = self.for_collider()
         elif output_type == 'schedule':
             t = self.for_schedule()
         else:
             assert False, f'pretty printing of output_type {output_type} not yet defined'
-        if 'row_time' not in t:
+        if 'row_time' not in t and output_type != 'regression':
             t['row_time'] = [t['move_time'][i] + t['prepause'][i] + t['postpause'][i] for i in range(t['nrows'])]
-        if 'net_time' not in t:
+        if 'net_time' not in t and output_type != 'regression':
             t['net_time'] = [sum(t['row_time'][:i]) for i in range(1, t['nrows'] + 1)]
         output = f'move table for: {self.posid} ({output_type} version)'
         singletons = [k for k,v in t.items() if not isinstance(v, (list, tuple))]
