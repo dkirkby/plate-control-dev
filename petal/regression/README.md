@@ -414,15 +414,15 @@ For tests that execute moves (most tests), the generated move tables are capture
     "  canid: 2101",
     "  busid: can10",
     "  nrows: 5",
-    "  total_time: 2.604611111111111",
+    "  total_time: 2.604611",
     "  required: True",
-    "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-    "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-    "              0          -1134         creep        cruise      0.108          0     0.108     0.108",
-    "           -614              0        cruise         creep      0.079          0     0.079     0.188",
-    "              0           2157         creep        cruise      0.165          0     0.165     0.353",
-    "         -10121          10121         creep         creep      1.125          0     1.125     1.478",
-    "          10111         -10144         creep         creep      1.127          0     1.127     2.605"
+    "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+    "  -------------  -------------  ------------  ------------  ---------  ---------",
+    "              0          -1134         creep        cruise      0.108          0",
+    "           -614              0        cruise         creep      0.079          0",
+    "              0           2157         creep        cruise      0.165          0",
+    "         -10121          10121         creep         creep      1.125          0",
+    "          10111         -10144         creep         creep      1.127          0"
   ]
 }
 ```
@@ -435,8 +435,6 @@ Move tables are stored as arrays of strings (one per line) to preserve column al
 - **speed_mode_T/P**: Speed mode for each axis (cruise, creep)
 - **move_time**: Duration of each step (seconds)
 - **postpause**: Pause after each step (milliseconds)
-- **row_time**: Total time for each row (seconds)
-- **net_time**: Cumulative time (seconds)
 
 **Implementation note**: Move tables must be captured after `schedule_moves()` but before `send_and_execute_moves()`, since they are cleared during move execution. See test_01_basic_moves for the correct pattern:
 
