@@ -1183,7 +1183,7 @@ class RegressionTestSuite:
                 move_tables[posid] = ['<empty or motionless>']
             else:
                 # Get hardware format as string (printfunc=None returns string)
-                table_str = table.display_for(output_type='hardware', printfunc=None)
+                table_str = table.display_for(output_type='regression', printfunc=None)
                 # Split into lines for better JSON readability
                 move_tables[posid] = table_str.split('\n') if table_str else []
 
