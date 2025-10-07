@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-05T18:44:27.098741",
-  "signature": "b6c7328b935a9399998dcf3b43244bd0e969056eab7e6f76177859db72c94e67",
+  "timestamp": "2025-10-06T17:37:19.105305",
+  "signature": "1577156de2911d34838f170f2edc6229c11508db42e81cd7d6cea1863f4f4a23",
   "data": {
     "regular_comparison": {
       "is_linphi": false,
@@ -8,8 +8,8 @@
     },
     "zeno_config": {
       "is_linphi": true,
-      "sz_ccw_p": 1.0,
-      "sz_cw_p": 1.0,
+      "sz_ccw_p": 0.8,
+      "sz_cw_p": 0.7,
       "zeno_motor_p": true
     },
     "zeno_move_1": {
@@ -18,11 +18,11 @@
         "is_enabled": true,
         "posintTP": [
           15.000025,
-          109.989346
+          110.018988
         ],
         "poslocTP": [
           144.754334,
-          108.903638
+          108.93328
         ]
       },
       "target": [
@@ -89,8 +89,8 @@
     "zeno_move_table": {
       "has_zeno_field": true,
       "num_rows": 1,
-      "pccwa": 1.0,
-      "pcwa": 1.0,
+      "pccwa": 0.8,
+      "pcwa": 0.7,
       "zeno_value": "P"
     },
     "zeno_short_move": {

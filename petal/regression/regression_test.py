@@ -844,7 +844,7 @@ class RegressionTestSuite:
                 'log_note': 'test_zeno_move_1'
             }
         })
-        ptl.schedule_send_and_execute_moves(anticollision=None)
+        ptl.schedule_send_and_execute_moves(anticollision='adjust')
 
         results['zeno_move_1'] = {
             'target': [15.0, 110.0],
