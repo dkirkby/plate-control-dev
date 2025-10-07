@@ -1,0 +1,59 @@
+name: Regression Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11', '3.13']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools numpy astropy pandas configobj Cython coverage matplotlib
+
+    - name: Compile Cython extensions
+      run: |
+        cd petal
+        python setup.py build_ext --inplace
+        # If --inplace didn't work, manually copy from build directory
+        if [ ! -f poscollider*.so ]; then
+          find build -name "poscollider*.so" -exec cp {} . \;
+        fi
+
+    - name: Run regression tests
+      run: |
+        cd petal
+        python -m regression.regression_test --mode compare
+
+    - name: Run regression tests with coverage (Python 3.11 only)
+      if: matrix.python-version == '3.11'
+      run: |
+        cd petal
+        coverage run -m regression.regression_test --mode compare
+        coverage report
+        coverage html
+
+    - name: Upload coverage report
+      if: matrix.python-version == '3.11'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: petal/htmlcov/
+        retention-days: 30

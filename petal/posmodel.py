@@ -27,7 +27,7 @@ class PosModel(object):
         self._stepsize_creep             = 0.1    # deg
         self._motor_speed_cruise         = {pc.T: 9900.0 * 360.0 / 60.0, pc.P: 9900.0 * 360.0 / 60.0} # deg/sec (= RPM *360/60)
         self._stepsize_cruise            = {pc.T: 3.3, pc.P: 3.3} # deg/step
-        if self.state._val['ZENO_MOTOR_P'] is True:
+        if self.state._val.get('ZENO_MOTOR_P', False) is True:
             if self.DEBUG:
                 self.printfunc(f'PosModel: new linphi posid = {posid}')  # DEBUG
 #           self.linphi_params['LAST_P_DIR'] = 1    # 1 is CCW, -1 is CW
@@ -39,10 +39,10 @@ class PosModel(object):
 
     @property
     def is_linphi(self):
-        return self.state._val['ZENO_MOTOR_P'] is True
+        return self.state._val.get('ZENO_MOTOR_P', False) is True
 
     def get_zeno_scale(self, which):    # specify 'SZ_CW_P', 'SZ_CCW_P', or the _T varieties
-        scale = self.state._val[which]
+        scale = self.state._val.get(which)
         if scale is None:
             scale = 1.0
         return scale

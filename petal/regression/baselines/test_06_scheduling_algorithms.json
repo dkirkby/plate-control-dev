@@ -1,0 +1,798 @@
+{
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "b6019e6854ca49338186cc8a3785b2fc207f12ceb86287e02510d0e9b96dc38d",
+  "data": {
+    "ac_None_anneal_filled": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 3",
+            "  total_time: 2.358056",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -1125           -614        cruise        cruise      0.108          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10131         creep         creep      1.126          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 3",
+            "  total_time: 2.442500",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -2659          -1637        cruise        cruise      0.193          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10108         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "ac_None_anneal_ramped": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 3",
+            "  total_time: 2.358056",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -1125           -614        cruise        cruise      0.108          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10131         creep         creep      1.126          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 3",
+            "  total_time: 2.442500",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -2659          -1637        cruise        cruise      0.193          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10108         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "ac_adjust_anneal_filled": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02101": [
+            "move table for: M02101 (regression version)",
+            "  posid: M02101",
+            "  canid: 2101",
+            "  busid: can10",
+            "  nrows: 8",
+            "  total_time: 5.244833",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0              0         creep         creep          0        156",
+            "              0              0         creep         creep      0.000          0",
+            "              0          -1134         creep        cruise      0.108          0",
+            "              0              0         creep         creep      0.000       2623",
+            "              0              0         creep         creep      0.000          0",
+            "              0           1134         creep        cruise      0.108          0",
+            "              0          10121         creep         creep      1.125          0",
+            "              0         -10121         creep         creep      1.125          0"
+          ],
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 7",
+            "  total_time: 2.886833",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -3487         creep        cruise      0.239          0",
+            "              0              0         creep         creep      0.000         25",
+            "          -1125              0        cruise         creep      0.108          0",
+            "              0              0         creep         creep      0.000         85",
+            "              0           2464         creep        cruise      0.182          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10098         creep         creep      1.123          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 6",
+            "  total_time: 3.994833",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -1988         creep        cruise      0.156          0",
+            "              0              0         creep         creep      0.000        108",
+            "          -2659              0        cruise         creep      0.193          0",
+            "              0          11594         creep         creep      1.288          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10119         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "ac_adjust_anneal_ramped": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02101": [
+            "move table for: M02101 (regression version)",
+            "  posid: M02101",
+            "  canid: 2101",
+            "  busid: can10",
+            "  nrows: 9",
+            "  total_time: 3.321056",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0              0         creep         creep          0        200",
+            "              0              0         creep         creep      0.000          0",
+            "              0          -1134         creep        cruise      0.108          0",
+            "              0              0         creep         creep      0.000        147",
+            "              0              0         creep         creep      0.000        508",
+            "              0              0         creep         creep      0.000          0",
+            "              0           1134         creep        cruise      0.108          0",
+            "              0          10121         creep         creep      1.125          0",
+            "              0         -10121         creep         creep      1.125          0"
+          ],
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 10",
+            "  total_time: 3.493278",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0              0         creep         creep          0        100",
+            "              0              0         creep         creep      0.000          0",
+            "              0          -3487         creep        cruise      0.239          0",
+            "              0              0         creep         creep      0.000        317",
+            "              0              0         creep         creep      0.000          0",
+            "          -1125              0        cruise         creep      0.108        300",
+            "              0              0         creep         creep      0.000          0",
+            "              0           2464         creep        cruise      0.182          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10098         creep         creep      1.123          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 10",
+            "  total_time: 4.401278",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0              0         creep         creep          0        300",
+            "              0              0         creep         creep      0.000          0",
+            "              0          -1988         creep        cruise      0.156        100",
+            "              0              0         creep         creep      0.000          0",
+            "          -2659              0        cruise         creep      0.193          0",
+            "              0              0         creep         creep      0.000        115",
+            "              0              0         creep         creep      0.000          0",
+            "              0          11594         creep         creep      1.288          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10119         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "ac_freeze_anneal_filled": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 3",
+            "  total_time: 2.358056",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -1125           -614        cruise        cruise      0.108          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10131         creep         creep      1.126          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 3",
+            "  total_time: 2.442500",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -2659          -1637        cruise        cruise      0.193          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10108         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    },
+    "ac_freeze_anneal_ramped": {
+      "final_state": {
+        "has_schedule": true,
+        "move_tables": {
+          "M02201": [
+            "move table for: M02201 (regression version)",
+            "  posid: M02201",
+            "  canid: 2201",
+            "  busid: can23",
+            "  nrows: 3",
+            "  total_time: 2.358056",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -1125           -614        cruise        cruise      0.108          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10106         -10131         creep         creep      1.126          0"
+          ],
+          "M02601": [
+            "move table for: M02601 (regression version)",
+            "  posid: M02601",
+            "  canid: 2601",
+            "  busid: can22",
+            "  nrows: 3",
+            "  total_time: 2.442500",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "          -2659          -1637        cruise        cruise      0.193          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10124         -10108         creep         creep      1.125          0"
+          ]
+        },
+        "positioner_states": {
+          "M02101": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              129.754309,
+              98.914292
+            ]
+          },
+          "M02201": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              15.000025,
+              110.000017
+            ],
+            "poslocTP": [
+              -162.17576,
+              85.9036
+            ]
+          },
+          "M02601": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              30.00005,
+              120.000034
+            ],
+            "poslocTP": [
+              -18.866749,
+              110.563252
+            ]
+          },
+          "M02701": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              -179.113875,
+              90.24081
+            ]
+          },
+          "M02801": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              25.593681,
+              97.458672
+            ]
+          },
+          "M03301": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.081367,
+              92.991259
+            ]
+          },
+          "M03401": {
+            "classified_as_retracted": false,
+            "is_enabled": true,
+            "posintTP": [
+              0.0,
+              100.0
+            ],
+            "poslocTP": [
+              174.433238,
+              94.408249
+            ]
+          }
+        }
+      },
+      "schedule_stats": {}
+    }
+  }
+}

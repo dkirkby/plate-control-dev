@@ -1,0 +1,138 @@
+{
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "086cc8e5b244f3da049c5e99360faef78d43d01824b4c24dd4090b1cb754271b",
+  "data": {
+    "after_enabled_move": {
+      "disabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": false,
+        "posintTP": [
+          0.0,
+          100.0
+        ],
+        "poslocTP": [
+          129.754309,
+          98.914292
+        ]
+      },
+      "enabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          -10.000017,
+          94.999992
+        ],
+        "poslocTP": [
+          119.754292,
+          93.914284
+        ]
+      },
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (regression version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 3",
+          "  total_time: 2.441833",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "           2659            614        cruise        cruise      0.193          0",
+          "         -10121          10121         creep         creep      1.125          0",
+          "          10118         -10111         creep         creep      1.124          0"
+        ]
+      }
+    },
+    "after_mixed_move": {
+      "disabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": false,
+        "posintTP": [
+          0.0,
+          100.0
+        ],
+        "poslocTP": [
+          129.754309,
+          98.914292
+        ]
+      },
+      "enabled_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          20.000034,
+          105.000008
+        ],
+        "poslocTP": [
+          149.754342,
+          103.914301
+        ]
+      },
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (regression version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 3",
+          "  total_time: 2.386833",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "          -1637           -103        cruise        cruise      0.136          0",
+          "         -10121          10121         creep         creep      1.125          0",
+          "          10134         -10126         creep         creep      1.126          0"
+        ]
+      }
+    },
+    "disabled_request": {
+      "accepted_posids": [],
+      "num_requests_accepted": 0,
+      "num_requests_sent": 1
+    },
+    "disabled_unchanged": {
+      "final_position": [
+        0.0,
+        100.0
+      ],
+      "initial_position": [
+        0.0,
+        100.0
+      ],
+      "positions_match": true
+    },
+    "enabled_request": {
+      "accepted_posids": [
+        "M02101"
+      ],
+      "num_requests_accepted": 1,
+      "num_requests_sent": 1
+    },
+    "mixed_request": {
+      "accepted_posids": [
+        "M02101"
+      ],
+      "num_requests_accepted": 1,
+      "num_requests_sent": 2
+    },
+    "positioner_status": {
+      "all_disabled_posids": [
+        "M03601"
+      ],
+      "all_enabled_posids": [
+        "M02101"
+      ],
+      "disabled": {
+        "ctrl_enabled": false,
+        "is_enabled": false,
+        "posid": "M03601"
+      },
+      "enabled": {
+        "ctrl_enabled": true,
+        "is_enabled": true,
+        "posid": "M02101"
+      }
+    }
+  }
+}
