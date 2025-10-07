@@ -1466,12 +1466,36 @@ class RegressionTestSuite:
                 print(f"  └─ {result['num_differences']} difference(s) found")
                 if self.verbose and 'first_differences' in result:
                     for diff in result['first_differences'][:3]:
-                        print(f"     • {diff}")
+                        formatted = self._format_diff(diff)
+                        # Indent multi-line output
+                        lines = formatted.split('\n')
+                        print(f"     • {lines[0]}")
+                        for line in lines[1:]:
+                            print(f"       {line}")
             elif result['status'] == 'ERROR':
                 print(f"  └─ {result['message']}")
 
         self._print_summary(results)
         return results
+
+    def _format_diff(self, diff: Dict) -> str:
+        """Format a single difference for display"""
+        path = diff.get('path', '?')
+        diff_type = diff.get('type', '?')
+
+        if diff_type == 'VALUE_CHANGED':
+            baseline = diff.get('baseline')
+            current = diff.get('current')
+            # Truncate long values
+            baseline_str = str(baseline)[:100]
+            current_str = str(current)[:100]
+            return f"{path}: {diff_type}\n      Baseline: {baseline_str}\n      Current:  {current_str}"
+        elif diff_type == 'TYPE_MISMATCH':
+            return f"{path}: {diff_type} (baseline={diff.get('baseline_type')}, current={diff.get('current_type')})"
+        elif diff_type == 'LENGTH_CHANGED':
+            return f"{path}: {diff_type} (baseline={diff.get('baseline_length')}, current={diff.get('current_length')})"
+        else:
+            return f"{path}: {diff_type}"
 
     def _print_summary(self, results: Dict[str, Dict]):
         """Print test summary"""
@@ -1504,7 +1528,10 @@ class RegressionTestSuite:
                 if 'first_differences' in result:
                     print(f"  First differences:")
                     for diff in result['first_differences']:
-                        print(f"    • {diff.get('path', '?')}: {diff.get('type', '?')}")
+                        formatted = self._format_diff(diff)
+                        # Indent multi-line output
+                        for line in formatted.split('\n'):
+                            print(f"    • {line}" if line == formatted.split('\n')[0] else f"      {line}")
 
 
 def main():
