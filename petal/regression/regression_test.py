@@ -253,10 +253,12 @@ class RegressionTestSuite:
             }
 
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+            ptl.schedule_moves(anticollision='adjust')
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
 
             results['opposing_moves_adjust'] = {
-                'final_state': self._capture_petal_state(ptl),
+                'final_state': self._capture_petal_state(ptl, move_tables=move_tables),
                 'schedule_stats': self._capture_schedule_stats(ptl)
             }
 
@@ -269,10 +271,12 @@ class RegressionTestSuite:
 
         if len(self.test_posids) >= 2:
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision='freeze')
+            ptl.schedule_moves(anticollision='freeze')
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
 
             results['opposing_moves_freeze'] = {
-                'final_state': self._capture_petal_state(ptl),
+                'final_state': self._capture_petal_state(ptl, move_tables=move_tables),
                 'schedule_stats': self._capture_schedule_stats(ptl)
             }
 
@@ -305,8 +309,13 @@ class RegressionTestSuite:
                 }
             }
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision=None)
-            results[case_name] = self._capture_positioner_state(ptl, posid)
+            ptl.schedule_moves(anticollision=None)
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
+            results[case_name] = {
+                'positioner_state': self._capture_positioner_state(ptl, posid),
+                'move_tables': move_tables
+            }
 
         # Test phi limits
         phi_cases = [
@@ -323,8 +332,13 @@ class RegressionTestSuite:
                 }
             }
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision=None)
-            results[case_name] = self._capture_positioner_state(ptl, posid)
+            ptl.schedule_moves(anticollision=None)
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
+            results[case_name] = {
+                'positioner_state': self._capture_positioner_state(ptl, posid),
+                'move_tables': move_tables
+            }
 
         return results
 
@@ -452,10 +466,12 @@ class RegressionTestSuite:
                     }
 
                 ptl.request_targets(requests)
-                ptl.schedule_send_and_execute_moves(anticollision=ac_mode)
+                ptl.schedule_moves(anticollision=ac_mode)
+                move_tables = self._capture_move_tables(ptl)
+                ptl.send_and_execute_moves()
 
                 results[key] = {
-                    'final_state': self._capture_petal_state(ptl),
+                    'final_state': self._capture_petal_state(ptl, move_tables=move_tables),
                     'schedule_stats': self._capture_schedule_stats(ptl),
                 }
 
@@ -531,8 +547,13 @@ class RegressionTestSuite:
             }
         }
         ptl.request_targets(requests)
-        ptl.schedule_send_and_execute_moves(anticollision='adjust')
-        results['after_move_1'] = self._capture_positioner_state(ptl, posid)
+        ptl.schedule_moves(anticollision='adjust')
+        move_tables_1 = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
+        results['after_move_1'] = {
+            'positioner_state': self._capture_positioner_state(ptl, posid),
+            'move_tables': move_tables_1
+        }
 
         # Correction move
         requests = {
@@ -543,8 +564,13 @@ class RegressionTestSuite:
             }
         }
         ptl.request_targets(requests)
-        ptl.schedule_send_and_execute_moves(anticollision='freeze')
-        results['after_correction'] = self._capture_positioner_state(ptl, posid)
+        ptl.schedule_moves(anticollision='freeze')
+        move_tables_2 = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
+        results['after_correction'] = {
+            'positioner_state': self._capture_positioner_state(ptl, posid),
+            'move_tables': move_tables_2
+        }
 
         # Final move
         requests = {
@@ -555,8 +581,13 @@ class RegressionTestSuite:
             }
         }
         ptl.request_targets(requests)
-        ptl.schedule_send_and_execute_moves(anticollision='adjust')
-        results['after_move_2'] = self._capture_positioner_state(ptl, posid)
+        ptl.schedule_moves(anticollision='adjust')
+        move_tables_3 = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
+        results['after_move_2'] = {
+            'positioner_state': self._capture_positioner_state(ptl, posid),
+            'move_tables': move_tables_3
+        }
 
         return results
 
@@ -596,11 +627,14 @@ class RegressionTestSuite:
                 }
             }
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+            ptl.schedule_moves(anticollision='adjust')
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
 
             ptlXY_results.append({
                 'target': target,
-                'final_state': self._capture_positioner_state(ptl, posid)
+                'final_state': self._capture_positioner_state(ptl, posid),
+                'move_tables': move_tables
             })
 
         results['ptlXY_moves'] = ptlXY_results
@@ -631,11 +665,14 @@ class RegressionTestSuite:
                 }
             }
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+            ptl.schedule_moves(anticollision='adjust')
+            move_tables = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
 
             obsXY_results.append({
                 'target': target,
-                'final_state': self._capture_positioner_state(ptl, posid)
+                'final_state': self._capture_positioner_state(ptl, posid),
+                'move_tables': move_tables
             })
 
         results['obsXY_moves'] = obsXY_results
@@ -723,11 +760,14 @@ class RegressionTestSuite:
             }
         }
         ptl.request_targets(requests)
-        ptl.schedule_send_and_execute_moves(anticollision='adjust')
+        ptl.schedule_moves(anticollision='adjust')
+        move_tables = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
 
         results['move_1'] = {
             'target': [30.0, 120.0],
             'final_state': self._capture_positioner_state(ptl, posid),
+            'move_tables': move_tables
         }
 
         # Test 2: Create a move table directly and check backlash generation
@@ -775,11 +815,14 @@ class RegressionTestSuite:
                 }
             }
             ptl.request_targets(requests)
-            ptl.schedule_send_and_execute_moves(anticollision='adjust')
+            ptl.schedule_moves(anticollision='adjust')
+            move_tables_seq = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
 
             sequence_results.append({
                 'target': target,
                 'final_state': self._capture_positioner_state(ptl, posid),
+                'move_tables': move_tables_seq
             })
 
         results['move_sequence'] = sequence_results
@@ -848,11 +891,14 @@ class RegressionTestSuite:
                 'log_note': 'test_zeno_move_1'
             }
         })
-        ptl.schedule_send_and_execute_moves(anticollision='adjust')
+        ptl.schedule_moves(anticollision='adjust')
+        move_tables = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
 
         results['zeno_move_1'] = {
             'target': [15.0, 110.0],
-            'final_state': self._capture_positioner_state(ptl, zeno_posid)
+            'final_state': self._capture_positioner_state(ptl, zeno_posid),
+            'move_tables': move_tables
         }
 
         # Test 2: Create move table and verify Zeno-specific parameters
@@ -910,10 +956,13 @@ class RegressionTestSuite:
                     'log_note': f'test_zeno_seq_{target}'
                 }
             })
-            ptl.schedule_send_and_execute_moves(anticollision=None)
+            ptl.schedule_moves(anticollision=None)
+            move_tables_zeno = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
             move_results.append({
                 'target': target,
-                'final_state': self._capture_positioner_state(ptl, zeno_posid)
+                'final_state': self._capture_positioner_state(ptl, zeno_posid),
+                'move_tables': move_tables_zeno
             })
 
         results['zeno_move_sequence'] = move_results
@@ -994,11 +1043,14 @@ class RegressionTestSuite:
         }
 
         # Execute the move (only enabled positioner should move)
-        ptl.schedule_send_and_execute_moves(anticollision=None)
+        ptl.schedule_moves(anticollision=None)
+        move_tables_mixed = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
 
         results['after_mixed_move'] = {
             'enabled_state': self._capture_positioner_state(ptl, enabled_posid),
             'disabled_state': self._capture_positioner_state(ptl, disabled_posid),
+            'move_tables': move_tables_mixed
         }
 
         # Test 4: Request move to enabled positioner only (should work)
@@ -1016,11 +1068,14 @@ class RegressionTestSuite:
             'accepted_posids': sorted(list(requests_enabled_only.keys())),
         }
 
-        ptl.schedule_send_and_execute_moves(anticollision=None)
+        ptl.schedule_moves(anticollision=None)
+        move_tables_enabled = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
 
         results['after_enabled_move'] = {
             'enabled_state': self._capture_positioner_state(ptl, enabled_posid),
             'disabled_state': self._capture_positioner_state(ptl, disabled_posid),
+            'move_tables': move_tables_enabled
         }
 
         # Test 5: Verify disabled positioner position hasn't changed from initial

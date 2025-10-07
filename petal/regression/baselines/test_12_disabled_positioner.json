@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-05T18:53:19.858082",
-  "signature": "ab6e44e7c747d9b9d679a7da8fec1efb73fecd3e6a01e267299d2bf62c186eff",
+  "timestamp": "2025-10-06T18:59:17.871318",
+  "signature": "eec3ac13a92e3165cf35a6d3d2df3098d8bfbeb239cf30fa5e47a3e2d3a52f1f",
   "data": {
     "after_enabled_move": {
       "disabled_state": {
@@ -25,6 +25,22 @@
         "poslocTP": [
           119.754292,
           93.914284
+        ]
+      },
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (hardware version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 3",
+          "  total_time: 2.4418333333333333",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+          "           2659            614        cruise        cruise      0.193          0     0.193     0.193",
+          "         -10121          10121         creep         creep      1.125          0     1.125     1.318",
+          "          10118         -10111         creep         creep      1.124          0     1.124     2.442"
         ]
       }
     },
@@ -51,6 +67,22 @@
         "poslocTP": [
           149.754342,
           103.914301
+        ]
+      },
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (hardware version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 3",
+          "  total_time: 2.3868333333333336",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+          "          -1637           -103        cruise        cruise      0.136          0     0.136     0.136",
+          "         -10121          10121         creep         creep      1.125          0     1.125     1.261",
+          "          10134         -10126         creep         creep      1.126          0     1.126     2.387"
         ]
       }
     },

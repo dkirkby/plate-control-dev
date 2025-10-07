@@ -1,42 +1,99 @@
 {
-  "timestamp": "2025-10-02T16:37:33.369672",
-  "signature": "f685ae84e40be710ca62058fe8d055908caf507130cbf809723c71685c107356",
+  "timestamp": "2025-10-06T18:59:17.871318",
+  "signature": "cf1441715fc83395c004d16f6e69cd804567a7340b13bc04bf514a8211384b09",
   "data": {
     "after_correction": {
-      "classified_as_retracted": false,
-      "is_enabled": true,
-      "posintTP": [
-        38.873376,
-        123.054046
-      ],
-      "poslocTP": [
-        168.627684,
-        121.968339
-      ]
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (hardware version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 3",
+          "  total_time: 3.3938888888888883",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+          "           -499         -10303        cruise         creep      1.145          0     1.145     1.145",
+          "         -10121          10121         creep         creep      1.125          0     1.125     2.269",
+          "          10117         -10121         creep         creep      1.125          0     1.125     3.394"
+        ]
+      },
+      "positioner_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          38.873376,
+          123.054046
+        ],
+        "poslocTP": [
+          168.627684,
+          121.968339
+        ]
+      }
     },
     "after_move_1": {
-      "classified_as_retracted": false,
-      "is_enabled": true,
-      "posintTP": [
-        30.00005,
-        120.000034
-      ],
-      "poslocTP": [
-        159.754359,
-        118.914326
-      ]
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (hardware version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 5",
+          "  total_time: 2.603277777777778",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+          "              0          -1134         creep        cruise      0.108          0     0.108     0.108",
+          "          -2659              0        cruise         creep      0.193          0     0.193     0.301",
+          "              0            -94         creep        cruise      0.051          0     0.051     0.352",
+          "         -10121          10121         creep         creep      1.125          0     1.125     1.477",
+          "          10124         -10141         creep         creep      1.127          0     1.127     2.603"
+        ]
+      },
+      "positioner_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          30.00005,
+          120.000034
+        ],
+        "poslocTP": [
+          159.754359,
+          118.914326
+        ]
+      }
     },
     "after_move_2": {
-      "classified_as_retracted": false,
-      "is_enabled": true,
-      "posintTP": [
-        -20.000034,
-        150.000084
-      ],
-      "poslocTP": [
-        109.754275,
-        148.914376
-      ]
+      "move_tables": {
+        "M02101": [
+          "move table for: M02101 (hardware version)",
+          "  posid: M02101",
+          "  canid: 2101",
+          "  busid: can10",
+          "  nrows: 4",
+          "  total_time: 2.780777777777778",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+          "           5611              0        cruise         creep      0.357          0     0.357     0.357",
+          "              0          -2347         creep        cruise      0.176          0     0.176     0.533",
+          "         -10121          10121         creep         creep      1.125          0     1.125     1.657",
+          "          10109         -10111         creep         creep      1.123          0     1.123     2.781"
+        ]
+      },
+      "positioner_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          -20.000034,
+          150.000084
+        ],
+        "poslocTP": [
+          109.754275,
+          148.914376
+        ]
+      }
     }
   }
 }
