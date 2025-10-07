@@ -10,6 +10,7 @@ This regression test suite uses a "golden master" approach to ensure that code r
 - [Common Usage Scenarios](#common-usage-scenarios)
 - [Measuring Code Coverage](#measuring-code-coverage)
 - [Understanding Test Results](#understanding-test-results)
+- [What Gets Captured in Test Results](#what-gets-captured-in-test-results)
 - [Adding New Tests](#adding-new-tests)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
@@ -388,6 +389,78 @@ Running test_03_edge_cases... ✗ FAIL
 Baseline didn't exist, so one was created. This happens:
 - First time running a test
 - After deleting a baseline file
+
+---
+
+## What Gets Captured in Test Results
+
+Each regression test captures comprehensive data about the petal system's behavior. The captured data varies by test but generally includes:
+
+### Positioner State
+For each positioner involved in the test:
+- **posintTP**: Internal theta/phi coordinates (degrees)
+- **poslocTP**: Local tangent plane coordinates
+- **is_enabled**: Whether the positioner is operational
+- **classified_as_retracted**: Safety flag status
+
+### Move Tables
+For tests that execute moves (most tests), the generated move tables are captured in human-readable format:
+
+```json
+"move_tables": {
+  "M02101": [
+    "move table for: M02101 (hardware version)",
+    "  posid: M02101",
+    "  canid: 2101",
+    "  busid: can10",
+    "  nrows: 5",
+    "  total_time: 2.604611111111111",
+    "  required: True",
+    "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
+    "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
+    "              0          -1134         creep        cruise      0.108          0     0.108     0.108",
+    "           -614              0        cruise         creep      0.079          0     0.079     0.188",
+    "              0           2157         creep        cruise      0.165          0     0.165     0.353",
+    "         -10121          10121         creep         creep      1.125          0     1.125     1.478",
+    "          10111         -10144         creep         creep      1.127          0     1.127     2.605"
+  ]
+}
+```
+
+Move tables are stored as arrays of strings (one per line) to preserve column alignment in the JSON baseline files. Each move table shows:
+- **posid, canid, busid**: Positioner identification
+- **nrows**: Number of move steps
+- **total_time**: Total duration of the move sequence (seconds)
+- **motor_steps_T/P**: Motor steps for theta/phi axes (positive = CCW, negative = CW)
+- **speed_mode_T/P**: Speed mode for each axis (cruise, creep)
+- **move_time**: Duration of each step (seconds)
+- **postpause**: Pause after each step (milliseconds)
+- **row_time**: Total time for each row (seconds)
+- **net_time**: Cumulative time (seconds)
+
+**Implementation note**: Move tables must be captured after `schedule_moves()` but before `send_and_execute_moves()`, since they are cleared during move execution. See test_01_basic_moves for the correct pattern:
+
+```python
+ptl.request_targets(requests)
+ptl.schedule_moves(anticollision='adjust')
+move_tables = self._capture_move_tables(ptl)  # Capture here
+ptl.send_and_execute_moves()
+state = self._capture_petal_state(ptl, move_tables=move_tables)
+```
+
+### Schedule Statistics
+When scheduling is involved:
+- **has_data**: Whether scheduling stats were collected
+- **cache_size**: Number of scheduling operations recorded
+
+### Coordinate Transforms
+For transform tests:
+- Forward transforms (posintTP → poslocTP, poslocXY, ptlXY, obsXY)
+- Reverse transforms (back to posintTP)
+- Roundtrip accuracy verification
+
+### Test-Specific Data
+Each test may capture additional domain-specific information relevant to what it's testing.
 
 ---
 

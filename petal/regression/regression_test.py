@@ -206,10 +206,14 @@ class RegressionTestSuite:
                 }
 
                 ptl.request_targets(requests)
-                ptl.schedule_send_and_execute_moves(anticollision='adjust')
+                # Schedule moves and capture move tables before they're cleared by execution
+                ptl.schedule_moves(anticollision='adjust')
+                move_tables = self._capture_move_tables(ptl)
+                # Now execute and capture final state
+                ptl.send_and_execute_moves()
 
-                # Capture state after move
-                state = self._capture_petal_state(ptl)
+                # Capture state after move, passing the move tables we captured
+                state = self._capture_petal_state(ptl, move_tables=move_tables)
                 system_results.append({
                     'target': target,
                     'final_state': state
@@ -1068,11 +1072,17 @@ class RegressionTestSuite:
         # Create petal - it will load states from config files automatically
         return petal.Petal(**config)
 
-    def _capture_petal_state(self, ptl: petal.Petal) -> Dict:
-        """Capture complete petal state for comparison"""
+    def _capture_petal_state(self, ptl: petal.Petal, move_tables: Dict = None) -> Dict:
+        """Capture complete petal state for comparison
+
+        Args:
+            ptl: Petal instance
+            move_tables: Optional pre-captured move tables (since they get cleared after execution)
+        """
         state = {
             'positioner_states': {},
             'has_schedule': hasattr(ptl, 'schedule') and ptl.schedule is not None,
+            'move_tables': move_tables if move_tables is not None else {},
         }
 
         # Capture each positioner's state
@@ -1102,6 +1112,27 @@ class RegressionTestSuite:
             'has_data': len(stats.cache) > 0,
             'cache_size': len(stats.cache),
         }
+
+    def _capture_move_tables(self, ptl: petal.Petal) -> Dict:
+        """Capture move tables in human-readable hardware format"""
+        if not hasattr(ptl, 'schedule') or ptl.schedule is None:
+            return {}
+
+        if not hasattr(ptl.schedule, 'move_tables') or not ptl.schedule.move_tables:
+            return {}
+
+        move_tables = {}
+        for posid, table in ptl.schedule.move_tables.items():
+            # Skip empty or motionless tables
+            if not table or (hasattr(table, 'is_motionless') and table.is_motionless):
+                move_tables[posid] = ['<empty or motionless>']
+            else:
+                # Get hardware format as string (printfunc=None returns string)
+                table_str = table.display_for(output_type='hardware', printfunc=None)
+                # Split into lines for better JSON readability
+                move_tables[posid] = table_str.split('\n') if table_str else []
+
+        return move_tables
 
     def _sanitize_table_output(self, output: Dict) -> Dict:
         """Clean move table output for serialization"""
