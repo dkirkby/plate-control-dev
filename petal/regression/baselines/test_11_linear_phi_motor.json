@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-07T06:08:58.000309",
-  "signature": "386dd4c18fc1b9005fc54add9d257cc70016d37e892bba3643812744561924e5",
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "f3bcc2c1c2e179aa74feb2e70907f682576e58e9af8f16d859eabeffff9538f5",
   "data": {
     "regular_comparison": {
       "is_linphi": false,
@@ -27,7 +27,7 @@
       },
       "move_tables": {
         "M03501": [
-          "move table for: M03501 (hardware version)",
+          "move table for: M03501 (regression version)",
           "  posid: M03501",
           "  canid: 3501",
           "  busid: can35",
@@ -37,14 +37,14 @@
           "  nrows: 6",
           "  total_time: 0.207278",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "              0             68         creep        cruise      0.015          0     0.015     0.015",
-          "              0           -577         creep        cruise      0.043          0     0.043     0.058",
-          "          -1125              0        cruise        cruise      0.108          0     0.108     0.166",
-          "              0            239         creep        cruise      0.025          0     0.025     0.191",
-          "              0            -68         creep        cruise      0.015          0     0.015     0.206",
-          "            -15              0         creep        cruise      0.002          0     0.002     0.207"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "              0             68         creep        cruise      0.015          0",
+          "              0           -577         creep        cruise      0.043          0",
+          "          -1125              0        cruise        cruise      0.108          0",
+          "              0            239         creep        cruise      0.025          0",
+          "              0            -68         creep        cruise      0.015          0",
+          "            -15              0         creep        cruise      0.002          0"
         ]
       },
       "target": [
@@ -68,7 +68,7 @@
         },
         "move_tables": {
           "M03501": [
-            "move table for: M03501 (hardware version)",
+            "move table for: M03501 (regression version)",
             "  posid: M03501",
             "  canid: 3501",
             "  busid: can35",
@@ -78,11 +78,11 @@
             "  nrows: 3",
             "  total_time: 0.152611",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0            574         creep        cruise      0.043          0     0.043     0.043",
-            "           1125            -68        cruise        cruise      0.108          0     0.108     0.151",
-            "             15              0         creep        cruise      0.002          0     0.002     0.153"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0            574         creep        cruise      0.043          0",
+            "           1125            -68        cruise        cruise      0.108          0",
+            "             15              0         creep        cruise      0.002          0"
           ]
         },
         "target": [
@@ -105,7 +105,7 @@
         },
         "move_tables": {
           "M03501": [
-            "move table for: M03501 (hardware version)",
+            "move table for: M03501 (regression version)",
             "  posid: M03501",
             "  canid: 3501",
             "  busid: can35",
@@ -115,11 +115,11 @@
             "  nrows: 3",
             "  total_time: 0.208389",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0             68         creep        cruise      0.015          0     0.015     0.015",
-            "          -2659           -404        cruise        cruise      0.193          0     0.193     0.208",
-            "              3              0         creep        cruise      0.000          0     0.000     0.208"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0             68         creep        cruise      0.015          0",
+            "          -2659           -404        cruise        cruise      0.193          0",
+            "              3              0         creep        cruise      0.000          0"
           ]
         },
         "target": [
@@ -142,7 +142,7 @@
         },
         "move_tables": {
           "M03501": [
-            "move table for: M03501 (hardware version)",
+            "move table for: M03501 (regression version)",
             "  posid: M03501",
             "  canid: 3501",
             "  busid: can35",
@@ -152,11 +152,11 @@
             "  nrows: 3",
             "  total_time: 0.323444",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0             68         creep        cruise      0.015          0     0.015     0.015",
-            "           4704           -406        cruise        cruise      0.307          0     0.307     0.322",
-            "            -16              0         creep        cruise      0.002          0     0.002     0.323"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0             68         creep        cruise      0.015          0",
+            "           4704           -406        cruise        cruise      0.307          0",
+            "            -16              0         creep        cruise      0.002          0"
           ]
         },
         "target": [

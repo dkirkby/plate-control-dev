@@ -1,22 +1,22 @@
 {
-  "timestamp": "2025-10-07T06:08:58.000309",
-  "signature": "5b2f148d96e5f775b3cc7cfe8e4db1af958cdc0a152fa2ec8669218386abbd6b",
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "7b6b621e4b3545285281702c65a8cb0b4972e75ec6b94372d857b8e5b834e729",
   "data": {
     "near_negative_limit": {
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 2.327444",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "           -614              0        cruise         creep      0.079          0     0.079     0.079",
-          "         -10121              0         creep         creep      1.125          0     1.125     1.204",
-          "          10111              0         creep         creep      1.123          0     1.123     2.327"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "           -614              0        cruise         creep      0.079          0",
+          "         -10121              0         creep         creep      1.125          0",
+          "          10111              0         creep         creep      1.123          0"
         ]
       },
       "positioner_state": {
@@ -35,18 +35,18 @@
     "near_positive_limit": {
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 3.264667",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "         -17482              0        cruise         creep      1.017          0     1.017     1.017",
-          "         -10121              0         creep         creep      1.125          0     1.125     2.141",
-          "          10112              0         creep         creep      1.124          0     1.124     3.265"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "         -17482              0        cruise         creep      1.017          0",
+          "         -10121              0         creep         creep      1.125          0",
+          "          10112              0         creep         creep      1.124          0"
         ]
       },
       "positioner_state": {
@@ -65,18 +65,18 @@
     "phi_maximum": {
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 3.237722",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "              0         -16971         creep        cruise      0.988          0     0.988     0.988",
-          "              0          10121         creep         creep      1.125          0     1.125     2.113",
-          "              0         -10125         creep         creep      1.125          0     1.125     3.238"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "              0         -16971         creep        cruise      0.988          0",
+          "              0          10121         creep         creep      1.125          0",
+          "              0         -10125         creep         creep      1.125          0"
         ]
       },
       "positioner_state": {
@@ -95,18 +95,18 @@
     "phi_minimum": {
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 3.289500",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "          17891           8793        cruise        cruise      1.039          0     1.039     1.039",
-          "         -10121          10121         creep         creep      1.125          0     1.125     2.164",
-          "          10127         -10131         creep         creep      1.126          0     1.126     3.289"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "          17891           8793        cruise        cruise      1.039          0",
+          "         -10121          10121         creep         creep      1.125          0",
+          "          10127         -10131         creep         creep      1.126          0"
         ]
       },
       "positioner_state": {
@@ -125,18 +125,18 @@
     "wrap_around": {
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 2.307278",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "            205              0        cruise         creep      0.057          0     0.057     0.057",
-          "         -10121              0         creep         creep      1.125          0     1.125     1.181",
-          "          10134              0         creep         creep      1.126          0     1.126     2.307"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "            205              0        cruise         creep      0.057          0",
+          "         -10121              0         creep         creep      1.125          0",
+          "          10134              0         creep         creep      1.126          0"
         ]
       },
       "positioner_state": {

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-07T06:08:58.000309",
-  "signature": "5dbc3fcc9ad76525de996afdc66235f7ff88439d14100b35ddf2e30490b4dbd9",
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "5bfc5e7e65a1006f2a0e55da0d2af5b2b0420ec99d27622b166865a53b76d7a4",
   "data": {
     "obsXY_moves": [
       {
@@ -18,20 +18,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 3.183778",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0          -1134         creep        cruise      0.108          0     0.108     0.108",
-            "           6630              0         creep         creep      0.737          0     0.737     0.845",
-            "              0            798         creep        cruise      0.090          0     0.090     0.935",
-            "         -10121          10121         creep         creep      1.125          0     1.125     2.059",
-            "          10121         -10117         creep         creep      1.125          0     1.125     3.184"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -1134         creep        cruise      0.108          0",
+            "           6630              0         creep         creep      0.737          0",
+            "              0            798         creep        cruise      0.090          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10121         -10117         creep         creep      1.125          0"
           ]
         },
         "target": [
@@ -54,20 +54,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 2.765222",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0           -798         creep        cruise      0.090          0     0.090     0.090",
-            "          -2264              0        cruise         creep      0.171          0     0.171     0.261",
-            "              0           3740         creep        cruise      0.253          0     0.253     0.514",
-            "         -10121          10121         creep         creep      1.125          0     1.125     1.638",
-            "          10120         -10141         creep         creep      1.127          0     1.127     2.765"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0           -798         creep        cruise      0.090          0",
+            "          -2264              0        cruise         creep      0.171          0",
+            "              0           3740         creep        cruise      0.253          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10120         -10141         creep         creep      1.127          0"
           ]
         },
         "target": [
@@ -90,20 +90,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 2.892722",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0          -3740         creep        cruise      0.253          0     0.253     0.253",
-            "           5138              0        cruise         creep      0.331          0     0.331     0.584",
-            "              0           -233         creep        cruise      0.058          0     0.058     0.642",
-            "         -10121          10121         creep         creep      1.125          0     1.125     1.767",
-            "          10134         -10098         creep         creep      1.126          0     1.126     2.893"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -3740         creep        cruise      0.253          0",
+            "           5138              0        cruise         creep      0.331          0",
+            "              0           -233         creep        cruise      0.058          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10134         -10098         creep         creep      1.126          0"
           ]
         },
         "target": [
@@ -128,20 +128,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 3.183778",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0          -1134         creep        cruise      0.108          0     0.108     0.108",
-            "           6630              0         creep         creep      0.737          0     0.737     0.845",
-            "              0            798         creep        cruise      0.090          0     0.090     0.935",
-            "         -10121          10121         creep         creep      1.125          0     1.125     2.059",
-            "          10121         -10117         creep         creep      1.125          0     1.125     3.184"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -1134         creep        cruise      0.108          0",
+            "           6630              0         creep         creep      0.737          0",
+            "              0            798         creep        cruise      0.090          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10121         -10117         creep         creep      1.125          0"
           ]
         },
         "target": [
@@ -164,20 +164,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 2.765222",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0           -798         creep        cruise      0.090          0     0.090     0.090",
-            "          -2264              0        cruise         creep      0.171          0     0.171     0.261",
-            "              0           3740         creep        cruise      0.253          0     0.253     0.514",
-            "         -10121          10121         creep         creep      1.125          0     1.125     1.638",
-            "          10120         -10141         creep         creep      1.127          0     1.127     2.765"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0           -798         creep        cruise      0.090          0",
+            "          -2264              0        cruise         creep      0.171          0",
+            "              0           3740         creep        cruise      0.253          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10120         -10141         creep         creep      1.127          0"
           ]
         },
         "target": [
@@ -200,20 +200,20 @@
         },
         "move_tables": {
           "M02101": [
-            "move table for: M02101 (hardware version)",
+            "move table for: M02101 (regression version)",
             "  posid: M02101",
             "  canid: 2101",
             "  busid: can10",
             "  nrows: 5",
             "  total_time: 2.892722",
             "  required: True",
-            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-            "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-            "              0          -3740         creep        cruise      0.253          0     0.253     0.253",
-            "           5138              0        cruise         creep      0.331          0     0.331     0.584",
-            "              0           -233         creep        cruise      0.058          0     0.058     0.642",
-            "         -10121          10121         creep         creep      1.125          0     1.125     1.767",
-            "          10134         -10098         creep         creep      1.126          0     1.126     2.893"
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "              0          -3740         creep        cruise      0.253          0",
+            "           5138              0        cruise         creep      0.331          0",
+            "              0           -233         creep        cruise      0.058          0",
+            "         -10121          10121         creep         creep      1.125          0",
+            "          10134         -10098         creep         creep      1.126          0"
           ]
         },
         "target": [

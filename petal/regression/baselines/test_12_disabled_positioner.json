@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-07T06:08:58.000309",
-  "signature": "b971ec710710314f26cf8df15b722cef0c41818fe241b5e0f56f2d99e6dc5e4c",
+  "timestamp": "2025-10-07T08:54:42.398627",
+  "signature": "086cc8e5b244f3da049c5e99360faef78d43d01824b4c24dd4090b1cb754271b",
   "data": {
     "after_enabled_move": {
       "disabled_state": {
@@ -29,18 +29,18 @@
       },
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 2.441833",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "           2659            614        cruise        cruise      0.193          0     0.193     0.193",
-          "         -10121          10121         creep         creep      1.125          0     1.125     1.318",
-          "          10118         -10111         creep         creep      1.124          0     1.124     2.442"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "           2659            614        cruise        cruise      0.193          0",
+          "         -10121          10121         creep         creep      1.125          0",
+          "          10118         -10111         creep         creep      1.124          0"
         ]
       }
     },
@@ -71,18 +71,18 @@
       },
       "move_tables": {
         "M02101": [
-          "move table for: M02101 (hardware version)",
+          "move table for: M02101 (regression version)",
           "  posid: M02101",
           "  canid: 2101",
           "  busid: can10",
           "  nrows: 3",
           "  total_time: 2.386833",
           "  required: True",
-          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause  row_time  net_time",
-          "  -------------  -------------  ------------  ------------  ---------  ---------  --------  --------",
-          "          -1637           -103        cruise        cruise      0.136          0     0.136     0.136",
-          "         -10121          10121         creep         creep      1.125          0     1.125     1.261",
-          "          10134         -10126         creep         creep      1.126          0     1.126     2.387"
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "          -1637           -103        cruise        cruise      0.136          0",
+          "         -10121          10121         creep         creep      1.125          0",
+          "          10134         -10126         creep         creep      1.126          0"
         ]
       }
     },
