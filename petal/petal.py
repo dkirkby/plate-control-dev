@@ -265,40 +265,43 @@ class Petal(object):
         for i in range(self.n_strikes, 0, -1):
             self.strikes[f'strike_{i}'] = set()
 
-        self.petal_debug = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
-                            'cancel_anneal_verbose': True } # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
-                                                            # Set 'compact_linphi' to True to compact move tables before conversion for LinPhi operation
+        self.petal_options = {'linphi_verbose': 1,            # Set 'linphi_verbose' to 2 for more verbose linphi related output
+                              'lintheta_verbose': 1,          # Set 'lintheta_verbose' to 2 for more verbose lintheta related output
+                              'cancel_anneal_verbose': True,  # Set 'cancel_anneal_verbose'to False if no messages about canceling annealing are desired
+                              'compact_zeno': True}           # Set 'compact_zeno' to True to compact move tables before conversion for zeno operation
 
     def petal_version(self):
         """
         Returns string PETAL version id
         """
-        version = 'PETAL_v2.11'  # MUST be changed manually!
+        version = 'PETAL_v2.12'  # MUST be changed manually!
         if self.simulator_on:
             return version+'-Sim'
         else:
             return version
 
     if DEBUG:
-        def get_petal_debug(self):
+        def get_petal_options(self):
             """
-            Returns petal_debug dictionary
+            Returns petal_options dictionary
             """
-            return self.petal_debug
+            return self.petal_options
 
-        def set_petal_debug(self, key, value):
+        def set_petal_options(self, key, value):
             """
-            set key and value in petal_debug dictionary
+            set key and value in petal_options dictionary
             """
-            self.petal_debug[key] = value
+            self.petal_options[key] = value
             return
 
-        def del_petal_debug(self, key):
+        def del_petal_options(self, key):
             """
-            remove key from petal_debug dictionary
+            remove key from petal_options dictionary
             """
-            self.petal_debug.pop(key, None)
+            self.petal_options.pop(key, None)
             return
+            
+            -d
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -2738,7 +2741,7 @@ class Petal(object):
         '''Print out a message for one posid and also store the message to its
         log note field.
         '''
-        if self.verbose or (self.petal_debug.get('linphi_verbose') and self.posmodels[posid].is_linphi):
+        if self.verbose or (self.petal_options.get('linphi_verbose') and self.posmodels[posid].is_linphi) or (self.petal_options.get('lintheta_verbose') and self.posmodels[posid].is_lintheta):
             self.printfunc(f'{posid}: {msg}')
         self.set_posfid_val(posid, 'LOG_NOTE', msg)
 
