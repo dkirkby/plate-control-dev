@@ -34,17 +34,8 @@ class PosModel():
         self.gear_ratio                  = {pc.T: pc.gear_ratio[self.state._val['GEAR_TYPE_T']], pc.P: pc.gear_ratio[self.state._val['GEAR_TYPE_P']]}
 #       gear_ratio = 337.359434
 #       Note: the following lines must follow the gear_ratio setting
-        try:
-            dps_T, sud_T = self._calc_zeno_speed_sud(pc.T)
-            dps_P, sud_P = self._calc_zeno_speed_sud(pc.P)
-        except TypeError as e:
-            # DEBUG: diagnose CI failures with numpy array scalar conversion
-            self.printfunc(f'DEBUG: TypeError in _calc_zeno_speed_sud: {e}')
-            self.printfunc(f'DEBUG: gear_ratio[T] type={type(self.gear_ratio[pc.T])}, value={self.gear_ratio[pc.T]}')
-            self.printfunc(f'DEBUG: gear_ratio[P] type={type(self.gear_ratio[pc.P])}, value={self.gear_ratio[pc.P]}')
-            self.printfunc(f'DEBUG: T_zeno_speed type={type(pc.T_zeno_speed)}, value={pc.T_zeno_speed}')
-            self.printfunc(f'DEBUG: P_zeno_speed type={type(pc.P_zeno_speed)}, value={pc.P_zeno_speed}')
-            raise
+        dps_T, sud_T = self._calc_zeno_speed_sud(pc.T)
+        dps_P, sud_P = self._calc_zeno_speed_sud(pc.P)
         self._spinupdown_dist_zeno = {pc.T: sud_T, pc.P: sud_P}
         self._stepsize_cruise_zeno = {pc.T: dps_T, pc.P: dps_P}
         self.refresh_cache()

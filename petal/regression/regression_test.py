@@ -598,23 +598,12 @@ class RegressionTestSuite:
 
         results = {}
 
-        # DEBUG: Print version info to help diagnose CI failures
-        import numpy as np
-        print(f"  DEBUG: Python version: {sys.version}")
-        print(f"  DEBUG: NumPy version: {np.__version__}")
-
         # Test ptlXY coordinate system (petal-level Cartesian)
-        try:
-            ptl = self._create_test_petal(
-                simulator_on=True,
-                anticollision='adjust',
-                verbose=False
-            )
-        except TypeError as e:
-            print(f"  DEBUG: TypeError during _create_test_petal: {e}")
-            print(f"  DEBUG: Full traceback:")
-            traceback.print_exc()
-            raise
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
 
         posid = self.test_posids[0]
 
@@ -629,7 +618,7 @@ class RegressionTestSuite:
         ]
 
         ptlXY_results = []
-        for i, target in enumerate(ptlXY_targets):
+        for target in ptlXY_targets:
             requests = {
                 posid: {
                     'command': 'ptlXY',
@@ -637,18 +626,8 @@ class RegressionTestSuite:
                     'log_note': f'test_09_ptlXY_{target[0]}_{target[1]}'
                 }
             }
-            try:
-                ptl.request_targets(requests)
-            except TypeError as e:
-                print(f"  DEBUG: TypeError in request_targets (iteration {i}, target={target}): {e}")
-                traceback.print_exc()
-                raise
-            try:
-                ptl.schedule_moves(anticollision='adjust')
-            except TypeError as e:
-                print(f"  DEBUG: TypeError in schedule_moves (iteration {i}): {e}")
-                traceback.print_exc()
-                raise
+            ptl.request_targets(requests)
+            ptl.schedule_moves(anticollision='adjust')
             move_tables = self._capture_move_tables(ptl)
             ptl.send_and_execute_moves()
 
@@ -661,17 +640,11 @@ class RegressionTestSuite:
         results['ptlXY_moves'] = ptlXY_results
 
         # Test obsXY coordinate system (observer-level global)
-        try:
-            ptl = self._create_test_petal(
-                simulator_on=True,
-                anticollision='adjust',
-                verbose=False
-            )
-        except Exception as e:
-            print(f"  DEBUG: Exception during second _create_test_petal (obsXY): {e}")
-            print(f"  DEBUG: Full traceback:")
-            traceback.print_exc()
-            raise
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            anticollision='adjust',
+            verbose=False
+        )
 
         # Note: obsXY coordinates are observatory-level global positions
         # These coordinates may be unreachable for this test positioner,
@@ -1501,9 +1474,6 @@ class RegressionTestSuite:
                             print(f"       {line}")
             elif result['status'] == 'ERROR':
                 print(f"  └─ {result['message']}")
-                if 'traceback' in result:
-                    print(f"  DEBUG: Full traceback:")
-                    print(result['traceback'])
 
         self._print_summary(results)
         return results
