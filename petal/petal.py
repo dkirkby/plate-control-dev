@@ -300,8 +300,6 @@ class Petal(object):
             """
             self.petal_options.pop(key, None)
             return
-            
-            -d
 
     def is_pc_connected(self):
         if self.simulator_on:
