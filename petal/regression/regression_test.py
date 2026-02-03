@@ -598,12 +598,23 @@ class RegressionTestSuite:
 
         results = {}
 
+        # DEBUG: Print version info to help diagnose CI failures
+        import numpy as np
+        print(f"  DEBUG: Python version: {sys.version}")
+        print(f"  DEBUG: NumPy version: {np.__version__}")
+
         # Test ptlXY coordinate system (petal-level Cartesian)
-        ptl = self._create_test_petal(
-            simulator_on=True,
-            anticollision='adjust',
-            verbose=False
-        )
+        try:
+            ptl = self._create_test_petal(
+                simulator_on=True,
+                anticollision='adjust',
+                verbose=False
+            )
+        except TypeError as e:
+            print(f"  DEBUG: TypeError during _create_test_petal: {e}")
+            print(f"  DEBUG: Full traceback:")
+            traceback.print_exc()
+            raise
 
         posid = self.test_posids[0]
 
@@ -618,7 +629,7 @@ class RegressionTestSuite:
         ]
 
         ptlXY_results = []
-        for target in ptlXY_targets:
+        for i, target in enumerate(ptlXY_targets):
             requests = {
                 posid: {
                     'command': 'ptlXY',
@@ -626,8 +637,18 @@ class RegressionTestSuite:
                     'log_note': f'test_09_ptlXY_{target[0]}_{target[1]}'
                 }
             }
-            ptl.request_targets(requests)
-            ptl.schedule_moves(anticollision='adjust')
+            try:
+                ptl.request_targets(requests)
+            except TypeError as e:
+                print(f"  DEBUG: TypeError in request_targets (iteration {i}, target={target}): {e}")
+                traceback.print_exc()
+                raise
+            try:
+                ptl.schedule_moves(anticollision='adjust')
+            except TypeError as e:
+                print(f"  DEBUG: TypeError in schedule_moves (iteration {i}): {e}")
+                traceback.print_exc()
+                raise
             move_tables = self._capture_move_tables(ptl)
             ptl.send_and_execute_moves()
 
