@@ -661,11 +661,17 @@ class RegressionTestSuite:
         results['ptlXY_moves'] = ptlXY_results
 
         # Test obsXY coordinate system (observer-level global)
-        ptl = self._create_test_petal(
-            simulator_on=True,
-            anticollision='adjust',
-            verbose=False
-        )
+        try:
+            ptl = self._create_test_petal(
+                simulator_on=True,
+                anticollision='adjust',
+                verbose=False
+            )
+        except Exception as e:
+            print(f"  DEBUG: Exception during second _create_test_petal (obsXY): {e}")
+            print(f"  DEBUG: Full traceback:")
+            traceback.print_exc()
+            raise
 
         # Note: obsXY coordinates are observatory-level global positions
         # These coordinates may be unreachable for this test positioner,
@@ -1495,6 +1501,9 @@ class RegressionTestSuite:
                             print(f"       {line}")
             elif result['status'] == 'ERROR':
                 print(f"  └─ {result['message']}")
+                if 'traceback' in result:
+                    print(f"  DEBUG: Full traceback:")
+                    print(result['traceback'])
 
         self._print_summary(results)
         return results
