@@ -1091,6 +1091,140 @@ class RegressionTestSuite:
 
         return results
 
+    def test_13_linear_theta_motor(self) -> Dict:
+        """
+        Test linear theta motor (Zeno motor) functionality.
+
+        Exercises code paths specific to Zeno motors on the theta axis:
+        - is_lintheta property detection
+        - Zeno scaling parameters (SZ_CW_T, SZ_CCW_T)
+        - Special move table generation for linear theta
+        - No creep moves on theta axis for Zeno motors
+        - No backlash compensation on theta axis for Zeno motors
+        """
+        results = {}
+
+        # Test with Zeno motor positioner (M03502)
+        zeno_posid = 'M03502'
+        ptl = self._create_test_petal(
+            simulator_on=True,
+            posids=[zeno_posid]
+        )
+
+        # Verify Zeno motor is detected correctly
+        posmodel = ptl.posmodels[zeno_posid]
+        results['zeno_config'] = {
+            'is_lintheta': posmodel.is_lintheta,
+            'is_linphi': posmodel.is_linphi,
+            'zeno_motor_t': posmodel.state._val.get('ZENO_MOTOR_T', False),
+            'zeno_motor_p': posmodel.state._val.get('ZENO_MOTOR_P', False),
+            'sz_cw_t': posmodel.get_zeno_scale('SZ_CW_T'),
+            'sz_ccw_t': posmodel.get_zeno_scale('SZ_CCW_T'),
+        }
+
+        # Test 1: Execute a move with Zeno motor
+        ptl.request_targets({
+            zeno_posid: {
+                'command': 'posintTP',
+                'target': [15.0, 110.0],
+                'log_note': 'test_zeno_theta_move_1'
+            }
+        })
+        ptl.schedule_moves(anticollision='adjust')
+        move_tables = self._capture_move_tables(ptl)
+        ptl.send_and_execute_moves()
+
+        results['zeno_move_1'] = {
+            'target': [15.0, 110.0],
+            'final_state': self._capture_positioner_state(ptl, zeno_posid),
+            'move_tables': move_tables
+        }
+
+        # Test 2: Create move table and verify Zeno-specific parameters
+        table = posmovetable.PosMoveTable(posmodel)
+        table.set_move(0, pc.T, 20.0)
+        table.set_move(0, pc.P, 15.0)
+
+        # Check that move table has Zeno parameters
+        hw_table = table.for_hardware()
+        results['zeno_move_table'] = {
+            'has_zeno_field': 'zeno' in hw_table,
+            'zeno_value': hw_table.get('zeno', None),
+            'tccwa': hw_table.get('TCCWA', None),  # CCW scale for theta
+            'tcwa': hw_table.get('TCWA', None),     # CW scale for theta
+            'num_rows': len(table.rows),
+        }
+
+        # Test 3: Verify no creep on theta axis for Zeno motors
+        # Make a short move that would normally use creep on a regular motor
+        table_short = posmovetable.PosMoveTable(posmodel)
+        table_short.set_move(0, pc.T, 1.0)   # Short theta move (Zeno: should NOT use creep)
+        table_short.set_move(0, pc.P, 1.0)   # Short phi move (should use creep)
+
+        results['zeno_short_move'] = {
+            'num_rows': len(table_short.rows),
+            'theta_move_data': table_short.rows[0].data if len(table_short.rows) > 0 else None,
+        }
+
+        # Test 4: Compare with regular motor behavior
+        regular_posid = 'M02101'
+        ptl_regular = self._create_test_petal(
+            simulator_on=True,
+            posids=[regular_posid]
+        )
+
+        regular_posmodel = ptl_regular.posmodels[regular_posid]
+        results['regular_comparison'] = {
+            'is_lintheta': regular_posmodel.is_lintheta,
+            'is_linphi': regular_posmodel.is_linphi,
+            'zeno_motor_t': regular_posmodel.state._val.get('ZENO_MOTOR_T', False),
+            'zeno_motor_p': regular_posmodel.state._val.get('ZENO_MOTOR_P', False),
+        }
+
+        # Test 5: Multi-move sequence with Zeno motor
+        move_targets = [
+            [0.0, 95.0],
+            [30.0, 105.0],
+            [-20.0, 115.0],
+        ]
+
+        move_results = []
+        for target in move_targets:
+            ptl.request_targets({
+                zeno_posid: {
+                    'command': 'posintTP',
+                    'target': target,
+                    'log_note': f'test_zeno_theta_seq_{target}'
+                }
+            })
+            ptl.schedule_moves(anticollision=None)
+            move_tables_zeno = self._capture_move_tables(ptl)
+            ptl.send_and_execute_moves()
+            move_results.append({
+                'target': target,
+                'final_state': self._capture_positioner_state(ptl, zeno_posid),
+                'move_tables': move_tables_zeno
+            })
+
+        results['zeno_move_sequence'] = move_results
+
+        # Test 6: Compare with linear phi motor (M03501)
+        linphi_posid = 'M03501'
+        ptl_linphi = self._create_test_petal(
+            simulator_on=True,
+            posids=[linphi_posid]
+        )
+
+        linphi_posmodel = ptl_linphi.posmodels[linphi_posid]
+        results['linphi_comparison'] = {
+            'is_lintheta': linphi_posmodel.is_lintheta,
+            'is_linphi': linphi_posmodel.is_linphi,
+            'zeno_motor_t': linphi_posmodel.state._val.get('ZENO_MOTOR_T', False),
+            'zeno_motor_p': linphi_posmodel.state._val.get('ZENO_MOTOR_P', False),
+        }
+
+        return results
+
     # ============================================================
     # HELPER METHODS - PETAL CREATION & STATE CAPTURE
     # ============================================================
