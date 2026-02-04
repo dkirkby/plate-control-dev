@@ -113,6 +113,9 @@ _regression_dir = Path(__file__).parent
 _petal_dir = _regression_dir.parent
 sys.path.insert(0, str(_petal_dir))
 
+# Ensure that an import of DOSlib.positioner_index fails, even when DOSlib is installed.
+sys.modules['DOSlib.positioner_index'] = None
+
 import numpy as np
 import petal
 import posmodel
