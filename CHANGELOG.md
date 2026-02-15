@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for linear theta motors that mirrors existing linear phi motor support.
 - Regression tests for robots with a linear theta and both linear theta and phi motors.
+- Github action to generate a tarfile with executable bits set correctly when publishing a release.
+- README in markdown format that is display on the this project's github page.
 
 ### Changed
 
