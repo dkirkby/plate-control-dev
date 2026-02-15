@@ -374,7 +374,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         R = math.hypot(obsXY[0], obsXY[1])
         obsXYZ = [obsXY[0], obsXY[1], pc.R2Z_lookup(R)] # Z(R(obsXY)) --> imperfect (but very close) invertibilty with posintTP_to_obsXY
         ptlXYZ = self.obsXYZ_to_ptlXYZ(obsXYZ, cast=True)
-        return [float(ptlXYZ[0]), float(ptlXYZ[1])]
+        return [float(ptlXYZ[0, 0]), float(ptlXYZ[1, 0])]
     
     def ptlXY_to_obsXY(self, ptlXY):
         """Wrapper for similar petaltransforms 3D function. Uses focal surface
@@ -382,7 +382,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         R = math.hypot(ptlXY[0], ptlXY[1])
         ptlXYZ = [ptlXY[0], ptlXY[1], pc.R2Z_lookup(R)] # Z(R(ptlXY)) --> imperfect (but very close) invertibilty with obsXY_to_posintTP
         obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ, cast=True)
-        return [float(obsXYZ[0]), float(obsXYZ[1])]
+        return [float(obsXYZ[0, 0]), float(obsXYZ[1, 0])]
     
     def poslocTP_to_ptlXYZ(self, poslocTP):
         '''Composite transformation, performs poslocXY --> flatXY --> ptlXYZ.

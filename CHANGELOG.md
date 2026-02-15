@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [PETAL_v2.11] - Unreleased
+## [PETAL_v2.12] - 2026-02-14
+
+### Added
+
+- Support for linear theta motors that mirrors existing linear phi motor support.
+- Regression tests for robots with a linear theta and both linear theta and phi motors.
+- Github action to generate a tarfile with executable bits set correctly when publishing a release.
+- README in markdown format that is display on the this project's github page.
+
+### Changed
+
+- CI tests use both numpy 1.25.2 and 2.x (KPNO uses 1.25 and some 1.26 but will eventually migrate to 2.x)
+
+### Fixed
+
+- Missing pytz import for regression test
+- Rewrite some numpy expressions to work in both 1.25 and 2.x in postransforms
+- Regression test now works when DOSlib is installed in the test environment
+
+## [PETAL_v2.11] - 2025-10-07
 
 ### Added
 

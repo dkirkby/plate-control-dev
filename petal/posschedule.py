@@ -208,18 +208,26 @@ class PosSchedule(object):
         interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
         if interfering_neighbors:
             return self._denied_str(target_str, f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
-        if posmodel.is_linphi:
+        if posmodel.is_linphi or posmodel.is_lintheta:
             targXY = trans.posintTP_to_poslocXY(targt_posintTP)
             strtXY = trans.posintTP_to_poslocXY(start_posintTP)
             dist_from_targt = 1000.0 * math.dist(targXY, strtXY)
-            LINPHI_DIST_LIMIT = 10.0 # microns
+            ZENO_DIST_LIMIT = 10.0 # microns
             try:
-                if hasattr(self.petal, 'petal_debug'):
-                    LINPHI_DIST_LIMIT = float(self.petal.petal_debug.get('linphi_dist_limit'))
+                if hasattr(self.petal, 'petal_options'):
+                    if posmodel.is_linphi:
+                        ZENO_DIST_LIMIT = float(self.petal.petal_options.get('linphi_dist_limit'))
+                    if posmodel.is_lintheta:
+                        ZENO_DIST_LIMIT = float(self.petal.petal_options.get('lintheta_dist_limit'))
             except TypeError:
                 pass
-            if dist_from_targt < LINPHI_DIST_LIMIT: # 10 microns
-                return self._denied_str(target_str, f"Linear phi already close enough, {dist_from_targt} < {LINPHI_DIST_LIMIT} microns to target")
+            if dist_from_targt < ZENO_DIST_LIMIT: # 10 microns
+                mystr = f" already close enough, {dist_from_targt} < {ZENO_DIST_LIMIT} microns to target"
+                if posmodel.is_linphi:
+                    mystr = "Linear phi" + mystr
+                else: # is_lintheta
+                    mystr = "Linear theta" + mystr
+                return self._denied_str(target_str, mystr)
         # form internal request dict
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
@@ -295,7 +303,7 @@ class PosSchedule(object):
         colliding_posids = [posid for posid in colliding_sweeps]
         for posid in colliding_posids:
             p_state = self.petal.posmodels[posid].state
-            if p_state._val.get('ZENO_MOTOR_P', False) is True:
+            if p_state._val.get('ZENO_MOTOR_P', False) is True or p_state._val.get('ZENO_MOTOR_T', False) is True:
                 zeno_posids.add(posid)
         if zeno_posids:
             colliding = set(colliding_sweeps)
@@ -326,6 +334,41 @@ class PosSchedule(object):
                     self.stats.sub_request_accepted()
                 self._reinit_stages() # clear out old move tables - starting over
         return
+
+    if DEBUG:
+        def _possibly_induce_scheduling_error(self, colliding_sweeps, collision_pairs, anticollision):
+            if hasattr(self.petal, 'petal_options') and 'collision' in self.petal.petal_options and anticollision:
+                pid_colliders = []
+                pid_collidees = []
+                if self.petal.petal_options['collision'] == 1:
+                    pid_colliders = ['M01825']  # 1 zeno collider with non-zeno collidee
+                    pid_collidees = ['M02354']
+                if self.petal.petal_options['collision'] == 2:
+                    pid_colliders = ['M01825', 'M07770']  # 2 zeno colliders with non-zeno collidees
+                    pid_collidees = ['M02354', 'M07771']
+                if self.petal.petal_options['collision'] == 3:
+                    pid_colliders = ['M01995']  # a non-zeno collider with non-zeno collidee
+                    pid_collidees = ['M02095']
+                if self.petal.petal_options['collision'] == 4:
+                    pid_colliders = ['M01995', 'M01973']  # 2 non-zeno colliders with non-zeno collidees
+                    pid_collidees = ['M02095', 'M02020']
+
+                if not collision_pairs:
+                    colliding_sweeps = {}
+                    collision_pairs = []
+                    for ndx, pid_collider in enumerate(pid_colliders):
+                        pid_collidee = pid_collidees[ndx]
+                        p_state = self.petal.posmodels[pid_collider].state
+                        if p_state._val['CTRL_ENABLED'] is True:
+                            colliding_sweeps[pid_collider] = set()
+                            colliding_sweeps[pid_collidee] = set()
+                            collision_pairs.append(pid_collider + '-' + pid_collidee)
+                        else:
+                            self.printfunc(f'DBG {pid_collider} is not CTRL_ENABLED')
+                    self.printfunc(f'DBG Collision pairs set: {collision_pairs}')
+                else:
+                    self.printfunc(f'DBG Collision pairs already set: {collision_pairs}')
+            return colliding_sweeps, collision_pairs
 
     def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -398,7 +441,7 @@ class PosSchedule(object):
                     if p in self.petal.power_supply_map[ps]:
                         count[ps] += 1
             if count['V1'] <= pc.max_targets_for_no_anneal and count['V2'] <= pc.max_targets_for_no_anneal:
-                if hasattr(self.petal, 'petal_debug') and self.petal.petal_debug.get('cancel_anneal_verbose') and should_anneal:
+                if hasattr(self.petal, 'petal_options') and self.petal.petal_options.get('cancel_anneal_verbose') and should_anneal:
                     self.printfunc(f'Annealing cancelled due to anticollision={anticollision} and number of targets={count} <= max of {pc.max_targets_for_no_anneal}')
                 should_anneal = False
 
@@ -511,8 +554,8 @@ class PosSchedule(object):
         '''
         frozen = set()
         SHOW_FROZEN_MT = None
-        if hasattr(self.petal, 'petal_debug'):
-            SHOW_FROZEN_MT = self.petal.petal_debug.get('show_frozen_mt')
+        if hasattr(self.petal, 'petal_options'):
+            SHOW_FROZEN_MT = self.petal.petal_options.get('show_frozen_mt')
         user_requested = set(self.get_requests(include_dummies=False))
         has_table = set(self.move_tables)
         check = has_table & user_requested # ignores expert tables
@@ -532,7 +575,7 @@ class PosSchedule(object):
             do_set_frozen = False
             if SHOW_FROZEN_MT and posid in SHOW_FROZEN_MT:
                 self.printfunc(f'posid={posid}, net_requested={net_requested}, net_scheduled={net_scheduled}, err={err[posid]}')
-            if self.petal.posmodels[posid].is_linphi:
+            if self.petal.posmodels[posid].is_linphi or self.petal.posmodels[posid].is_lintheta:
                 if err[posid][0] > pc.schedule_checking_numeric_angular_tol or\
                    err[posid][1] > pc.schedule_checking_angular_tol_zeno:
                        do_set_frozen = True

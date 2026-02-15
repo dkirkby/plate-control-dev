@@ -1,0 +1,26 @@
+name: Release Tarball
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload-tarball:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create tarball with git archive
+        run: |
+          git archive --format=tar.gz --prefix=${{ github.event.release.tag_name }}/ \
+            -o ${{ github.event.release.tag_name }}.tar.gz HEAD
+
+      - name: Upload to release
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            ${{ github.event.release.tag_name }}.tar.gz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

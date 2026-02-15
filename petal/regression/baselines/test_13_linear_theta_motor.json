@@ -1,0 +1,195 @@
+{
+  "timestamp": "2026-02-03T12:34:52.206525",
+  "signature": "4fa7a3203366bd10106bbfbb7eb31b80b69b1420f9741e100fca11a5e4a792ec",
+  "data": {
+    "linphi_comparison": {
+      "is_linphi": true,
+      "is_lintheta": false,
+      "zeno_motor_p": true,
+      "zeno_motor_t": false
+    },
+    "regular_comparison": {
+      "is_linphi": false,
+      "is_lintheta": false,
+      "zeno_motor_p": false,
+      "zeno_motor_t": false
+    },
+    "zeno_config": {
+      "is_linphi": false,
+      "is_lintheta": true,
+      "sz_ccw_t": 0.8,
+      "sz_cw_t": 0.7,
+      "zeno_motor_p": false,
+      "zeno_motor_t": true
+    },
+    "zeno_move_1": {
+      "final_state": {
+        "classified_as_retracted": false,
+        "is_enabled": true,
+        "posintTP": [
+          14.99884,
+          110.000017
+        ],
+        "poslocTP": [
+          144.753148,
+          108.914309
+        ]
+      },
+      "move_tables": {
+        "M03502": [
+          "move table for: M03502 (regression version)",
+          "  posid: M03502",
+          "  canid: 3502",
+          "  busid: can35",
+          "  zeno: T",
+          "  TCCWA: 0.8",
+          "  TCWA: 0.7",
+          "  nrows: 5",
+          "  total_time: 0.219111",
+          "  required: True",
+          "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+          "  -------------  -------------  ------------  ------------  ---------  ---------",
+          "              0          -1134        cruise        cruise      0.108          0",
+          "             68              0        cruise         creep      0.015          0",
+          "           -574              0        cruise         creep      0.043          0",
+          "              0            112        cruise        cruise      0.052          0",
+          "              0            -10        cruise         creep      0.001          0"
+        ]
+      },
+      "target": [
+        15.0,
+        110.0
+      ]
+    },
+    "zeno_move_sequence": [
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            0.0,
+            94.999992
+          ],
+          "poslocTP": [
+            129.754309,
+            93.914284
+          ]
+        },
+        "move_tables": {
+          "M03502": [
+            "move table for: M03502 (regression version)",
+            "  posid: M03502",
+            "  canid: 3502",
+            "  busid: can35",
+            "  zeno: T",
+            "  TCCWA: 0.8",
+            "  TCWA: 0.7",
+            "  nrows: 3",
+            "  total_time: 0.152611",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "            574              0        cruise         creep      0.043          0",
+            "            -68           1125        cruise        cruise      0.108          0",
+            "              0             15        cruise         creep      0.002          0"
+          ]
+        },
+        "target": [
+          0.0,
+          95.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            29.997679,
+            105.000008
+          ],
+          "poslocTP": [
+            159.751988,
+            103.914301
+          ]
+        },
+        "move_tables": {
+          "M03502": [
+            "move table for: M03502 (regression version)",
+            "  posid: M03502",
+            "  canid: 3502",
+            "  busid: can35",
+            "  zeno: T",
+            "  TCCWA: 0.8",
+            "  TCWA: 0.7",
+            "  nrows: 3",
+            "  total_time: 0.095556",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "             68              0        cruise         creep      0.015          0",
+            "          -1080           -614        cruise        cruise      0.079          0",
+            "              0            -10        cruise         creep      0.001          0"
+          ]
+        },
+        "target": [
+          30.0,
+          105.0
+        ]
+      },
+      {
+        "final_state": {
+          "classified_as_retracted": false,
+          "is_enabled": true,
+          "posintTP": [
+            -19.978691,
+            115.000025
+          ],
+          "poslocTP": [
+            109.775617,
+            113.914318
+          ]
+        },
+        "move_tables": {
+          "M03502": [
+            "move table for: M03502 (regression version)",
+            "  posid: M03502",
+            "  canid: 3502",
+            "  busid: can35",
+            "  zeno: T",
+            "  TCCWA: 0.8",
+            "  TCWA: 0.7",
+            "  nrows: 3",
+            "  total_time: 0.189222",
+            "  required: True",
+            "  motor_steps_T  motor_steps_P  speed_mode_T  speed_mode_P  move_time  postpause",
+            "  -------------  -------------  ------------  ------------  ---------  ---------",
+            "           1754              0        cruise         creep      0.109          0",
+            "            -68           -614        cruise        cruise      0.079          0",
+            "              0            -10        cruise         creep      0.001          0"
+          ]
+        },
+        "target": [
+          -20.0,
+          115.0
+        ]
+      }
+    ],
+    "zeno_move_table": {
+      "has_zeno_field": true,
+      "num_rows": 1,
+      "tccwa": 0.8,
+      "tcwa": 0.7,
+      "zeno_value": "T"
+    },
+    "zeno_short_move": {
+      "num_rows": 1,
+      "theta_move_data": {
+        "auto_cmd": "",
+        "dP_ideal": 1.0,
+        "dT_ideal": 1.0,
+        "postpause": 0,
+        "prepause": 0
+      }
+    }
+  }
+}

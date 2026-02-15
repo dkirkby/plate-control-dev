@@ -12,7 +12,17 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.9', '3.11', '3.13']
+        include:
+          # NumPy 1.x tests (1.25.2 doesn't support Python 3.13)
+          - python-version: '3.9'
+            numpy-version: '1.25.2'
+          - python-version: '3.11'
+            numpy-version: '1.25.2'
+          # NumPy 2.x tests (latest)
+          - python-version: '3.11'
+            numpy-version: ''  # latest
+          - python-version: '3.13'
+            numpy-version: ''  # latest
 
     steps:
     - name: Checkout repository
@@ -26,7 +36,12 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools numpy astropy pandas configobj Cython coverage matplotlib
+        if [ -n "${{ matrix.numpy-version }}" ]; then
+          pip install numpy==${{ matrix.numpy-version }}
+        else
+          pip install numpy
+        fi
+        pip install setuptools astropy pandas configobj Cython coverage matplotlib pytz
 
     - name: Compile Cython extensions
       run: |
@@ -42,8 +57,8 @@ jobs:
         cd petal
         python -m regression.regression_test --mode compare
 
-    - name: Run regression tests with coverage (Python 3.11 only)
-      if: matrix.python-version == '3.11'
+    - name: Run regression tests with coverage (Python 3.11 + NumPy 1.25.2)
+      if: matrix.python-version == '3.11' && matrix.numpy-version == '1.25.2'
       run: |
         cd petal
         coverage run -m regression.regression_test --mode compare
@@ -51,7 +66,7 @@ jobs:
         coverage html
 
     - name: Upload coverage report
-      if: matrix.python-version == '3.11'
+      if: matrix.python-version == '3.11' && matrix.numpy-version == '1.25.2'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
