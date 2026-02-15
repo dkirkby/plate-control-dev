@@ -104,6 +104,19 @@ coverage report
 coverage html   # generates htmlcov/index.html
 ```
 
+## Versioning
+
+This package does not use standard python versioning. Instead, there is a version string defined in the `petal_version` method of the `Petal` class of `petal/petal.py`. The format is `PETAL_vN.NN`.
+
+To start work on a new version, change this string then create a new section in `CHANGELOG.md` to document the work.
+
+To finalize and release a new version, tag the main branch after merging all changes, e.g.
+```
+git tag -a PETAL_v2.12 -m "...notes..."
+git push origin PETAL_v2.12
+```
+Next, [create a new release](https://github.com/dkirkby/plate-control-dev/releases/new) from the tag, which will generate a tarfile suitable for deployment (see below).
+
 ## Deployment
 
 The target platforms are the LBL test stands and the DESI online system at KPNO. Neither of these uses git or github for deployment (or wants to have the full history of commits).
