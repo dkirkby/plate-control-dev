@@ -104,6 +104,18 @@ coverage report
 coverage html   # generates htmlcov/index.html
 ```
 
+## Deployment
+
+The target platforms are the LBL test stands and the DESI online system at KPNO. Neither of these uses git or github for deployment (or wants to have the full history of commits).
+
+Instead, we deploy from github via a tarfile associated with a tagged release. This can then either be used directly, or committed to SVN (which is used for most online packages).
+
+There is a minor complication with sending code to svn from git via a tarfile: executable bits are not preserved, for two reasons. The first issue is that the github auto-generated source tarball does not preserve executable bits. The solution is to automatically create a suitable tarball using `git archive` with a github action triggered by publishing a release. The second issue is that `svn commit` does not propagate filesystem executable bits. Since the files with this bit set all match `pecs/*.py` we can propagate the bits manually using:
+```bash
+find pecs -name '*.py' -exec svn propset svn:executable ON {} +
+```
+Note that this should not be necessary in an existing SVN repo where these properties are already set.
+
 ## How It Works
 
 ### Coordinate Systems
