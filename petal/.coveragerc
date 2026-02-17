@@ -2,7 +2,7 @@
 source = .
 omit =
     petalcomm.py
-regression/*
+    regression/*
     setup.py
     */__pycache__/*
     */site-packages/*
