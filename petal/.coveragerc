@@ -2,8 +2,7 @@
 source = .
 omit =
     petalcomm.py
-    petsockcomm.py
-    regression/*
+regression/*
     setup.py
     */__pycache__/*
     */site-packages/*
