@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replace `np.any([list comprehension])` with `any(generator)` in pecs.py for NumPy 2.x compatibility.
+- Update stale comments referencing removed `np.int`/`np.float`/`np.bool` types in set_calibrations.py.
+
 ## [PETAL_v2.12] - 2026-02-14
 
 ### Added

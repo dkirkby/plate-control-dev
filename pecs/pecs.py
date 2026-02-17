@@ -295,7 +295,7 @@ class PECS:
                           return_coord='QS', drop_devid=False,
                           participating_petals=self.illuminated_ptl_roles)
                       .sort_values(by='DEVICE_ID').reset_index(drop=True))
-        if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
+        if any('P' in device_id for device_id in exppos['DEVICE_ID']):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
         centers = self.ptlm.get_centers(return_coord='QS', drop_devid=False,
@@ -324,7 +324,7 @@ class PECS:
             else:
                 this_meapos = pd.DataFrame(positions).rename(columns=
                                 {'id': 'DEVICE_ID'}).set_index('DEVICE_ID').sort_index()
-                if np.any(['P' in device_id for device_id in this_meapos.index]):
+                if any('P' in device_id for device_id in this_meapos.index):
                     self.print('Measured positions of positioners by FVC '
                                'are contaminated by fiducials.')
                 this_meapos.columns = this_meapos.columns.str.upper()  # clean up header to save
