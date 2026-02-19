@@ -123,6 +123,23 @@ The target platforms are the LBL test stands and the DESI online system at KPNO.
 
 Instead, we deploy from github via a tarfile associated with a tagged release. This can then either be used directly, or committed to SVN (which is used for most online packages).
 
+### Tarball Installation
+
+The tarball for each release (e.g. v2.12) has a URL like:
+```
+https://github.com/dkirkby/plate-control-dev/releases/download/PETAL_v2.12/PETAL_v2.12.tar.gz
+```
+If you are expanding this tarball into an existing SVN checkout, you will need to strip the top-level directory using, e.g.
+```
+tar zxf /tmp/PETAL_v2.12.tar.gz --strip-components=1
+```
+To view the changes between two versions, use e.g.
+```
+https://github.com/dkirkby/plate-control-dev/compare/PETAL_v2.11...PETAL_v2.12
+```
+
+### Executable Bits
+
 There is a minor complication with sending code to svn from git via a tarfile: executable bits are not preserved, for two reasons. The first issue is that the github auto-generated source tarball does not preserve executable bits. The solution is to automatically create a suitable tarball using `git archive` with a github action triggered by publishing a release. The second issue is that `svn commit` does not propagate filesystem executable bits. Since the files with this bit set all match `pecs/*.py` we can propagate the bits manually using:
 ```bash
 find pecs -name '*.py' -exec svn propset svn:executable ON {} +
